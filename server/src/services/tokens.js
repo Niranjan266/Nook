@@ -24,9 +24,12 @@ export const REFRESH_COOKIE = 'nook_rt';
  *
  * With COOKIE_DOMAIN set (app and API on subdomains of one domain) the cookie
  * is first-party, so `SameSite=Lax` is both sufficient and immune to the
- * third-party cookie blocking that Safari already does and Chrome is rolling
- * out. Without it we're forced into `SameSite=None`, which works today but is
- * exactly the thing browsers are removing — hence the recommendation.
+ * third-party cookie blocking that Safari and Firefox do by default.
+ *
+ * Without it we're forced into `SameSite=None`, which Chrome still largely
+ * accepts — Google abandoned the forced deprecation in 2024 — but Safari and
+ * Firefox drop. So this is not a future deadline, it is a present-day split:
+ * sessions survive on Chrome and quietly die on iPhone.
  */
 function cookieOptions() {
   const sameSite = env.cookieDomain ? 'lax' : isProd ? 'none' : 'lax';

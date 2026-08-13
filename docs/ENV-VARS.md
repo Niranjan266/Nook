@@ -215,7 +215,7 @@ The refresh cookie is what keeps you signed in across a page reload. With
 
 Leave it blank and the cookie becomes cross-site, forcing
 `SameSite=None` — which Safari's tracking prevention and Chrome's third-party
-cookie phase-out both discard. The symptom is nasty because it is intermittent:
+Firefox both discard by default. The symptom is nasty because it is partial:
 sign-in appears to work, then users are silently logged out on refresh, and only
 in some browsers.
 

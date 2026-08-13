@@ -24,7 +24,7 @@ You'll paste those values into the dashboards below, then delete the file. Nothi
 
 **Vercel cannot host the API.** Its functions are serverless — they start per request and stop. Socket.IO needs a connection held open the whole time the app is on screen. No setting changes that, which is why there are two hosts.
 
-**Both subdomains of `niranjand.in` is exactly right.** The session cookie is set on `.niranjand.in`, which makes it *first-party* for both — so Safari's tracking prevention and Chrome's third-party cookie removal leave it alone, and nobody gets signed out on reload. You get this for free by using two subdomains of a domain you already own.
+**Both subdomains of `niranjand.in` is exactly right.** The session cookie is set on `.niranjand.in`, which makes it *first-party* for both — so Safari's and Firefox's third-party cookie blocking leaves it alone, and nobody gets signed out on reload. You get this for free by using two subdomains of a domain you already own.
 
 Custom domains work on Render's **free** plan: two included, with automatic Let's Encrypt certificates. You only need one.
 

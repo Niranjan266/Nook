@@ -248,10 +248,14 @@ without cache.
 
 The leading dot is what makes the refresh cookie belong to the whole domain, so
 a cookie set by `nook-api.niranjand.in` counts as first-party to
-`nook.niranjand.in`. Without it the cookie is cross-site, which Safari's
-tracking prevention and Chrome's third-party cookie phase-out both discard —
-and the symptom is horrible: sign-in appears to work, then users are silently
-logged out on refresh, in some browsers only.
+`nook.niranjand.in`.
+
+Without it the cookie is cross-site, and **Safari and Firefox discard
+third-party cookies by default** — they have for years. Chrome is the lenient
+one here: Google abandoned the forced deprecation in 2024 and now asks users
+instead, so Chrome mostly still accepts them. That asymmetry is what makes this
+bug so unpleasant. It works perfectly on your machine, and an iPhone user tells
+you the app "keeps logging me out".
 
 ---
 

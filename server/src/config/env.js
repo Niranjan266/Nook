@@ -20,9 +20,14 @@ export const env = {
   /**
    * Set to `.yoursite.com` when the app and API are subdomains of one domain.
    * The refresh cookie then belongs to the whole site, which makes it
-   * first-party — so Safari's tracking prevention and Chrome's third-party
-   * cookie phase-out leave it alone. Without it the cookie is cross-site and
-   * users get silently signed out on refresh.
+   * first-party.
+   *
+   * That matters because Safari and Firefox block third-party cookies by
+   * default, and have for years. (Google abandoned Chrome's forced deprecation
+   * in 2024 — Chrome now asks the user instead — so Chrome is the lenient case,
+   * not the deadline.) Without this set, the cookie is cross-site and Safari
+   * and Firefox users are silently signed out on refresh while Chrome users
+   * are mostly fine, which is the worst kind of bug to be told about.
    */
   cookieDomain: process.env.COOKIE_DOMAIN || '',
 
