@@ -1,0 +1,63 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "//": [
+    "This file makes the deploy work when Vercel's Root Directory is left at the",
+    "repo root (the default). Without it the build fails with:",
+    "",
+    "    sh: line 1: tsc: command not found",
+    "    Error: Command \"npm run build\" exited with 127",
+    "",
+    "Why: at the repo root Vercel installs the root package.json, which has no",
+    "dependencies. It then runs `npm run build`, which forwards into client/ —",
+    "but client/node_modules was never installed, so tsc does not exist.",
+    "",
+    "So we install and build inside client/ explicitly, and point Vercel at",
+    "client/dist for the output.",
+    "",
+    "If you instead set Root Directory to `client` in project settings, Vercel",
+    "reads client/vercel.json and ignores this file. Both paths work."
+  ],
+
+  "buildCommand": "npm --prefix client install --no-audit --no-fund && npm --prefix client run build",
+  "installCommand": "echo 'Dependencies are installed by buildCommand inside client/'",
+  "outputDirectory": "client/dist",
+  "framework": null,
+
+  "rewrites": [
+    {
+      "source": "/((?!assets/|.*\\.[a-zA-Z0-9]+$).*)",
+      "destination": "/index.html"
+    }
+  ],
+
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(self), microphone=(self), geolocation=(), interest-cohort=()"
+        }
+      ]
+    }
+  ]
+}
