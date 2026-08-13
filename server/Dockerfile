@@ -11,9 +11,9 @@ WORKDIR /app
 # Copy manifests first so a code change doesn't invalidate the dependency layer.
 COPY package*.json ./
 
-# --omit=dev keeps the image small. Optional deps are wanted: sharp and the
-# Redis adapter both live there. mongodb-memory-server is also optional and
-# will simply be unused, since production always has a real MONGODB_URI.
+# --omit=dev keeps the image small. Optional deps are deliberately kept: sharp
+# (thumbnails + blurhash) and the Redis adapter both live there, and both are
+# feature-detected at boot — if an install fails the server still starts.
 RUN npm install --omit=dev --no-audit --no-fund
 
 COPY src ./src

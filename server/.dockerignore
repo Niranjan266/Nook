@@ -1,0 +1,26 @@
+# Keep the build context small and — more importantly — keep secrets and local
+# state out of the image. Anything listed here is invisible to `docker build`,
+# so it cannot be COPYed in by accident.
+
+node_modules
+npm-debug.log*
+
+# Secrets. These must arrive as runtime env vars from the host dashboard,
+# never baked into a layer where `docker history` can read them back out.
+.env
+.env.*
+*.pem
+
+# Local database and uploads. Production uses Turso and Cloudinary; shipping a
+# stale nook.db would silently shadow them on first boot.
+data/
+*.db
+*.db-shm
+*.db-wal
+uploads/
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

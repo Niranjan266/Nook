@@ -19,6 +19,15 @@ webpush.setVapidDetails(env.vapid.subject, keys.publicKey, keys.privateKey);
 
 export const publicVapidKey = () => keys.publicKey;
 
+/**
+ * "configured" or "ephemeral". Worth surfacing on /api/health: an ephemeral
+ * keypair looks perfectly healthy until the service restarts, at which point
+ * every existing subscription is silently invalid — browsers bind a
+ * subscription to the public key it was created with.
+ */
+export const pushProvider = () =>
+  env.vapid.publicKey && env.vapid.privateKey ? 'configured' : 'ephemeral';
+
 export async function notify(userId, payload) {
   const subs = await pushSubscriptionsFor(userId);
   if (!subs.length) return 0;

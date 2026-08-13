@@ -11,6 +11,7 @@ import { usingTurso, closeDb } from './db/index.js';
 import { notFound, errorHandler } from './middleware/error.js';
 import { UPLOAD_DIR, mediaProvider } from './services/media.js';
 import { mailProvider } from './services/mail.js';
+import { pushProvider } from './services/push.js';
 import { attachSockets } from './sockets/index.js';
 
 import { startScheduler } from './services/scheduler.js';
@@ -60,12 +61,21 @@ if (!isProd) app.use(morgan('  :method :url :status :response-time[0]ms'));
 
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '30d' }));
 
+/**
+ * Deployment self-check. Every third-party service in Nook degrades quietly
+ * rather than crashing, which is right for local development and dangerous in
+ * production: a missing Turso token doesn't error, it just writes to a
+ * container disk that gets wiped on the next deploy. So health reports which
+ * implementation actually won, not merely that the process is up.
+ */
 app.get('/api/health', (req, res) =>
   res.json({
     ok: true,
     app: 'nook',
+    db: usingTurso() ? 'turso' : 'sqlite-file',
     media: mediaProvider(),
     mail: mailProvider(),
+    push: pushProvider(),
     time: new Date().toISOString(),
   })
 );
