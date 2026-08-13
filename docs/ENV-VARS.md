@@ -274,17 +274,41 @@ it is what the "Open Nook" button in the welcome email points at. Point it at
 the API by mistake and the button opens a JSON 404. If you leave it empty it
 falls back to the first `CLIENT_ORIGIN`, which is correct in this setup.
 
-**Setting up Brevo:**
+**Setting up Brevo — the two-minute version:**
 
 1. [brevo.com](https://www.brevo.com) → sign up (free tier is 300 emails/day)
-2. **Senders, Domains & Dedicated IPs → Domains** → add `niranjand.in`
-3. Add the DKIM, SPF and DMARC records Brevo gives you at **BigRock**
-4. Wait for verification, then **SMTP & API → API Keys** → create a v3 key
-5. Put the key in Render (never in the repo, never in Vercel)
+2. **Senders, Domains & Dedicated IPs → Senders** → add `no-reply@niranjand.in`
+3. Click the link in the confirmation email Brevo sends you
+4. **SMTP & API → API Keys** → create a v3 key
+5. Put the key in Render — never in the repo, never in Vercel
 
-Skipping domain verification is the usual reason "it worked in the dashboard
-but not from the app": Brevo accepts the API call and then silently refuses to
-deliver from an unverified sender.
+That is genuinely all that is required to start sending. **No DNS records
+needed.** Verifying a single sender address is enough; the API will refuse to
+deliver from an address you have not confirmed, which is the usual reason mail
+"works in the dashboard but not from the app".
+
+**Later, when you care about deliverability**, authenticate the whole domain:
+**Domains** → add `niranjand.in` → add the DKIM, SPF and DMARC records at
+BigRock. That stops Gmail appending a small "via brevo" note next to your
+sender name and keeps you out of spam folders as volume grows. Worth doing
+before you have real users; not worth blocking on today.
+
+### Why not Gmail SMTP?
+
+It cannot work here, and the failure is silent enough to waste an afternoon:
+**Render blocks outbound traffic on ports 25, 465 and 587 for free instances**,
+so `smtp.gmail.com` simply times out. Port 25 is blocked on every Render plan;
+465 and 587 open up only on paid instances.
+
+Even on a paid instance it is the wrong tool. Sending as
+`no-reply@niranjand.in` through Google's servers makes Gmail rewrite the
+header, so Outlook recipients see *"yourname@gmail.com on behalf of
+no-reply@niranjand.in"*. Add a 500/day cap and the fact that it is a personal
+mailbox rather than a transactional service, and an API key is both less setup
+and less risk.
+
+Any HTTPS email API works on Render — Brevo, [Resend](https://resend.com),
+MailerSend, Postmark. Only SMTP is blocked, because it is what spammers use.
 
 Omit `BREVO_API_KEY` entirely and every email prints to the server log instead.
 Nothing breaks — you just read the log to recover an account. `/api/health`
