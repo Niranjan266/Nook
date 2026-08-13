@@ -7,14 +7,31 @@
  * receives is byte-for-byte the same.
  */
 
+import { nicknamesFor } from './nicknames.js';
+
 const iso = (value) => (value instanceof Date ? value.toISOString() : value || null);
 
-export function serializeUser(u) {
+/**
+ * `viewerId` is what makes the nickname work. Every surface that shows a
+ * person's name goes through here, so applying the viewer's private rename at
+ * this single point means it lands everywhere at once and cannot drift.
+ *
+ * `displayName` becomes the nickname; `realName` carries the untouched one so
+ * the UI can show "buddy · Niranjan" where that is useful, and `nickname` says
+ * explicitly whether a rename is in play. Sending all three costs a few bytes
+ * and saves the client from guessing.
+ */
+export function serializeUser(u, viewerId) {
   if (!u) return null;
+  const id = String(u._id || u.id);
+  const nickname = nicknamesFor(viewerId)[id] || '';
   return {
-    id: String(u._id || u.id),
+    id,
     username: u.username,
-    displayName: u.displayName,
+    nookId: u.nookId || '',
+    displayName: nickname || u.displayName,
+    realName: u.displayName,
+    nickname,
     avatarUrl: u.avatarUrl || '',
     about: u.about || '',
     accent: u.accent || 'terracotta',
@@ -39,7 +56,7 @@ export function serializeMessage(m, viewerId) {
     id,
     clientId: m.clientId || '',
     conversationId: String(m.conversation?._id || m.conversation),
-    sender: m.sender?.username ? serializeUser(m.sender) : { id: senderId },
+    sender: m.sender?.username ? serializeUser(m.sender, viewer) : { id: senderId },
     type: m.type,
     body: m.deletedForAll || deletedForMe ? '' : m.body || '',
     media:
@@ -81,7 +98,10 @@ export function serializeMessage(m, viewerId) {
             body: m.replyTo.deletedForAll ? '' : m.replyTo.body,
             type: m.replyTo.type,
             senderId: String(m.replyTo.sender?._id || m.replyTo.sender),
-            senderName: m.replyTo.sender?.displayName || '',
+            senderName:
+              nicknamesFor(viewer)[String(m.replyTo.sender?._id || m.replyTo.sender)] ||
+              m.replyTo.sender?.displayName ||
+              '',
             thumbUrl: m.replyTo.media?.thumbUrl || m.replyTo.media?.url || '',
           }
         : { id: String(m.replyTo) }
@@ -96,7 +116,15 @@ export function serializeMessage(m, viewerId) {
     deletedForMe,
     editedAt: iso(m.editedAt),
     viewOnce: viewOnce.enabled
-      ? { enabled: true, seen: seenByViewer, burnt, viewers: (viewOnce.viewedBy || []).map(String) }
+      ? {
+          enabled: true,
+          seen: seenByViewer,
+          burnt,
+          // How long the viewer gets. 0 means "until they close it" — the
+          // sender chose no countdown, not a zero-second one.
+          seconds: Number.isFinite(m.viewSeconds) ? m.viewSeconds : 10,
+          viewers: (viewOnce.viewedBy || []).map(String),
+        }
       : null,
     call: m.call?.kind ? { kind: m.call.kind, status: m.call.status, duration: m.call.duration || 0 } : null,
     expiresAt: iso(m.expiresAt),
@@ -114,13 +142,22 @@ export function serializeConversation(c, viewerId) {
   return {
     id: String(c._id || c.id),
     type: c.type,
-    name: c.type === 'group' ? c.name : partner?.displayName || 'Someone',
+    // A direct chat is named after the other person, so the viewer's private
+    // rename has to win here too — otherwise the header and the chat list
+    // would keep showing the real name while every message bubble showed the
+    // nickname.
+    name:
+      c.type === 'group'
+        ? c.name
+        : partner
+          ? nicknamesFor(viewer)[String(partner._id || partner.id)] || partner.displayName || 'Someone'
+          : 'Someone',
     avatarUrl: c.type === 'group' ? c.avatarUrl || '' : partner?.avatarUrl || '',
     description: c.description || '',
     inviteCode: c.inviteCode || '',
-    partner: partner?.username ? serializeUser(partner) : null,
+    partner: partner?.username ? serializeUser(partner, viewer) : null,
     members: (c.members || []).map((m) => ({
-      user: m.user?.username ? serializeUser(m.user) : { id: String(m.user) },
+      user: m.user?.username ? serializeUser(m.user, viewer) : { id: String(m.user) },
       role: m.role,
       joinedAt: iso(m.joinedAt),
     })),

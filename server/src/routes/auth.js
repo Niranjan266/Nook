@@ -49,6 +49,7 @@ async function me(user) {
   return {
     id: user.id,
     username: user.username,
+    nookId: user.nookId || '',
     displayName: user.displayName,
     email: user.email,
     emailVerified: user.emailVerified,

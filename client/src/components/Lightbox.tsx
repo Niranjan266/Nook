@@ -32,6 +32,16 @@ export default function Lightbox() {
 
   const isSnap = Boolean(message?.viewOnce?.enabled);
 
+  /**
+   * The sender chose this when they took the shot. `0` means they chose no
+   * countdown at all, so the viewer closes it themselves — which is why this
+   * is a `??` and not a `||`: zero is a real answer, not a missing one.
+   * Older snaps sent before the timer existed have no value and get the 10
+   * seconds that used to be hardcoded here.
+   */
+  const snapSeconds = message?.viewOnce?.seconds ?? 10;
+  const counts = isSnap && snapSeconds > 0;
+
   return (
     <AnimatePresence>
       {message && message.media && (
@@ -44,12 +54,12 @@ export default function Lightbox() {
           aria-modal="true"
           aria-label={isSnap ? 'Snap' : 'Media'}
         >
-          {isSnap && (
+          {counts && (
             <motion.div
               className="snap-timer"
               initial={{ scaleX: 1 }}
               animate={{ scaleX: 0 }}
-              transition={{ duration: 10, ease: 'linear' }}
+              transition={{ duration: snapSeconds, ease: 'linear' }}
               onAnimationComplete={() => setLightbox(null)}
             />
           )}
@@ -93,8 +103,11 @@ export default function Lightbox() {
 
           {isSnap ? (
             <p className="hint">
-              <IconWarning size={14} style={{ verticalAlign: -2 }} /> This closes in a few seconds and cannot be
-              reopened. Nook can’t stop a screenshot — the sender just gets told one may have happened.
+              <IconWarning size={14} style={{ verticalAlign: -2 }} />{' '}
+              {counts
+                ? `This closes in ${snapSeconds} seconds and cannot be reopened.`
+                : 'Close this when you’re done — it cannot be reopened.'}{' '}
+              Nook can’t stop a screenshot — the sender just gets told one may have happened.
             </p>
           ) : (
             message.body && (

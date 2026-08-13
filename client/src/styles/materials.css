@@ -356,3 +356,19 @@ textarea.groove {
     opacity: 0.95;
   }
 }
+
+/* A code you read character by character, so: mono, spaced, and pressed into
+   the clay like a field rather than floating like a label. */
+.nook-id {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 14px;
+  background: var(--clay-sunk);
+  border-radius: var(--r-clay-sm);
+  box-shadow: var(--clay-in);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  user-select: all; /* one click selects the whole code */
+}

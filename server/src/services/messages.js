@@ -75,6 +75,7 @@ export async function createMessage({ conversationId, senderId, payload }) {
     mentions: payload.mentions || [],
     clientId: payload.clientId || '',
     viewOnce: Boolean(payload.viewOnce),
+    viewSeconds: Number.isFinite(payload.viewSeconds) ? payload.viewSeconds : 10,
     threadRoot: threadRoot?.id || null,
     transcript: payload.transcript || '',
     scheduledFor: isScheduled ? scheduledFor : null,

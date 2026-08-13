@@ -26,6 +26,9 @@ export function NewChatSheet() {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Person[]>([]);
   const [contacts, setContacts] = useState<Person[]>([]);
+  /** The server tells us whether the query was Nook-ID shaped, so the empty
+      state can say something true rather than guessing. */
+  const [wasNookId, setWasNookId] = useState(false);
   const open = sheet === 'new-chat';
 
   useEffect(() => {
@@ -34,10 +37,17 @@ export function NewChatSheet() {
   }, [open]);
 
   useEffect(() => {
-    if (q.trim().length < 2) return setResults([]);
+    if (q.trim().length < 2) {
+      setResults([]);
+      setWasNookId(false);
+      return;
+    }
     const t = setTimeout(() => {
-      get<{ users: Person[] }>(`/users/search?q=${encodeURIComponent(q)}`)
-        .then((r) => setResults(r.users))
+      get<{ users: Person[]; exactNookId?: boolean }>(`/users/search?q=${encodeURIComponent(q)}`)
+        .then((r) => {
+          setResults(r.users);
+          setWasNookId(Boolean(r.exactNookId));
+        })
         .catch(() => {});
     }, 280);
     return () => clearTimeout(t);
@@ -59,16 +69,19 @@ export function NewChatSheet() {
   return (
     <Sheet open={open} onClose={closeSheet} title="New conversation">
       <label className="field">
-        <span className="sr-only">Find someone by username</span>
+        <span className="sr-only">Find someone by username or Nook ID</span>
         <input
           className="groove"
-          placeholder="Find someone by username"
+          placeholder="Username or Nook ID"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoCapitalize="none"
           spellCheck={false}
         />
       </label>
+      <p className="tiny faint" style={{ padding: '4px 4px 0' }}>
+        A Nook ID looks like <code>nook-7f3k2q</code>. Yours is in Settings.
+      </p>
 
       <button className="list-row" onClick={() => openSheet('new-group')}>
         <span className="clay-round" style={{ width: 40, height: 40, boxShadow: 'none', background: 'var(--clay-sunk)' }}>
@@ -87,15 +100,22 @@ export function NewChatSheet() {
             <Avatar name={p.displayName} src={p.avatarUrl} id={p.id} accent={p.accent} size={42} online={p.online} showDot />
             <span className="grow">
               <span className="list-row-label">{p.displayName}</span>
-              <span className="list-row-sub">@{p.username}</span>
+              <span className="list-row-sub">
+                @{p.username}
+                {p.nookId ? ` · ${p.nookId}` : ''}
+              </span>
             </span>
           </button>
         ))}
         {shown.length === 0 && (
           <p className="small muted" style={{ padding: '10px 4px' }}>
-            {q.trim().length >= 2
-              ? 'Nobody by that name. Usernames are exact — no phone numbers involved.'
-              : 'No contacts yet. Search for a username to start.'}
+            {q.trim().length < 2
+              ? 'No contacts yet. Search for a username or Nook ID to start.'
+              : wasNookId
+                ? // Saying "no such name" when they pasted a code would send
+                  // them hunting for a typo in the name instead of the code.
+                  'No account has that Nook ID. Codes can be regenerated — ask them for a fresh one.'
+                : 'Nobody by that name. Usernames are exact — no phone numbers involved.'}
           </p>
         )}
       </div>

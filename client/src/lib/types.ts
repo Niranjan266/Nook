@@ -4,7 +4,18 @@ export type Visibility = 'everyone' | 'contacts' | 'nobody';
 export interface Person {
   id: string;
   username: string;
+  /** Short shareable code, e.g. `nook-7f3k2q`. Searchable; can be regenerated. */
+  nookId?: string;
+  /**
+   * What *you* should call this person — already resolved by the server, so
+   * rendering `displayName` anywhere is automatically nickname-aware and no
+   * call site has to know nicknames exist.
+   */
   displayName: string;
+  /** Their own name, before your rename. Equal to displayName when unrenamed. */
+  realName?: string;
+  /** Your private rename, or '' if you haven't set one. */
+  nickname?: string;
   avatarUrl: string;
   about?: string;
   accent: Accent;
@@ -153,7 +164,14 @@ export interface Message {
   deletedForAll: boolean;
   deletedForMe: boolean;
   editedAt: string | null;
-  viewOnce: { enabled: boolean; seen: boolean; burnt: boolean; viewers: string[] } | null;
+  viewOnce: {
+    enabled: boolean;
+    seen: boolean;
+    burnt: boolean;
+    /** Seconds the viewer gets. 0 = they close it themselves. */
+    seconds?: number;
+    viewers: string[];
+  } | null;
   call: { kind: 'audio' | 'video'; status: string; duration: number } | null;
   expiresAt: string | null;
   createdAt: string;

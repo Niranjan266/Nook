@@ -132,6 +132,14 @@ attachSockets(io);
 
 await migrate();
 
+// Accounts created before Nook IDs existed have an empty one. Cheap no-op
+// once everybody has been given a code.
+{
+  const { backfillNookIds } = await import('./db/users.js');
+  const filled = await backfillNookIds();
+  if (filled) console.log(`  db        issued Nook IDs to ${filled} existing account(s)`);
+}
+
 /**
  * An empty database has nothing to look at, so development fills it with demo
  * accounts. Those accounts have a published password ("nookdemo1"), so seeding

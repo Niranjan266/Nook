@@ -361,3 +361,24 @@ CREATE TABLE IF NOT EXISTS guest_links (
   revoked         INTEGER NOT NULL DEFAULT 0,
   created_at      INTEGER NOT NULL
 );
+
+-- ── additive migrations ────────────────────────────────────────────────────
+--
+-- SQLite has no `ADD COLUMN IF NOT EXISTS`. Re-running these on a database
+-- that already has the column raises "duplicate column name", which
+-- migrate.js treats as "already applied" and skips. That is the whole
+-- mechanism — keep new columns here, never edit the CREATE TABLE above, or
+-- existing databases will silently miss the change.
+
+-- A short, shareable code (nook-7f3k2q). Distinct from `username`: the
+-- username is a permanent handle, this can be regenerated if it leaks.
+ALTER TABLE users ADD COLUMN nook_id TEXT NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_nook_id ON users (nook_id) WHERE nook_id <> '';
+
+-- What *this* user calls that contact. Private to the owner of the row, and
+-- applied at serialisation time so it shows everywhere they see the person.
+ALTER TABLE user_contacts ADD COLUMN nickname TEXT NOT NULL DEFAULT '';
+
+-- How long a snap stays open, in seconds. 0 means the viewer closes it.
+-- Only meaningful when view_once = 1.
+ALTER TABLE messages ADD COLUMN view_seconds INTEGER NOT NULL DEFAULT 10;

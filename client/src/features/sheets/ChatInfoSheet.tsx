@@ -4,7 +4,7 @@ import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
 import Sheet from '@/components/Sheet';
 import Avatar from '@/components/Avatar';
-import { post, del } from '@/lib/api';
+import { post, put, del } from '@/lib/api';
 import { disappearLabel, lastSeenLabel } from '@/lib/format';
 import { SOUNDS, previewSound } from '@/lib/sounds';
 import { exportConversation } from '@/lib/export';
@@ -22,6 +22,7 @@ import {
   IconLock,
   IconTrash,
   IconBlock,
+  IconTag,
   IconUsers,
   IconStar,
   IconPlus,
@@ -33,10 +34,14 @@ const TIMERS = [0, 3600, 86400, 604800, 2592000];
 export default function ChatInfoSheet() {
   const { sheet, closeSheet, openSheet, toast } = useUi();
   const conversation = useChat(selectActive);
-  const { updatePrefs, setDisappearing, removeMember, setRole, presence, setPace } = useChat();
+  const { updatePrefs, setDisappearing, removeMember, setRole, presence, setPace, loadConversations } =
+    useChat();
   const me = useAuth((s) => s.me);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [nickDraft, setNickDraft] = useState('');
+  const [savingNick, setSavingNick] = useState(false);
 
   const open = sheet === 'chat-info';
   if (!conversation || !me) return null;
@@ -48,6 +53,29 @@ export default function ChatInfoSheet() {
 
   const toggle = (key: 'muted' | 'pinned' | 'archived' | 'locked') =>
     updatePrefs(conversation.id, { [key]: !conversation[key] });
+
+  /**
+   * The nickname lives on the server and is applied when anything is
+   * serialised, so the honest way to refresh the UI is to re-fetch rather than
+   * patch a name into a dozen cached places and hope none were missed.
+   */
+  const saveNickname = async () => {
+    if (!partner) return;
+    const next = nickDraft.trim();
+    setSavingNick(true);
+    try {
+      if (next) await put(`/users/${partner.id}/nickname`, { nickname: next });
+      else await del(`/users/${partner.id}/nickname`);
+
+      await loadConversations();
+      setRenaming(false);
+      toast(next ? `You’ll see them as ${next}` : 'Back to their real name');
+    } catch (err: any) {
+      toast(err?.message || 'Could not save that nickname.', true);
+    } finally {
+      setSavingNick(false);
+    }
+  };
 
   return (
     <Sheet open={open} onClose={closeSheet} title={isGroup ? 'Group' : 'Contact'}>
@@ -65,9 +93,17 @@ export default function ChatInfoSheet() {
           {isGroup
             ? conversation.description || `${conversation.members.length} people`
             : partner
-              ? `@${partner.username}`
+              ? `@${partner.username}${partner.nookId ? ` · ${partner.nookId}` : ''}`
               : ''}
         </p>
+        {/* When you've renamed someone, say so plainly and show who they
+            actually are. Otherwise a nickname set months ago becomes a small
+            mystery, and nothing else in the app would tell you. */}
+        {!isGroup && partner?.nickname && (
+          <p className="tiny faint" style={{ textAlign: 'center' }}>
+            You call them {partner.nickname} · they’re {partner.realName}
+          </p>
+        )}
         {!isGroup && partner && (
           <p className="tiny faint">
             {partnerPresence?.online ? 'Online now' : partnerPresence?.lastSeen ? `Last seen ${lastSeenLabel(partnerPresence.lastSeen)}` : ''}
@@ -75,6 +111,57 @@ export default function ChatInfoSheet() {
         )}
         {!isGroup && partner?.about && <p className="small" style={{ textAlign: 'center' }}>{partner.about}</p>}
       </div>
+
+      {!isGroup && partner && (
+        <div className="sheet-section">
+          <span className="eyebrow">What you call them</span>
+          {renaming ? (
+            <>
+              <input
+                className="groove"
+                aria-label="Nickname"
+                value={nickDraft}
+                onChange={(e) => setNickDraft(e.target.value)}
+                placeholder={partner.realName || partner.displayName}
+                maxLength={40}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveNickname();
+                  if (e.key === 'Escape') setRenaming(false);
+                }}
+              />
+              <p className="tiny faint" style={{ margin: '4px 0 6px' }}>
+                Only you see this. {partner.realName || partner.displayName} is never told, and nobody
+                in a shared group sees it either. Leave it empty to go back to their real name.
+              </p>
+              <div className="row" style={{ gap: 6 }}>
+                <button className="clay-btn grow" onClick={() => setRenaming(false)}>
+                  Cancel
+                </button>
+                <button className="slab grow" onClick={saveNickname} disabled={savingNick}>
+                  {savingNick ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              className="list-row"
+              onClick={() => {
+                setNickDraft(partner.nickname || '');
+                setRenaming(true);
+              }}
+            >
+              <IconTag size={19} />
+              <span className="grow">
+                <span className="list-row-label">
+                  {partner.nickname ? `Rename — currently “${partner.nickname}”` : 'Give them a nickname'}
+                </span>
+                <span className="list-row-sub">Just for you, everywhere you see them</span>
+              </span>
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="sheet-section">
         <button className="list-row" onClick={() => openSheet('room')}>

@@ -22,6 +22,8 @@ import {
   IconReply,
   IconFile,
   IconMic,
+  IconCopy,
+  IconRefresh,
   IconFolder,
   IconSchedule,
 } from '@/components/Icon';
@@ -42,6 +44,8 @@ export default function SettingsSheet() {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(me?.displayName || '');
   const [about, setAbout] = useState(me?.about || '');
+  const [copied, setCopied] = useState(false);
+  const [rolling, setRolling] = useState(false);
 
   const open = sheet === 'settings';
   if (!me) return null;
@@ -69,6 +73,34 @@ export default function SettingsSheet() {
       });
     } catch {
       toast('Could not save quiet hours.', true);
+    }
+  };
+
+  const copyNookId = async () => {
+    if (!me.nookId) return;
+    try {
+      await navigator.clipboard.writeText(me.nookId);
+    } catch {
+      // Clipboard access needs a secure context and, in some browsers, a
+      // permission the user may have denied. Selecting the text is a fair
+      // consolation prize; failing silently is not.
+      toast('Could not copy — select the code and copy it manually.', true);
+      return;
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  const regenerateNookId = async () => {
+    setRolling(true);
+    try {
+      const { nookId } = await post<{ nookId: string }>('/users/me/nook-id');
+      setMe({ ...me, nookId });
+      toast('New Nook ID. The old one no longer finds you.');
+    } catch {
+      toast('Could not make a new Nook ID.', true);
+    } finally {
+      setRolling(false);
     }
   };
 
@@ -136,10 +168,37 @@ export default function SettingsSheet() {
         ) : (
           <button className="stack" style={{ alignItems: 'center', gap: 2 }} onClick={() => setEditingName(true)}>
             <h3>{me.displayName}</h3>
-            <span className="small muted">@{me.username}</span>
+            <span className="small muted">
+              @{me.username}
+              {me.nookId ? ` · ${me.nookId}` : ''}
+            </span>
             <span className="tiny faint">{me.about || 'Add something about you'}</span>
           </button>
         )}
+      </div>
+
+      <div className="sheet-section">
+        <span className="eyebrow">Your Nook ID</span>
+        <p className="tiny faint" style={{ marginBottom: 6 }}>
+          Share this instead of your username. Anyone with it can find you — and if you’d rather they
+          couldn’t, make a new one. Your username never changes.
+        </p>
+        <div className="row" style={{ gap: 6 }}>
+          <code className="nook-id grow">{me.nookId || '—'}</code>
+          <button className="clay-btn" onClick={copyNookId} aria-label="Copy your Nook ID">
+            {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+        <button
+          className="clay-btn"
+          style={{ marginTop: 6 }}
+          onClick={regenerateNookId}
+          disabled={rolling}
+        >
+          <IconRefresh size={16} />
+          {rolling ? 'Making a new one…' : 'Make a new Nook ID'}
+        </button>
       </div>
 
       <div className="sheet-section">

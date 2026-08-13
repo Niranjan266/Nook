@@ -6,23 +6,35 @@ import { httpError } from '../middleware/error.js';
 import { publicQuietHours } from '../services/quietHours.js';
 import { emitToUser } from '../sockets/hub.js';
 import { notify } from '../services/push.js';
+import { warmNicknames } from '../lib/nicknames.js';
 
 const router = Router();
 router.use(requireAuth);
 
-const publicUser = (u, extra = {}) => ({
-  id: u.id,
-  username: u.username,
-  displayName: u.displayName,
-  avatarUrl: u.avatarUrl,
-  about: u.about,
-  accent: u.accent,
-  online: u.online,
-  lastSeen: u.lastSeen,
-  ...extra,
-});
+/**
+ * `nicks` is the viewer's private rename map. Passing it here keeps these
+ * responses consistent with everything `serialize.js` produces — a person you
+ * have renamed reads the same in search results as in the chat header.
+ */
+const publicUser = (u, extra = {}, nicks = {}) => {
+  const nickname = nicks[u.id] || '';
+  return {
+    id: u.id,
+    username: u.username,
+    nookId: u.nookId || '',
+    displayName: nickname || u.displayName,
+    realName: u.displayName,
+    nickname,
+    avatarUrl: u.avatarUrl,
+    about: u.about,
+    accent: u.accent,
+    online: u.online,
+    lastSeen: u.lastSeen,
+    ...extra,
+  };
+};
 
-/* ── search people by username / display name ─────────────────────────────── */
+/* ── search people by username, display name or Nook ID ───────────────────── */
 
 router.get(
   '/search',
@@ -30,15 +42,32 @@ router.get(
     const q = String(req.query.q || '').trim();
     if (q.length < 2) return res.json({ users: [] });
 
-    const [blocked, contacts] = await Promise.all([
+    const [blocked, contacts, nicks] = await Promise.all([
       U.blockedIds(req.user.id),
       U.contactIds(req.user.id),
+      U.nicknameMap(req.user.id),
     ]);
 
     const users = await U.searchUsers({ query: q, excludeId: req.user.id, excludeIds: blocked });
     res.json({
-      users: users.map((u) => publicUser(u, { isContact: contacts.includes(u.id) })),
+      users: users.map((u) => publicUser(u, { isContact: contacts.includes(u.id) }, nicks)),
+      // Lets the client say "that's a Nook ID and nobody has it" rather than
+      // the vaguer "no results", which reads like a typo in your own code.
+      exactNookId: U.looksLikeNookId(q),
     });
+  })
+);
+
+/* ── your own Nook ID ─────────────────────────────────────────────────────── */
+
+router.post(
+  '/me/nook-id',
+  asyncRoute(async (req, res) => {
+    // Regenerating is the whole reason this is separate from the username:
+    // if you have handed your code to the wrong person, you can burn it
+    // without changing the handle your friends know you by.
+    const nookId = await U.claimNookId(req.user.id);
+    res.json({ nookId });
   })
 );
 
@@ -187,8 +216,48 @@ router.get(
   '/',
   asyncRoute(async (req, res) => {
     const ids = await U.contactIds(req.user.id);
-    const contacts = await U.findUsersByIds(ids);
-    res.json({ contacts: contacts.map((u) => publicUser(u)) });
+    const [contacts, nicks] = await Promise.all([U.findUsersByIds(ids), U.nicknameMap(req.user.id)]);
+    res.json({ contacts: contacts.map((u) => publicUser(u, {}, nicks)) });
+  })
+);
+
+/* ── nicknames — what you call someone, private to you ────────────────────── */
+
+router.put(
+  '/:id/nickname',
+  asyncRoute(async (req, res) => {
+    const { nickname } = z
+      .object({ nickname: z.string().trim().max(40, 'Nicknames max out at 40 characters.') })
+      .parse(req.body);
+
+    if (req.params.id === req.user.id) throw httpError(400, 'Change your own name in Settings.');
+    const person = await U.findUserById(req.params.id);
+    if (!person) throw httpError(404, 'No such person.');
+
+    const saved = nickname
+      ? await U.setNickname(req.user.id, person.id, nickname)
+      : (await U.clearNickname(req.user.id, person.id), '');
+
+    // The serialisers read this map synchronously, so it must be refreshed
+    // before the next response is built — otherwise the rename would appear
+    // only after a reconnect.
+    await warmNicknames(req.user.id);
+
+    // Deliberately only to this viewer's own devices. The person renamed must
+    // never learn about it, and nobody else in a shared group should either.
+    emitToUser(req.user.id, 'nickname:update', { userId: person.id, nickname: saved });
+
+    res.json({ userId: person.id, nickname: saved, realName: person.displayName });
+  })
+);
+
+router.delete(
+  '/:id/nickname',
+  asyncRoute(async (req, res) => {
+    await U.clearNickname(req.user.id, req.params.id);
+    await warmNicknames(req.user.id);
+    emitToUser(req.user.id, 'nickname:update', { userId: req.params.id, nickname: '' });
+    res.json({ ok: true });
   })
 );
 

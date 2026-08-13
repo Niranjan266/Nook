@@ -51,26 +51,46 @@ function splitStatements(sql) {
   return statements.filter((s) => s.replace(/--.*$/gm, '').trim().length > 1);
 }
 
+/**
+ * Errors that mean "this statement has already been applied".
+ *
+ * `CREATE ... IF NOT EXISTS` handles most of it, but SQLite has no
+ * `ADD COLUMN IF NOT EXISTS`. Adding a column to a table that already has it
+ * raises "duplicate column name: x" — which is not a failure, it is the
+ * migration being run a second time. Without this the server would boot once
+ * and then refuse to start ever again, which is a spectacularly bad way to
+ * find out you shipped a schema change.
+ */
+const ALREADY_APPLIED = [
+  /already exists/i,
+  /duplicate column name/i,
+];
+
 export async function migrate() {
   const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   const statements = splitStatements(sql);
 
-  let created = 0;
+  let applied = 0;
+  let skipped = 0;
+
   for (const statement of statements) {
     try {
       await db().execute(statement);
-      created += 1;
+      applied += 1;
     } catch (err) {
-      // A pre-existing FTS table can report "already exists" in ways the
-      // IF NOT EXISTS guard doesn't cover on some libSQL versions.
-      if (/already exists/i.test(err.message)) continue;
+      if (ALREADY_APPLIED.some((re) => re.test(err.message))) {
+        skipped += 1;
+        continue;
+      }
       console.error('\n  db        migration failed on:\n');
       console.error(statement.split('\n').slice(0, 3).join('\n'));
       throw err;
     }
   }
 
-  console.log(`  db        schema ready (${created} statements) → ${usingTurso() ? 'Turso' : 'local file'}`);
+  const where = usingTurso() ? 'Turso' : 'local file';
+  const note = skipped ? `${applied} applied, ${skipped} already present` : `${applied} statements`;
+  console.log(`  db        schema ready (${note}) → ${where}`);
 }
 
 /**

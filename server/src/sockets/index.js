@@ -4,6 +4,7 @@ import * as C from '../db/conversations.js';
 import * as M from '../db/messages.js';
 import * as Calls from '../db/misc.js';
 import { serializeMessage } from '../lib/serialize.js';
+import { warmNicknames } from '../lib/nicknames.js';
 import { createMessage, markRead } from '../services/messages.js';
 import { notify } from '../services/push.js';
 import { parseJson } from '../db/index.js';
@@ -31,6 +32,11 @@ export function attachSockets(io) {
       if (!user) return next(new Error('Unknown user.'));
       socket.userId = String(user.id);
       socket.user = user;
+
+      // Socket emits serialise for recipients other than the requester, so
+      // each connected viewer's nicknames must be warm for the whole session.
+      await warmNicknames(user.id);
+
       next();
     } catch {
       next(new Error('Bad token.'));

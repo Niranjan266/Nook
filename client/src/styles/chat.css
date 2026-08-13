@@ -1240,3 +1240,184 @@
     max-width: 260px;
   }
 }
+
+/* ── snap camera ───────────────────────────────────────────────────────────
+   A dark room. The stage is the only lit thing, so the controls sit on the
+   same warm charcoal as the snap viewer rather than introducing a third
+   surface colour. Clay and Slab both still apply: the shutter is Clay (a
+   physical, pressable puck) and every decision button is a Slab.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.snap-cam {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: #14110f;
+  color: #f7f2ea;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.snap-cam-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-2);
+}
+.snap-cam-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.snap-cam .clay-round {
+  background: rgba(247, 242, 234, 0.12);
+  color: #f7f2ea;
+  box-shadow: none;
+}
+.snap-cam .clay-round:disabled {
+  opacity: 0.4;
+}
+
+.snap-cam-stage {
+  position: relative;
+  overflow: hidden;
+  margin: 0 var(--s-4);
+  border-radius: var(--r-clay-lg, 28px);
+  background: #0d0b0a;
+  display: grid;
+  place-items: center;
+  min-height: 0; /* lets the 1fr row actually shrink instead of overflowing */
+}
+.snap-cam-feed,
+.snap-cam-shot {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* A front camera should behave like a mirror; the capture is flipped to match. */
+.snap-cam-feed.mirrored {
+  transform: scaleX(-1);
+}
+.snap-cam-waking {
+  position: absolute;
+  font-size: var(--t-sm);
+  opacity: 0.6;
+}
+
+.snap-cam-error {
+  padding: var(--s-6);
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: var(--s-3);
+  max-width: 38ch;
+}
+.snap-cam-error h3 {
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+}
+.snap-cam-error p {
+  font-size: var(--t-sm);
+  opacity: 0.75;
+  line-height: 1.5;
+}
+
+.snap-cam-controls {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) calc(var(--s-5) + env(safe-area-inset-bottom, 0px));
+}
+
+.snap-timers {
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(247, 242, 234, 0.1);
+}
+.snap-timer-pick {
+  min-width: 46px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #f7f2ea;
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.snap-timer-pick.on {
+  background: var(--ochre);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.snap-cam-hint {
+  font-size: var(--t-sm);
+  opacity: 0.7;
+}
+
+.snap-cam-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  max-width: 420px;
+}
+.snap-cam-spacer {
+  width: 44px;
+  flex: 0 0 44px;
+}
+
+/* Clay, not Slab: the shutter is the one control you press without reading. */
+.snap-shutter {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 4px solid rgba(247, 242, 234, 0.85);
+  background: #f7f2ea;
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.snap-shutter:hover:not(:disabled) {
+  transform: scale(1.04);
+}
+.snap-shutter:active:not(:disabled) {
+  transform: scale(0.94);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    inset 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.snap-shutter:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snap-shutter,
+  .snap-timer-pick {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .snap-cam-stage {
+    margin: 0 var(--s-2);
+    border-radius: var(--r-clay, 20px);
+  }
+}

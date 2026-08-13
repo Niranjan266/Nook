@@ -54,6 +54,11 @@ export function useSocketBridge(enabled: boolean) {
     socket.on('conversation:new', (c) => chat().onConversation(c));
     socket.on('conversation:update', (c) => chat().onConversation(c));
     socket.on('conversation:removed', ({ conversationId }) => chat().onConversationRemoved(conversationId));
+
+    // A rename you made on another device. Names are resolved server-side, so
+    // the cheapest correct response is to re-fetch rather than try to patch
+    // the new name into every cached conversation, member list and message.
+    socket.on('nickname:update', () => chat().loadConversations());
     socket.on('wallpaper:changed', (p) => chat().onWallpaper(p));
 
     socket.on('call:incoming', (p) => call().receive(p));

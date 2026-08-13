@@ -429,3 +429,24 @@ export const IconCallOut = (p: Props) => (
     <path d="M15 9.5 20 4.5m0 0h-3.6M20 4.5V8" />
   </Svg>
 );
+
+export const IconCopy = (p: Props) => (
+  <Svg {...p}>
+    <rect x="9" y="9" width="11" height="11" rx="2.5" />
+    <path d="M15 6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15" />
+  </Svg>
+);
+
+export const IconRefresh = (p: Props) => (
+  <Svg {...p}>
+    <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+    <path d="M19.9 4.6v4.2h-4.2" />
+  </Svg>
+);
+
+export const IconTag = (p: Props) => (
+  <Svg {...p}>
+    <path d="M4 11.2V5a1 1 0 0 1 1-1h6.2a2 2 0 0 1 1.4.6l7 7a2 2 0 0 1 0 2.8l-5.8 5.8a2 2 0 0 1-2.8 0l-7-7a2 2 0 0 1-.6-1.4Z" />
+    <path d="M8.2 8.2v.1" />
+  </Svg>
+);

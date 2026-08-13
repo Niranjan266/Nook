@@ -67,6 +67,9 @@ router.post(
         mentions: z.array(z.string()).optional(),
         clientId: z.string().optional(),
         viewOnce: z.boolean().optional(),
+        // How long the recipient may look at a snap. 0 means they close it
+        // themselves; capped at a minute so "view once" keeps meaning something.
+        viewSeconds: z.number().int().min(0).max(60).optional(),
         threadRoot: z.string().nullable().optional(),
         scheduledFor: z.string().nullable().optional(),
         transcript: z.string().max(8000).optional(),

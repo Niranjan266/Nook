@@ -9,6 +9,7 @@ import { popIn, spring } from '@/lib/motion';
 import { duration } from '@/lib/format';
 import { compressImage } from '@/lib/color';
 import { transcribe, canTranscribe } from '@/lib/transcribe';
+import SnapCamera from './SnapCamera';
 import type { PublicQuietHours } from '@/lib/types';
 import {
   IconSend,
@@ -51,6 +52,7 @@ export default function Composer({ conversationId }: Props) {
   const [attachOpen, setAttachOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [snapMode, setSnapMode] = useState(false);
+  const [camOpen, setCamOpen] = useState(false);
   const [uploading, setUploading] = useState<{ name: string; pct: number } | null>(null);
 
   const [recording, setRecording] = useState(false);
@@ -175,7 +177,7 @@ export default function Composer({ conversationId }: Props) {
     });
   }
 
-  async function sendFile(original: File, asSnap = false) {
+  async function sendFile(original: File, asSnap = false, viewSeconds = 10) {
     // A 12 MB phone photo should not travel as 12 MB.
     const file = await compressImage(original);
     const isImage = file.type.startsWith('image/');
@@ -194,6 +196,7 @@ export default function Composer({ conversationId }: Props) {
         media: { ...media, ...dims },
         body: '',
         viewOnce: asSnap,
+        ...(asSnap ? { viewSeconds } : {}),
         replyTo: replyTo?.id || null,
       });
     } catch (err: any) {
@@ -450,7 +453,7 @@ export default function Composer({ conversationId }: Props) {
                   className="list-row"
                   onClick={() => {
                     setSnapMode(true);
-                    cameraInput.current?.click();
+                    setCamOpen(true);
                     setAttachOpen(false);
                   }}
                 >
@@ -650,6 +653,22 @@ export default function Composer({ conversationId }: Props) {
           const f = e.target.files?.[0];
           if (f) sendFile(f);
           e.target.value = '';
+        }}
+      />
+
+      <SnapCamera
+        open={camOpen}
+        onClose={() => {
+          setCamOpen(false);
+          setSnapMode(false);
+        }}
+        onSend={(file, seconds) => sendFile(file, true, seconds)}
+        // Where a live camera isn't available — permission refused, no device,
+        // a browser that won't hand one over — fall back to the OS capture
+        // that Snap used before. Better a photo than a dead end.
+        onFallback={() => {
+          setSnapMode(true);
+          cameraInput.current?.click();
         }}
       />
     </div>

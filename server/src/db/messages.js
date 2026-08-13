@@ -44,6 +44,8 @@ function baseMessage(row) {
     threadUpdatedAt: row.thread_updated_at ? new Date(row.thread_updated_at) : null,
     call: row.call_kind ? { kind: row.call_kind, status: row.call_status, duration: row.call_duration } : null,
     viewOnce: { enabled: Boolean(row.view_once), viewedBy: [], burntAt: row.burnt_at ? new Date(row.burnt_at) : null },
+    // Seconds the viewer gets on a snap. 0 = they close it themselves.
+    viewSeconds: row.view_seconds ?? 10,
     deletedForAll: Boolean(row.deleted_for_all),
     editedAt: row.edited_at ? new Date(row.edited_at) : null,
     scheduledFor: row.scheduled_for ? new Date(row.scheduled_for) : null,
@@ -261,8 +263,8 @@ export async function createMessageRow(input) {
     `INSERT INTO messages
        (id, conversation_id, sender_id, type, body, media, link_preview, transcript,
         reply_to_id, forwarded_from, thread_root_id, call_kind, call_status, call_duration,
-        view_once, deleted_for_all, scheduled_for, delivered, expires_at, client_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+        view_once, view_seconds, deleted_for_all, scheduled_for, delivered, expires_at, client_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
     [
       id,
       input.conversationId,
@@ -279,6 +281,7 @@ export async function createMessageRow(input) {
       input.call?.status || null,
       input.call?.duration || 0,
       bool(input.viewOnce),
+      Number.isFinite(input.viewSeconds) ? input.viewSeconds : 10,
       input.scheduledFor ? new Date(input.scheduledFor).getTime() : null,
       bool(input.delivered !== false),
       input.expiresAt ? new Date(input.expiresAt).getTime() : null,
