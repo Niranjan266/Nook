@@ -41,6 +41,32 @@ That is the whole list.
 
 **Nothing else.** No token, no secret, no database URL.
 
+### Never set `NODE_ENV` in Vercel
+
+This one does not merely do nothing — **it breaks the build**, and the error
+message points nowhere near the cause.
+
+npm treats `NODE_ENV=production` as an implicit `--omit=dev`. `tsc` and `vite`
+are devDependencies, so the install quietly succeeds having skipped them, and
+the build then dies with:
+
+```
+sh: line 1: tsc: command not found
+Error: Command "npm --prefix client run build" exited with 127
+```
+
+Reproduced on a clean machine:
+
+```
+npm --prefix client install                    →  added 92 packages   ✅
+NODE_ENV=production npm --prefix client install →  added 29 packages   ❌ no tsc
+```
+
+Vercel manages `NODE_ENV` itself. Delete it from the project if it is there.
+
+The build command now passes `--include=dev` explicitly, so this cannot happen
+again — but the variable still has no business being in Vercel.
+
 Two things about this variable:
 
 - **No trailing slash.** `config.ts` strips one if you leave it, but the mobile
