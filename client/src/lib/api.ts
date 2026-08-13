@@ -4,7 +4,7 @@
  * cookie, so it never touches JS.
  */
 
-import { apiUrl } from './config';
+import { apiUrl, API_BASE } from './config';
 
 let accessToken: string | null = null;
 let refreshing: Promise<boolean> | null = null;
@@ -25,10 +25,59 @@ export function onToken(fn: Listener) {
 export class ApiError extends Error {
   status: number;
   field?: string;
-  constructor(message: string, status: number, field?: string) {
+  /** True when the request never reached the server at all. */
+  offline: boolean;
+  constructor(message: string, status: number, field?: string, offline = false) {
     super(message);
     this.status = status;
     this.field = field;
+    this.offline = offline;
+  }
+}
+
+/**
+ * `fetch` rejects with a bare `TypeError: Failed to fetch` for every
+ * transport-level failure — DNS miss, refused connection, bad certificate,
+ * CORS rejection, offline. The browser deliberately gives JS no detail, to
+ * avoid turning fetch into a port scanner.
+ *
+ * Left unhandled that TypeError escapes as "not an ApiError", and every caller
+ * falls through to its generic catch — which is how a completely unreachable
+ * API ends up reported to the user as "Something went wrong. Try again." That
+ * message sends people to check their password when the server isn't there.
+ */
+function transportError(): ApiError {
+  const where = API_BASE || 'this site';
+  return new ApiError(
+    navigator.onLine
+      ? `Can't reach the server at ${where}. It may be starting up, or offline.`
+      : "You're offline. Check your connection and try again.",
+    0,
+    undefined,
+    true
+  );
+}
+
+/**
+ * A misconfigured API URL usually points at something that answers — a static
+ * host, a proxy, a parked domain — and returns HTML. `JSON.parse` then throws
+ * a SyntaxError about "<", which tells the user nothing. Report what actually
+ * happened instead.
+ */
+function parseBody(text: string, status: number, contentType: string | null) {
+  if (!text) return {};
+  const looksJson = (contentType || '').includes('json') || /^\s*[[{]/.test(text);
+  if (!looksJson) {
+    throw new ApiError(
+      `The server at ${API_BASE || 'this site'} returned a page instead of data ` +
+        `(HTTP ${status}). VITE_API_URL is probably pointing at the wrong host.`,
+      status
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError(`The server sent a malformed response (HTTP ${status}).`, status);
   }
 }
 
@@ -58,16 +107,21 @@ export async function api<T = any>(path: string, options: Options = {}): Promise
   const { body, retry = true, headers, ...rest } = options;
   const isForm = body instanceof FormData;
 
-  const res = await fetch(apiUrl(path), {
-    ...rest,
-    credentials: 'include',
-    headers: {
-      ...(isForm ? {} : body !== undefined ? { 'content-type': 'application/json' } : {}),
-      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
-      ...headers,
-    },
-    body: isForm ? (body as FormData) : body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(path), {
+      ...rest,
+      credentials: 'include',
+      headers: {
+        ...(isForm ? {} : body !== undefined ? { 'content-type': 'application/json' } : {}),
+        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+        ...headers,
+      },
+      body: isForm ? (body as FormData) : body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw transportError();
+  }
 
   if (res.status === 401 && retry) {
     const ok = await refresh();
@@ -76,8 +130,7 @@ export async function api<T = any>(path: string, options: Options = {}): Promise
 
   if (res.status === 204) return undefined as T;
 
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
+  const data = parseBody(await res.text(), res.status, res.headers.get('content-type'));
 
   if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status})`, res.status, data.field);
   return data as T;
