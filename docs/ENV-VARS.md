@@ -51,6 +51,91 @@ Two things about this variable:
 
 ---
 
+## Where `PUBLIC_URL` comes from
+
+`PUBLIC_URL` is not a value you invent. It is **the address Northflank gives
+your service**, and it arrives in two stages.
+
+### Stage 1 — the free generated domain
+
+The moment you create the service and expose port 4000, Northflank publishes it
+on a domain it generates for you, shaped like:
+
+```
+https://p01--nook-api--7k2xqbvmn4rd.code.run
+```
+
+Find it under **your service → Ports & DNS** (the "Public DNS" column), or on
+the service overview. It has working HTTPS immediately and needs no DNS setup at
+all. Use it as `PUBLIC_URL` for your first deploy — everything works.
+
+> **While you are on the generated domain, `COOKIE_DOMAIN` must be empty.**
+>
+> A server can only set a cookie for its own domain. If `code.run` tries to
+> issue `Domain=.niranjand.in`, the browser rejects the cookie outright and
+> nobody can stay signed in. Leave `COOKIE_DOMAIN` blank and `tokens.js` falls
+> back to `SameSite=None; Secure`, which is cross-site but functional.
+
+### Stage 2 — your own subdomain
+
+Northflank → your service → **Domains** → **Add domain** → `nook-api.niranjand.in`.
+
+Northflank gives you two records to create at your DNS host:
+
+| Type | Name | Value |
+|---|---|---|
+| `TXT` | `_nf-verification.nook-api` | *(the token Northflank shows)* |
+| `CNAME` | `nook-api` | *(the target Northflank shows)* |
+
+Once it verifies, Let's Encrypt issues the certificate automatically. **Then**
+switch `PUBLIC_URL` to `https://nook-api.niranjand.in` and set
+`COOKIE_DOMAIN=.niranjand.in`, and update `VITE_API_URL` in Vercel + redeploy.
+
+---
+
+## ⚠ Read this before creating any DNS record for niranjand.in
+
+`niranjand.in` is currently delegated to **five** nameservers — four at BigRock
+and one at Vercel:
+
+```
+dns1.bigrock.in  dns2.bigrock.in  dns3.bigrock.in  dns4.bigrock.in
+ns1.vercel-dns.com
+```
+
+Each holds its own independent copy of the zone, and resolvers pick one at
+random. The two copies do not agree:
+
+```
+nook.niranjand.in       @ dns1.bigrock.in     → CNAME f95a6ed4cc7b34be.vercel-dns-017.com
+nook.niranjand.in       @ ns1.vercel-dns.com  → A 216.198.79.65
+
+www.niranjand.in        @ dns1.bigrock.in     → NXDOMAIN
+www.niranjand.in        @ ns1.vercel-dns.com  → A 216.198.79.65
+
+zzz-does-not-exist...   @ dns1.bigrock.in     → NXDOMAIN
+zzz-does-not-exist...   @ ns1.vercel-dns.com  → A 216.198.79.65   ← answers anything
+```
+
+The Vercel nameserver resolves **every** subdomain to Vercel. So the moment you
+add `nook-api` as a CNAME at BigRock, roughly **one lookup in five** will hit
+`ns1.vercel-dns.com` instead and be sent to Vercel, where the API does not
+exist — a 404 from the wrong server, for some users, some of the time,
+persisting for as long as their resolver caches it. This is one of the most
+unpleasant classes of bug to diagnose, because the record looks perfectly
+correct everywhere you check.
+
+**Fix it first.** In BigRock → Manage Domain → Name Servers, remove
+`ns1.vercel-dns.com` and leave only the four `*.bigrock.in` entries.
+
+This will not affect the live site. `nook.niranjand.in` already reaches Vercel
+via a CNAME held at BigRock, which is Vercel's documented and fully supported
+setup for subdomains — their nameservers are optional. Allow up to a few hours
+for the change to propagate, then confirm all answers agree before adding
+`nook-api`.
+
+---
+
 ## Northflank → your service → Environment
 
 This is the real backend, and this is where every secret lives.
@@ -62,8 +147,8 @@ This is the real backend, and this is where every secret lives.
 | `NODE_ENV` | `production` | Turns on secure cookies and disables verbose logging. |
 | `PORT` | `4000` | Must match the port you exposed on the service. |
 | `CLIENT_ORIGIN` | `https://nook.niranjand.in` | CORS allow-list. Comma-separate for more than one. A mismatch here is the classic "works locally, blocked in production". |
-| `PUBLIC_URL` | `https://nook-api.niranjand.in` | How the API refers to itself in media URLs and push payloads. |
-| `COOKIE_DOMAIN` | `.niranjand.in` | **Leading dot is required.** See below. |
+| `PUBLIC_URL` | `https://nook-api.niranjand.in` | How the API refers to itself in media URLs and push payloads. See "Where `PUBLIC_URL` comes from" above — on your first deploy this is the `.code.run` domain. |
+| `COOKIE_DOMAIN` | `.niranjand.in` | **Leading dot is required — and leave it empty until the custom domain is live.** See below. |
 | `TURSO_DATABASE_URL` | `libsql://nook-nook.aws-ap-south-1.turso.io` | Not a secret — it is just an address. |
 | `TURSO_AUTH_TOKEN` | *(your **rotated** token)* | Secret. Full read/write on the database. |
 | `JWT_ACCESS_SECRET` | *(from `Make-Keys.bat`)* | Secret. Anyone holding it can mint a login for any account. |
