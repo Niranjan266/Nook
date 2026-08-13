@@ -44,10 +44,29 @@ line();
 line('  Then paste the client ID and secret below.');
 line();
 
-const rl = readline.createInterface({ input, output });
-const clientId = (await rl.question('  GMAIL_CLIENT_ID     : ')).trim();
-const clientSecret = (await rl.question('  GMAIL_CLIENT_SECRET : ')).trim();
-rl.close();
+/**
+ * Values can come from the command line or the environment, so a second run
+ * after fixing something in the Google console does not mean retyping a
+ * 72-character client ID. Falls back to prompting.
+ *
+ *   node tools/gmail-auth.mjs <client-id> <client-secret>
+ */
+let [clientId, clientSecret] = process.argv.slice(2);
+clientId ||= process.env.GMAIL_CLIENT_ID || '';
+clientSecret ||= process.env.GMAIL_CLIENT_SECRET || '';
+
+if (clientId && clientSecret) {
+  line(`  GMAIL_CLIENT_ID     : ${clientId.slice(0, 24)}… (from ${process.argv[2] ? 'the command line' : 'the environment'})`);
+  line('  GMAIL_CLIENT_SECRET : ••••••••');
+} else {
+  const rl = readline.createInterface({ input, output });
+  clientId = clientId || (await rl.question('  GMAIL_CLIENT_ID     : ')).trim();
+  clientSecret = clientSecret || (await rl.question('  GMAIL_CLIENT_SECRET : ')).trim();
+  rl.close();
+}
+
+clientId = clientId.trim();
+clientSecret = clientSecret.trim();
 
 if (!clientId || !clientSecret) {
   line('\n  Both values are required. Nothing was saved.\n');
@@ -73,11 +92,59 @@ const authUrl =
   }).toString();
 
 line();
-line('  Open this in your browser, sign in as the account that will send:');
+line('  Opening your browser. Sign in as the account that will send.');
+line('  If nothing opens, paste this in yourself:');
 line();
 line(`  ${authUrl}`);
 line();
+
+// Opening it removes the most common failure: a very long URL mangled by
+// copy-paste out of a terminal that soft-wrapped it.
+try {
+  const { spawn } = await import('node:child_process');
+  const cmd =
+    process.platform === 'win32' ? ['cmd', ['/c', 'start', '', authUrl]]
+    : process.platform === 'darwin' ? ['open', [authUrl]]
+    : ['xdg-open', [authUrl]];
+  spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref();
+} catch {
+  /* the printed URL above is the fallback */
+}
+
 line('  Waiting for Google to redirect back…');
+line('  (Ctrl+C to give up.)');
+
+/**
+ * Turn the two ways this can fail into advice.
+ *
+ * Both look identical from here — the browser never comes back — but they have
+ * completely different fixes, and a bare "timed out" sends people looking at
+ * their network instead of at the Google console.
+ */
+function explainAndExit(err) {
+  line();
+  if (err.message === 'TIMEOUT') {
+    line('  ── Google never redirected back ────────────────────────────');
+    line();
+    line('  Nine times in ten this means the redirect URI is not registered.');
+    line('  In Google Cloud Console → APIs & Services → Credentials → open');
+    line('  this OAuth client → Authorised redirect URIs → add exactly:');
+    line();
+    line(`      ${REDIRECT}`);
+    line();
+    line('  No trailing slash, http not https, port 5388. Google matches it');
+    line('  character for character. Save, wait a minute, and run this again.');
+    line();
+    line('  If you did see a Google error page, its text says which it was:');
+    line('    "Error 400: redirect_uri_mismatch"  → the URI above is missing');
+    line('    "Access blocked … has not completed verification" → add your');
+    line('       address under OAuth consent screen → Test users');
+  } else {
+    line(`  ── Did not complete: ${err.message} ──`);
+  }
+  line();
+  process.exit(1);
+}
 
 const code = await new Promise((resolve, reject) => {
   const server = http.createServer((req, res) => {
@@ -111,11 +178,16 @@ const code = await new Promise((resolve, reject) => {
   });
 
   server.listen(PORT);
-  setTimeout(() => {
-    server.close();
-    reject(new Error('timed out after 5 minutes'));
-  }, 5 * 60 * 1000);
-});
+
+  // Fifteen minutes, because signing in can mean finding a phone for 2FA.
+  setTimeout(
+    () => {
+      server.close();
+      reject(new Error('TIMEOUT'));
+    },
+    15 * 60 * 1000
+  );
+}).catch(explainAndExit);
 
 const res = await fetch('https://oauth2.googleapis.com/token', {
   method: 'POST',
