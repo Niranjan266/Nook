@@ -104,10 +104,14 @@ export default function FrontDoor() {
     }
 
     setBusy(true);
-    post<{ accessToken: string }>('/auth/google/exchange', { code: handoff })
+    post<{ user: any; accessToken: string }>('/auth/google/exchange', { code: handoff })
       .then(async (data) => {
-        setToken(data.accessToken);
-        await useAuth.getState().init();
+        // The exchange returns the user with the token, so adopt the session
+        // outright. Calling init() here would throw away this token whenever
+        // the refresh cookie is cross-site and the browser dropped it — and
+        // then play the door animation over a screen nobody had signed into,
+        // which is what left the page blank.
+        useAuth.getState().adopt(data.user, data.accessToken);
         await openDoor();
       })
       .catch((err) => {
