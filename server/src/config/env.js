@@ -1,0 +1,89 @@
+import 'dotenv/config';
+import crypto from 'node:crypto';
+
+const bool = (v) => Boolean(v && String(v).trim());
+
+export const env = {
+  port: Number(process.env.PORT || 4000),
+  nodeEnv: process.env.NODE_ENV || 'development',
+  clientOrigin: (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+
+  /** Let *.vercel.app preview builds talk to this API. Off by default. */
+  allowVercelPreviews: process.env.ALLOW_VERCEL_PREVIEWS === '1',
+
+  /** Public origin of this API, e.g. https://api.yoursite.com — no trailing slash. */
+  publicUrl: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
+
+  /**
+   * Set to `.yoursite.com` when the app and API are subdomains of one domain.
+   * The refresh cookie then belongs to the whole site, which makes it
+   * first-party — so Safari's tracking prevention and Chrome's third-party
+   * cookie phase-out leave it alone. Without it the cookie is cross-site and
+   * users get silently signed out on refresh.
+   */
+  cookieDomain: process.env.COOKIE_DOMAIN || '',
+
+  /**
+   * Turso (libSQL). Leave both empty in development and the server writes to
+   * server/data/nook.db — a real SQLite file, no signup, survives restarts.
+   */
+  turso: {
+    url: (process.env.TURSO_DATABASE_URL || '').trim(),
+    authToken: (process.env.TURSO_AUTH_TOKEN || '').trim(),
+  },
+
+  accessSecret: process.env.JWT_ACCESS_SECRET || crypto.randomBytes(32).toString('hex'),
+  refreshSecret: process.env.JWT_REFRESH_SECRET || crypto.randomBytes(32).toString('hex'),
+  accessTtl: process.env.ACCESS_TTL || '15m',
+  refreshTtl: process.env.REFRESH_TTL || '30d',
+
+  cloudinary: {
+    enabled:
+      bool(process.env.CLOUDINARY_CLOUD_NAME) &&
+      bool(process.env.CLOUDINARY_API_KEY) &&
+      bool(process.env.CLOUDINARY_API_SECRET),
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+  },
+
+  brevo: {
+    enabled: bool(process.env.BREVO_API_KEY),
+    apiKey: process.env.BREVO_API_KEY,
+    senderEmail: process.env.BREVO_SENDER_EMAIL || 'no-reply@nook.app',
+    senderName: process.env.BREVO_SENDER_NAME || 'Nook',
+  },
+
+  vapid: {
+    publicKey: process.env.VAPID_PUBLIC_KEY || '',
+    privateKey: process.env.VAPID_PRIVATE_KEY || '',
+    subject: process.env.VAPID_SUBJECT || 'mailto:hello@nook.app',
+  },
+
+  ice: {
+    stun: (process.env.STUN_URLS || 'stun:stun.l.google.com:19302')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    turnUrl: process.env.TURN_URL || '',
+    turnUsername: process.env.TURN_USERNAME || '',
+    turnCredential: process.env.TURN_CREDENTIAL || '',
+  },
+};
+
+export const isProd = env.nodeEnv === 'production';
+
+export function iceServers() {
+  const servers = [{ urls: env.ice.stun }];
+  if (env.ice.turnUrl) {
+    servers.push({
+      urls: env.ice.turnUrl,
+      username: env.ice.turnUsername,
+      credential: env.ice.turnCredential,
+    });
+  }
+  return servers;
+}

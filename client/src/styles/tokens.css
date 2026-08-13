@@ -1,0 +1,165 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Nook — design tokens
+   "Soft Clay, Hard Edges"
+
+   Two materials, never blended:
+     CLAY  — puffy, rounded, dual shadow, no border. The world.
+     SLAB  — flat fill, 2px ink border, hard offset shadow. The things you press.
+
+   No neon. No purple-cyan gradients. No glass.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ── surface ───────────────────────────────────────────────────────────── */
+  --clay-bg: #e9e1d6;
+  --clay-surface: #f4eee6;
+  --clay-raised: #faf6f0;
+  --clay-sunk: #ded4c6;
+  --clay-edge: #cfc2b1;
+
+  /* ── ink ───────────────────────────────────────────────────────────────── */
+  --ink: #1e1a17;
+  --ink-soft: #5c5349;
+  --ink-faint: #8b8073;
+  --ink-invert: #f7f2ea;
+
+  /* ── accents ───────────────────────────────────────────────────────────── */
+  --terracotta: #c0603c;
+  --terracotta-deep: #a9502f;
+  --moss: #57694a;
+  --moss-deep: #46563b;
+  --ochre: #ce9535;
+  --ochre-deep: #b07f27;
+  --clay-blue: #47606f;
+  --clay-blue-deep: #3a4f5c;
+  --rust: #a33f2f;
+  --rust-deep: #8c3427;
+
+  --accent: var(--terracotta);
+  --accent-deep: var(--terracotta-deep);
+  --on-accent: #fdf8f2;
+
+  /* ── clay shadows: light from top-left, always a pair ──────────────────── */
+  --clay-1: 4px 4px 10px rgba(30, 26, 23, 0.11), -3px -3px 8px rgba(255, 255, 255, 0.85);
+  --clay-2: 8px 8px 20px rgba(30, 26, 23, 0.13), -5px -5px 14px rgba(255, 255, 255, 0.9);
+  --clay-3: 16px 18px 38px rgba(30, 26, 23, 0.16), -8px -8px 22px rgba(255, 255, 255, 0.92);
+  --clay-in: inset 3px 3px 7px rgba(30, 26, 23, 0.13), inset -2px -2px 6px rgba(255, 255, 255, 0.8);
+  --clay-in-deep: inset 5px 5px 12px rgba(30, 26, 23, 0.16), inset -3px -3px 8px rgba(255, 255, 255, 0.75);
+
+  /* ── slab: hard, offset, never blurred ─────────────────────────────────── */
+  --slab-border: 2px solid var(--ink);
+  --slab-shadow: 4px 4px 0 var(--ink);
+  --slab-shadow-sm: 3px 3px 0 var(--ink);
+  --slab-shadow-lg: 6px 6px 0 var(--ink);
+
+  /* ── radii: clay is round, slab is nearly square ───────────────────────── */
+  --r-clay-sm: 14px;
+  --r-clay: 22px;
+  --r-clay-lg: 30px;
+  --r-clay-xl: 38px;
+  --r-slab: 6px;
+  --r-pill: 999px;
+
+  /* ── type ──────────────────────────────────────────────────────────────── */
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --t-xs: 0.75rem;
+  --t-sm: 0.8125rem;
+  --t-base: 0.9375rem;
+  --t-md: 1rem;
+  --t-lg: 1.25rem;
+  --t-xl: 1.625rem;
+  --t-2xl: 2.125rem;
+  --t-3xl: 3rem;
+
+  /* ── spacing ───────────────────────────────────────────────────────────── */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 22px;
+  --s-6: 30px;
+  --s-7: 42px;
+  --s-8: 60px;
+
+  /* ── motion: one spring, everywhere ────────────────────────────────────── */
+  --ease-clay: cubic-bezier(0.34, 1.32, 0.48, 1);
+  --ease-out: cubic-bezier(0.22, 0.9, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --dur-slow: 380ms;
+
+  /* ── layout ────────────────────────────────────────────────────────────── */
+  --rail-w: 76px;
+  --shelf-w: 320px;
+  --z-sheet: 60;
+  --z-call: 90;
+  --z-toast: 120;
+
+  color-scheme: light;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dark — warm charcoal, never blue-black. Clay still catches light top-left.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root[data-theme='dark'] {
+  --clay-bg: #201d1a;
+  --clay-surface: #2b2724;
+  --clay-raised: #35302b;
+  --clay-sunk: #171412;
+  --clay-edge: #423b34;
+
+  --ink: #efe6da;
+  --ink-soft: #a79c8e;
+  --ink-faint: #7d7367;
+  --ink-invert: #1a1715;
+
+  --terracotta: #d97a53;
+  --terracotta-deep: #c0603c;
+  --moss: #7f9268;
+  --moss-deep: #64764f;
+  --ochre: #e0ad55;
+  --ochre-deep: #c4913a;
+  --clay-blue: #6b8598;
+  --clay-blue-deep: #547083;
+  --rust: #c85a45;
+  --rust-deep: #a33f2f;
+
+  --accent: var(--terracotta);
+  --accent-deep: var(--terracotta-deep);
+  --on-accent: #201d1a;
+
+  --clay-1: 4px 4px 10px rgba(0, 0, 0, 0.42), -3px -3px 8px rgba(255, 240, 220, 0.045);
+  --clay-2: 8px 8px 20px rgba(0, 0, 0, 0.48), -5px -5px 14px rgba(255, 240, 220, 0.055);
+  --clay-3: 16px 18px 38px rgba(0, 0, 0, 0.55), -8px -8px 22px rgba(255, 240, 220, 0.06);
+  --clay-in: inset 3px 3px 8px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(255, 240, 220, 0.05);
+  --clay-in-deep: inset 5px 5px 13px rgba(0, 0, 0, 0.58), inset -3px -3px 8px rgba(255, 240, 220, 0.05);
+
+  --slab-shadow: 4px 4px 0 var(--ink);
+
+  color-scheme: dark;
+}
+
+/* Accent switching — each person picks one, it colours their own UI */
+:root[data-accent='moss'] {
+  --accent: var(--moss);
+  --accent-deep: var(--moss-deep);
+}
+:root[data-accent='ochre'] {
+  --accent: var(--ochre);
+  --accent-deep: var(--ochre-deep);
+  --on-accent: #241d10;
+}
+:root[data-accent='clay-blue'] {
+  --accent: var(--clay-blue);
+  --accent-deep: var(--clay-blue-deep);
+}
+:root[data-accent='rust'] {
+  --accent: var(--rust);
+  --accent-deep: #8c3427;
+}

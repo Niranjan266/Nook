@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Nook">
+  <title>Nook</title>
+  <path fill="currentColor" fill-rule="evenodd"
+        d="M32 6h32a26 26 0 0 1 26 26v32a26 26 0 0 1-26 26H32A26 26 0 0 1 6 64V32A26 26 0 0 1 32 6Zm0 68V46a16 16 0 0 1 32 0v28Z"/>
+</svg>

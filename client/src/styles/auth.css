@@ -1,0 +1,326 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   The Front Door.
+
+   Deliberately not a split screen. One narrow clay column sitting low in the
+   viewport, an oversized mark above it, drifting clay blobs behind. On success
+   the panel splits down the middle and slides apart — the door opening.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.door {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  overflow: hidden;
+  padding: var(--s-5);
+  background: var(--clay-bg);
+}
+
+/* ── drifting clay blobs, CSS only ──────────────────────────────────────── */
+
+.door-blobs {
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(60px);
+  opacity: 0.55;
+}
+
+/* Dark clay reflects far less light — dial the blobs back or the panel drowns. */
+:root[data-theme='dark'] .door-blobs {
+  opacity: 0.3;
+}
+:root[data-theme='dark'] .door::after {
+  opacity: 0.2;
+}
+.door-blobs span {
+  position: absolute;
+  display: block;
+  border-radius: 48% 52% 60% 40% / 55% 45% 55% 45%;
+  animation: drift 34s var(--ease-out) infinite alternate;
+}
+.door-blobs span:nth-child(1) {
+  width: 46vmax;
+  height: 46vmax;
+  left: 2%;
+  top: 4%;
+  background: var(--terracotta);
+  opacity: 0.24;
+}
+.door-blobs span:nth-child(2) {
+  width: 38vmax;
+  height: 38vmax;
+  right: 4%;
+  top: 22%;
+  background: var(--moss);
+  opacity: 0.2;
+  animation-duration: 44s;
+  animation-delay: -8s;
+}
+.door-blobs span:nth-child(3) {
+  width: 34vmax;
+  height: 34vmax;
+  left: 30%;
+  bottom: -6%;
+  background: var(--ochre);
+  opacity: 0.19;
+  animation-duration: 52s;
+  animation-delay: -20s;
+}
+.door-blobs span:nth-child(4) {
+  width: 28vmax;
+  height: 28vmax;
+  right: 26%;
+  bottom: 6%;
+  background: var(--clay-blue);
+  opacity: 0.16;
+  animation-duration: 38s;
+  animation-delay: -14s;
+}
+
+@keyframes drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(4vw, -3vh, 0) scale(1.12) rotate(24deg);
+  }
+  100% {
+    transform: translate3d(-3vw, 4vh, 0) scale(0.95) rotate(-18deg);
+  }
+}
+
+/* paper grain so the clay doesn't read as flat CSS */
+.door::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E");
+}
+
+/* ── one centred column: mark above panel, never side by side ───────────── */
+
+.door-stack {
+  position: relative;
+  z-index: 2;
+  grid-row: 2;
+  grid-column: 1;
+  justify-self: center;
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── the mark, oversized, above the panel ───────────────────────────────── */
+
+.door-mark {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-6);
+  will-change: transform;
+  animation: door-rise 620ms var(--ease-clay) both;
+}
+
+@keyframes door-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.door-mark img {
+  width: 104px;
+  height: 104px;
+  filter: drop-shadow(10px 14px 22px rgba(30, 26, 23, 0.22));
+}
+.door-wordmark {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.door-tagline {
+  font-size: var(--t-sm);
+  color: var(--ink-soft);
+  letter-spacing: 0.01em;
+}
+
+/* ── the panel itself ───────────────────────────────────────────────────── */
+
+.door-panel {
+  position: relative;
+  width: 100%;
+  padding: var(--s-6);
+  background: var(--clay-raised);
+  border-radius: var(--r-clay-xl);
+  box-shadow: var(--clay-3);
+  animation: door-rise 620ms var(--ease-clay) 110ms both;
+}
+
+/* the panel and mark fade out only while the door swings open */
+.door.opening .door-stack {
+  opacity: 0;
+  transition: opacity 240ms var(--ease-out);
+}
+
+.door-steps {
+  position: relative;
+}
+
+.door-heading {
+  font-family: var(--font-display);
+  font-size: var(--t-xl);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  margin-bottom: 4px;
+}
+.door-sub {
+  font-size: var(--t-sm);
+  color: var(--ink-soft);
+  margin-bottom: var(--s-5);
+}
+
+.door-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.door-actions {
+  margin-top: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.door-switch {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--t-sm);
+  color: var(--ink-soft);
+}
+.door-switch button {
+  font-weight: 600;
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+.door-note {
+  position: relative;
+  z-index: 2;
+  grid-row: 3;
+  grid-column: 1;
+  align-self: end;
+  justify-self: center;
+  max-width: 380px;
+  padding-top: var(--s-6);
+  text-align: center;
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+
+/* username availability, inline */
+.door-avail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  padding-left: 4px;
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+.door-avail.ok {
+  color: var(--moss-deep);
+}
+.door-avail.no {
+  color: var(--rust);
+}
+
+/* strength: four slab segments */
+.strength {
+  display: flex;
+  gap: 5px;
+  margin-top: 9px;
+}
+.strength i {
+  height: 6px;
+  flex: 1;
+  border-radius: 2px;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  transition: background var(--dur) var(--ease-out);
+}
+.strength i.on {
+  background: var(--moss);
+}
+.strength i.warn {
+  background: var(--ochre);
+}
+
+/* six-digit code entry */
+.code-row {
+  display: flex;
+  gap: var(--s-2);
+  justify-content: space-between;
+}
+.code-row input {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--t-lg);
+  padding: 0;
+}
+
+/* ── the door opening ───────────────────────────────────────────────────── */
+
+.door.opening .door-panel,
+.door.opening .door-mark {
+  animation: none;
+}
+.door-leaf {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--clay-surface);
+  pointer-events: none;
+}
+.door-leaf.left {
+  border-right: 2px solid var(--clay-edge);
+}
+
+@media (max-width: 520px) {
+  .door {
+    grid-template-rows: 1fr auto auto;
+    padding: var(--s-4);
+  }
+  .door-panel {
+    padding: var(--s-5) var(--s-4);
+  }
+  .door-mark img {
+    width: 76px;
+    height: 76px;
+  }
+  .door-mark {
+    margin-bottom: var(--s-5);
+  }
+  .door-note {
+    padding-top: var(--s-5);
+  }
+}

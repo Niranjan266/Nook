@@ -1,0 +1,16 @@
+{
+  "name": "Nook",
+  "short_name": "Nook",
+  "description": "Your corner of the internet. A private place for the people who matter.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#E9E1D6",
+  "theme_color": "#E9E1D6",
+  "categories": ["social", "communication"],
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

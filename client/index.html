@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <title>Nook — your corner of the internet</title>
+    <meta
+      name="description"
+      content="A private place for the people who matter. Messages, media, voice notes, snaps and calls — no feeds, no reels, no strangers."
+    />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/logo.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <meta name="theme-color" content="#E9E1D6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#201D1A" media="(prefers-color-scheme: dark)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Nook — your corner of the internet" />
+    <meta
+      property="og:description"
+      content="A private place for the people who matter. No feeds, no reels, no strangers."
+    />
+    <meta property="og:image" content="/logo.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <script>
+      // Set the theme before first paint so there is no light flash.
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('nook.ui') || '{}');
+          var theme = saved.theme || 'system';
+          var dark =
+            theme === 'dark' ||
+            (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+          if (saved.accent) document.documentElement.dataset.accent = saved.accent;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

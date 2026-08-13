@@ -1,0 +1,198 @@
+/* ── reset ──────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--t-base);
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--clay-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.14;
+  letter-spacing: -0.018em;
+}
+
+h1 {
+  font-size: var(--t-2xl);
+}
+h2 {
+  font-size: var(--t-xl);
+}
+h3 {
+  font-size: var(--t-lg);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+a {
+  color: var(--accent-deep);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+ul,
+ol {
+  list-style: none;
+  padding: 0;
+}
+
+time,
+.tabular {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  letter-spacing: -0.02em;
+}
+
+/* ── focus: a hard slab ring, visible on clay and on wallpaper ──────────── */
+
+:focus-visible {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: var(--r-slab);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ── scrollbars: thin, clay ─────────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--clay-edge) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--clay-edge);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-faint);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+
+/* ── utility ────────────────────────────────────────────────────────────── */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  align-items: center;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.muted {
+  color: var(--ink-soft);
+}
+.faint {
+  color: var(--ink-faint);
+}
+.tiny {
+  font-size: var(--t-xs);
+}
+.small {
+  font-size: var(--t-sm);
+}
+.center {
+  display: grid;
+  place-items: center;
+}
+
+.eyebrow {
+  font-size: var(--t-xs);
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

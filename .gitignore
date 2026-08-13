@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# The local SQLite database and anything uploaded to it. Never commit either —
+# the .db file contains real messages and password hashes.
+server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+server/uploads/
+
+# Expo / React Native
+.expo/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+*.log
+_srv_install.*
+_cli_install.*
+.DS_Store
+.vscode/
+.idea/

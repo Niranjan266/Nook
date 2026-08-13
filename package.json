@@ -1,0 +1,13 @@
+{
+  "name": "nook",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nook — your corner of the internet. A private multi-mode chat app.",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "seed": "npm --prefix server run seed",
+    "build": "npm --prefix client run build"
+  }
+}

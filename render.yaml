@@ -1,0 +1,85 @@
+# Render blueprint for the Nook API.
+#
+# In Render: New → Blueprint → point it at this repo. It reads this file.
+# Secrets marked `sync: false` are NOT stored here — you type them into the
+# Render dashboard once, and they never touch the repository.
+
+services:
+  - type: web
+    name: nook-api
+    runtime: node
+    plan: free # $7/mo "starter" stops the instance sleeping — see notes below
+    region: singapore # closest of Render's regions to India; also: oregon, frankfurt, ohio, virginia
+    rootDir: server
+    buildCommand: npm install --no-audit --no-fund
+    startCommand: node src/index.js
+    healthCheckPath: /api/health
+
+    # Media lives here when Cloudinary isn't configured. Without a disk, Render's
+    # filesystem is ephemeral and every uploaded photo vanishes on redeploy.
+    # Disks are not available on the free plan — use Cloudinary, or upgrade.
+    # disk:
+    #   name: nook-uploads
+    #   mountPath: /opt/render/project/src/server/uploads
+    #   sizeGB: 5
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+
+      # Generated once by Render and kept. Changing these signs everyone out.
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+      # ── you fill these in the dashboard ──────────────────────────────────
+      - key: TURSO_DATABASE_URL # libsql://nook-you.turso.io
+        sync: false
+      - key: TURSO_AUTH_TOKEN # from `turso db tokens create nook`
+        sync: false
+      - key: CLIENT_ORIGIN # https://app.yoursite.com
+        sync: false
+      - key: PUBLIC_URL # https://api.yoursite.com
+        sync: false
+      - key: COOKIE_DOMAIN # .yoursite.com  ← the leading dot matters
+        sync: false
+
+      # ── optional; everything degrades gracefully without them ────────────
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: TURN_URL
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: '0'
+# Notes on the free plan, so nothing here surprises you:
+#
+#   1. It sleeps after 15 minutes with no traffic. Sleeping drops every open
+#      socket, so messages stop arriving in real time until someone loads the
+#      app again and wakes it (~30 seconds cold start).
+#   2. No persistent disk, so set Cloudinary or uploaded media disappears on
+#      every deploy.
+#   3. 750 instance-hours a month across all your free services.
+#
+# For anything you'd ask a friend to actually use, the $7 starter plan removes
+# points 1 and 2.

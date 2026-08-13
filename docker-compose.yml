@@ -1,0 +1,70 @@
+# Nook — run your own.
+#
+#   docker compose up -d
+#   open http://localhost:8080
+#
+# That is the whole install. Your messages, your media, your server.
+# Nothing in this file talks to us.
+
+services:
+  # No database service: libSQL is embedded. The server writes to a SQLite file
+  # on the `data` volume, or to Turso if you set TURSO_DATABASE_URL. One less
+  # container to run, back up and keep patched.
+
+  # Optional. Only needed if you run more than one `server` replica — without
+  # it, two instances cannot see each other's sockets.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    profiles: ['scale']
+
+  server:
+    build:
+      context: ./server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # Leave both empty to use the embedded SQLite file on the data volume.
+      TURSO_DATABASE_URL: ${TURSO_DATABASE_URL:-}
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN:-}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:8080}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      # Generate these once and keep them. Changing them signs everyone out.
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set this - node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set this too, and make it different}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      TURN_URL: ${TURN_URL:-}
+      TURN_USERNAME: ${TURN_USERNAME:-}
+      TURN_CREDENTIAL: ${TURN_CREDENTIAL:-}
+      REDIS_URL: ${REDIS_URL:-}
+    volumes:
+      # Media lives here when Cloudinary isn't configured. Back this up.
+      - uploads:/app/uploads
+      # And the database, when you're not using Turso. Back this up too.
+      - data:/app/data
+    expose:
+      - '4000'
+
+  web:
+    build:
+      context: ./client
+      args:
+        # Baked in at build time, so point it at wherever the API really is.
+        VITE_API_TARGET: ${API_ORIGIN:-http://server:4000}
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - '${PORT:-8080}:80'
+
+volumes:
+  uploads:
+  data:

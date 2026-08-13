@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Nook",
+    "slug": "nook",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nook",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E9E1D6"
+    },
+
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.nook.client",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Nook uses your microphone for voice messages and calls.",
+        "NSCameraUsageDescription": "Nook uses your camera for photos, snaps and video calls.",
+        "NSPhotoLibraryUsageDescription": "Nook needs your photo library so you can share pictures.",
+        "UIBackgroundModes": ["audio", "voip", "remote-notification"]
+      }
+    },
+
+    "android": {
+      "package": "app.nook.client",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#E9E1D6"
+      },
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA",
+        "MODIFY_AUDIO_SETTINGS",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-av",
+        { "microphonePermission": "Nook uses your microphone for voice messages." }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Nook needs your photo library so you can share pictures.",
+          "cameraPermission": "Nook uses your camera for photos and snaps."
+        }
+      ],
+      [
+        "expo-notifications",
+        { "color": "#C0603C", "defaultChannel": "messages" }
+      ]
+    ],
+
+    "extra": {
+      "router": { "origin": false },
+      "eas": { "projectId": "" }
+    },
+
+    "experiments": { "typedRoutes": true }
+  }
+}

@@ -1,0 +1,540 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   App shell — dock rail · shelf drawer · conversation surface · clay sheets
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail-w) auto 1fr;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--clay-bg);
+}
+
+/* ── dock rail ──────────────────────────────────────────────────────────── */
+
+.rail {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) 0;
+  background: var(--clay-bg);
+  z-index: 30;
+}
+
+.rail-logo {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  margin-bottom: var(--s-2);
+}
+.rail-logo img {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(3px 4px 7px rgba(30, 26, 23, 0.2));
+}
+
+.rail-scroll {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  scrollbar-width: none;
+}
+.rail-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.rail-item {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex: none;
+}
+.rail-item .chip {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  z-index: 2;
+}
+/* active marker: a hard slab tick on the rail edge */
+.rail-item.active::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 26px;
+  border-radius: 3px;
+  background: var(--accent);
+  border: 2px solid var(--ink);
+}
+
+.rail-tip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 11px;
+  background: var(--ink);
+  color: var(--ink-invert);
+  border-radius: var(--r-slab);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.rail-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-items: center;
+}
+
+/* ── shelf drawer ───────────────────────────────────────────────────────── */
+
+.shelf {
+  grid-column: 2;
+  width: var(--shelf-w);
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-4) var(--s-3) var(--s-3) 0;
+  overflow: hidden;
+}
+
+.shelf-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-2) var(--s-3);
+}
+.shelf-title {
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  flex: 1;
+}
+
+.shelf-search {
+  padding: 0 var(--s-2) var(--s-3);
+}
+.shelf-search .groove {
+  padding: 10px 14px;
+  font-size: var(--t-sm);
+  border-radius: var(--r-pill);
+}
+
+.shelf-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 var(--s-2) var(--s-3);
+  /* Folders are user-created, so this row has no fixed length. Scroll it
+     rather than letting it wrap and shove the list down the screen. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.shelf-tabs::-webkit-scrollbar {
+  display: none;
+}
+.shelf-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  transition: all var(--dur) var(--ease-out);
+}
+.shelf-tab.on {
+  background: var(--clay-sunk);
+  box-shadow: var(--clay-in);
+  color: var(--ink);
+}
+
+.shelf-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px var(--s-2) var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* a conversation tile — clay, gets a wallpaper-tinted left edge */
+.tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 11px 13px;
+  text-align: left;
+  background: transparent;
+  border-radius: var(--r-clay);
+  transition:
+    background var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+.tile:hover {
+  background: var(--clay-surface);
+  box-shadow: var(--clay-1);
+}
+.tile.active {
+  background: var(--clay-surface);
+  box-shadow: var(--clay-2);
+}
+.tile.active::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 16px;
+  bottom: 16px;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--tile-tint, var(--accent));
+}
+.tile-body {
+  flex: 1;
+  min-width: 0;
+}
+.tile-top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+.tile-name {
+  font-weight: 600;
+  font-size: var(--t-base);
+  letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+}
+.tile-time {
+  font-size: 11px;
+  color: var(--ink-faint);
+  flex: none;
+}
+.tile-bottom {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 1px;
+}
+.tile-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-sm);
+  color: var(--ink-soft);
+}
+.tile.unread .tile-name {
+  font-weight: 700;
+}
+.tile.unread .tile-preview {
+  color: var(--ink);
+  font-weight: 500;
+}
+.tile-marks {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+
+/* ── conversation surface ───────────────────────────────────────────────── */
+
+.surface {
+  grid-column: 3;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: var(--s-4) var(--s-4) var(--s-4) 0;
+  border-radius: var(--r-clay-lg);
+  background: var(--clay-surface);
+  box-shadow: var(--clay-2);
+  overflow: hidden;
+}
+
+/* ── clay sheets: slide over, never a fixed third column ────────────────── */
+
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  background: rgba(30, 26, 23, 0.32);
+  backdrop-filter: blur(2px);
+}
+
+.sheet {
+  position: fixed;
+  z-index: calc(var(--z-sheet) + 1);
+  top: var(--s-4);
+  right: var(--s-4);
+  bottom: var(--s-4);
+  width: min(400px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--clay-surface);
+  border-radius: var(--r-clay-lg);
+  box-shadow: var(--clay-3);
+  overflow: hidden;
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  flex: none;
+}
+.sheet-title {
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  flex: 1;
+}
+.sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--s-4) var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.sheet-foot {
+  flex: none;
+  padding: var(--s-3) var(--s-4) var(--s-4);
+  display: flex;
+  gap: var(--s-2);
+}
+
+.sheet-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.sheet-section > .eyebrow {
+  padding-left: 4px;
+  margin-bottom: 2px;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 11px 14px;
+  text-align: left;
+  background: var(--clay-surface);
+  border-radius: var(--r-clay-sm);
+  box-shadow: var(--clay-1);
+  transition:
+    box-shadow var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+button.list-row:hover {
+  box-shadow: var(--clay-2);
+  transform: translateY(-1px);
+}
+button.list-row:active {
+  box-shadow: var(--clay-in);
+  transform: none;
+}
+.list-row .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.list-row-label {
+  font-weight: 500;
+  font-size: var(--t-base);
+}
+.list-row-sub {
+  font-size: var(--t-xs);
+  color: var(--ink-soft);
+}
+
+/* ── empty state ────────────────────────────────────────────────────────── */
+
+.empty {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s-3);
+  padding: var(--s-7);
+  text-align: center;
+}
+.empty-art {
+  width: 168px;
+  height: 168px;
+  opacity: 0.95;
+}
+.empty h3 {
+  font-size: var(--t-lg);
+}
+.empty p {
+  max-width: 340px;
+  color: var(--ink-soft);
+  font-size: var(--t-sm);
+}
+
+/* ── toasts ─────────────────────────────────────────────────────────────── */
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: var(--s-5);
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-items: center;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 10px 16px;
+  background: var(--ink);
+  color: var(--ink-invert);
+  border-radius: var(--r-pill);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  box-shadow: 0 10px 26px rgba(30, 26, 23, 0.3);
+  pointer-events: auto;
+  max-width: min(440px, calc(100vw - 32px));
+}
+.toast.bad {
+  background: var(--rust);
+  color: #fdf6f3;
+}
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+
+/* Tablet: shelf narrows */
+@media (max-width: 1180px) {
+  :root {
+    --shelf-w: 268px;
+  }
+}
+
+/* Small laptop / large tablet: shelf becomes an overlay drawer */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: var(--rail-w) 1fr;
+  }
+  .shelf {
+    position: fixed;
+    left: var(--rail-w);
+    top: 0;
+    bottom: 0;
+    z-index: 40;
+    width: min(340px, calc(100vw - var(--rail-w) - 12px));
+    background: var(--clay-bg);
+    box-shadow: 18px 0 40px rgba(30, 26, 23, 0.18);
+    padding-right: var(--s-3);
+  }
+  .surface {
+    grid-column: 2;
+    margin-left: 0;
+  }
+}
+
+/* Phone: rail moves to the bottom, surface goes full-bleed */
+@media (max-width: 640px) {
+  :root {
+    --rail-w: 0px;
+  }
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .rail {
+    grid-row: 2;
+    grid-column: 1;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    height: 66px;
+    padding: 8px var(--s-3) calc(8px + env(safe-area-inset-bottom));
+    background: var(--clay-surface);
+    box-shadow: 0 -6px 20px rgba(30, 26, 23, 0.1);
+  }
+  .rail-logo,
+  .rail-scroll {
+    display: none;
+  }
+  .rail-foot {
+    flex-direction: row;
+    gap: var(--s-5);
+    width: 100%;
+    justify-content: space-around;
+  }
+  .rail-item.active::before {
+    left: 50%;
+    top: -9px;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 5px;
+  }
+  .shelf {
+    /* Must be reset — the base rule pins it to column 2, which would otherwise
+       make the grid invent a second column on phones. */
+    grid-column: 1;
+    grid-row: 1;
+    position: static;
+    width: 100%;
+    box-shadow: none;
+    padding: var(--s-4) var(--s-3) 0;
+  }
+  .surface {
+    grid-row: 1;
+    grid-column: 1;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 88dvh;
+    border-radius: var(--r-clay-xl) var(--r-clay-xl) 0 0;
+  }
+  .sheet-head::before {
+    content: '';
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 42px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--clay-sunk);
+    box-shadow: var(--clay-in);
+  }
+  .sheet-head {
+    position: relative;
+    padding-top: var(--s-5);
+  }
+}
