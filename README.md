@@ -6,18 +6,27 @@
 
 ## Run it
 
+On Windows, double-click one of these — they install what's missing, start what's needed, and tell you what's happening:
+
+| File | What it does |
+|---|---|
+| **`Nook-Web.bat`** | Starts the API and the web app, opens your browser |
+| **`Nook-Mobile.bat`** | Starts the API and Expo, and points your phone at this computer |
+| **`Make-Keys.bat`** | Generates your JWT and push keys locally, for deployment |
+| **`Stop-Nook.bat`** | Stops everything |
+
+Or by hand:
+
 ```bash
-# from the project root
 npm run install:all      # installs client + server
 
-# terminal 1
-npm run dev:server       # http://localhost:4000
-
-# terminal 2
-npm run dev:client       # http://localhost:5173
+npm run dev:server       # terminal 1 — http://localhost:4000
+npm run dev:client       # terminal 2 — http://localhost:5173
 ```
 
 Open **http://localhost:5173**.
+
+**`Nook-Mobile.bat` does one thing worth knowing about:** it finds the address your *phone* can reach this computer on, and writes it to `mobile/.env`. That's the most common reason a React Native app "can't connect" — `localhost` on a phone means the phone. It deliberately skips VirtualBox, WSL, Hyper-V and VPN adapters, which all look like valid addresses and none of which your phone can reach.
 
 **No database to install.** libSQL is embedded: with no Turso credentials the server writes to `server/data/nook.db`, a real SQLite file that survives restarts. Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` when you deploy.
 

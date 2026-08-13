@@ -1,8 +1,16 @@
 # Go live — the checklist
 
-Tick these in order. About 30 minutes, ₹0 to start.
+Tick these in order. About 30 minutes, ₹0 to start, nothing sleeping.
 
 `DEPLOY.md` explains the *why* behind each step. This is the *do*.
+
+---
+
+## Before you start: generate your secrets
+
+Double-click **`Make-Keys.bat`**. It creates your JWT secrets and VAPID push keys **on your own machine** using Node's crypto library, writes them to `MY-KEYS.txt`, and opens it. That file is git-ignored, so it can't be committed by accident.
+
+You'll paste those values into the dashboards below, then delete the file. Nothing secret ever needs to travel through a chat, an email or a commit.
 
 ---
 
@@ -38,6 +46,25 @@ git push -u origin main
 - [ ] **Private repo** unless you intend it to be public
 
 > Already checked: `.env`, `*.db`, `node_modules/` and `uploads/` are all excluded. The database file contains real password hashes — never commit it.
+
+---
+
+## Can I use MongoDB instead? (Northflank has it as an addon)
+
+**Yes, Northflank offers MongoDB** — their addons cover PostgreSQL, MySQL, MongoDB, Redis, MinIO, Memcached and RabbitMQ, with backups and TLS built in, and the free Sandbox includes **one database**.
+
+**But Nook no longer speaks MongoDB.** You asked to move to Turso, and that migration replaced the entire data layer: the schema, four data modules, all nine route files, the socket layer, the scheduler and the seed — roughly 2,000 lines, now SQL. Going back to Mongo means undoing all of it and re-testing every feature, for no gain. Search would also get *worse*: SQLite FTS5 gives ranked prefix matching, which the Mongo version never had.
+
+So you have two sensible choices, and MongoDB isn't one of them:
+
+| | **Turso** (recommended) | **SQLite on a Northflank volume** |
+|---|---|---|
+| Setup | One signup, two env vars | No signup, no keys at all |
+| Durability | Managed, replicated, backed up | Lives or dies with that one service |
+| If you delete the service | Data is safe | Data is gone |
+| Free tier | 9 GB, 1 billion row reads/month | Uses your Sandbox storage |
+
+Turso for anything you'd be upset to lose. The volume is fine for a throwaway trial — leave `TURSO_DATABASE_URL` empty, attach a volume at `/app/data`, and the server writes `nook.db` there automatically.
 
 ---
 
