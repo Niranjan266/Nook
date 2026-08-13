@@ -114,7 +114,7 @@ export function NewChatSheet() {
               : wasNookId
                 ? // Saying "no such name" when they pasted a code would send
                   // them hunting for a typo in the name instead of the code.
-                  'No account has that Nook ID. Codes can be regenerated — ask them for a fresh one.'
+                  'No account has that Nook ID. Check for a typo — codes never change, so an old one still works.'
                 : 'Nobody by that name. Usernames are exact — no phone numbers involved.'}
           </p>
         )}

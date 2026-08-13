@@ -18,6 +18,17 @@ export const env = {
   publicUrl: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
 
   /**
+   * Where the *app* lives — the link people click in emails. Distinct from
+   * PUBLIC_URL, which is where the API lives: a button pointing at the API
+   * would open a JSON 404. Falls back to the first allowed client origin,
+   * which is right in every deployment we have.
+   */
+  appUrl: (process.env.APP_URL || process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+    .split(',')[0]
+    .trim()
+    .replace(/\/+$/, ''),
+
+  /**
    * Set to `.yoursite.com` when the app and API are subdomains of one domain.
    * The refresh cookie then belongs to the whole site, which makes it
    * first-party.

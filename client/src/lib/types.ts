@@ -4,7 +4,7 @@ export type Visibility = 'everyone' | 'contacts' | 'nobody';
 export interface Person {
   id: string;
   username: string;
-  /** Short shareable code, e.g. `nook-7f3k2q`. Searchable; can be regenerated. */
+  /** Permanent shareable code, e.g. `nook-7f3k2q`. Searchable, never changes. */
   nookId?: string;
   /**
    * What *you* should call this person — already resolved by the server, so

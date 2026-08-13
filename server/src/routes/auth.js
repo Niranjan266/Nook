@@ -13,7 +13,7 @@ import {
   attachSession,
   readRefreshToken,
 } from '../services/tokens.js';
-import { sendRecoveryCode, sendEmailVerification } from '../services/mail.js';
+import { sendRecoveryCode, sendEmailVerification, sendWelcome } from '../services/mail.js';
 
 const router = Router();
 
@@ -95,6 +95,22 @@ router.post(
       passwordHash: await hashPassword(password),
       email: email || '',
     });
+
+    /**
+     * Welcome mail is a courtesy, not part of signing up. Brevo being down, a
+     * rejected sender address or a typo'd domain must never turn a successful
+     * account creation into an error the person cannot act on — their account
+     * exists either way. So: fire it, don't await it, and swallow the failure
+     * into the log where it belongs.
+     */
+    if (user.email) {
+      sendWelcome({
+        to: user.email,
+        displayName: user.displayName,
+        username: user.username,
+        nookId: user.nookId,
+      }).catch((err) => console.error(`  email     welcome failed for ${user.email}: ${err.message}`));
+    }
 
     const session = attachSession(req, res, user.id);
     res.status(201).json({ user: await me(user), accessToken: signAccess(user.id), ...session });

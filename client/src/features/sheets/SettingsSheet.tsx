@@ -3,7 +3,7 @@ import { useAuth } from '@/stores/auth';
 import { useUi } from '@/stores/ui';
 import Sheet from '@/components/Sheet';
 import Avatar from '@/components/Avatar';
-import { upload, post, put } from '@/lib/api';
+import { upload, post, put, patch, get } from '@/lib/api';
 import { enablePush, disablePush, pushState } from '@/lib/push';
 import { toClock, fromClock, isQuietNow } from '@/lib/rooms';
 import type { QuietHours } from '@/lib/types';
@@ -46,6 +46,9 @@ export default function SettingsSheet() {
   const [about, setAbout] = useState(me?.about || '');
   const [copied, setCopied] = useState(false);
   const [rolling, setRolling] = useState(false);
+  const [editingHandle, setEditingHandle] = useState(false);
+  const [handle, setHandle] = useState(me?.username || '');
+  const [handleNote, setHandleNote] = useState('');
 
   const open = sheet === 'settings';
   if (!me) return null;
@@ -91,16 +94,38 @@ export default function SettingsSheet() {
     setTimeout(() => setCopied(false), 1600);
   };
 
-  const regenerateNookId = async () => {
+  const saveUsername = async () => {
+    const next = handle.trim().toLowerCase();
+    if (!next || next === me.username) {
+      setEditingHandle(false);
+      return;
+    }
     setRolling(true);
     try {
-      const { nookId } = await post<{ nookId: string }>('/users/me/nook-id');
-      setMe({ ...me, nookId });
-      toast('New Nook ID. The old one no longer finds you.');
-    } catch {
-      toast('Could not make a new Nook ID.', true);
+      const r = await patch<{ username: string }>('/users/me/username', { username: next });
+      setMe({ ...me, username: r.username });
+      setEditingHandle(false);
+      setHandleNote('');
+      toast(`You're @${r.username} now`);
+    } catch (err: any) {
+      setHandleNote(err?.message || 'Could not change your username.');
     } finally {
       setRolling(false);
+    }
+  };
+
+  /** Live availability, so nobody types a whole name to be told it's taken. */
+  const checkHandle = async (value: string) => {
+    setHandle(value);
+    const v = value.trim().toLowerCase();
+    if (!v || v === me.username) return setHandleNote('');
+    try {
+      const r = await get<{ available: boolean; reason: string }>(
+        `/users/username-available/${encodeURIComponent(v)}`
+      );
+      setHandleNote(r.available ? '✓ Available' : r.reason);
+    } catch {
+      setHandleNote('');
     }
   };
 
@@ -180,8 +205,8 @@ export default function SettingsSheet() {
       <div className="sheet-section">
         <span className="eyebrow">Your Nook ID</span>
         <p className="tiny faint" style={{ marginBottom: 6 }}>
-          Share this instead of your username. Anyone with it can find you — and if you’d rather they
-          couldn’t, make a new one. Your username never changes.
+          This is yours permanently and cannot be changed. Share it and people can always find you —
+          even after you change your username.
         </p>
         <div className="row" style={{ gap: 6 }}>
           <code className="nook-id grow">{me.nookId || '—'}</code>
@@ -190,15 +215,64 @@ export default function SettingsSheet() {
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
-        <button
-          className="clay-btn"
-          style={{ marginTop: 6 }}
-          onClick={regenerateNookId}
-          disabled={rolling}
-        >
-          <IconRefresh size={16} />
-          {rolling ? 'Making a new one…' : 'Make a new Nook ID'}
-        </button>
+      </div>
+
+      <div className="sheet-section">
+        <span className="eyebrow">Username</span>
+        {editingHandle ? (
+          <>
+            <input
+              className="groove"
+              aria-label="Username"
+              value={handle}
+              onChange={(e) => checkHandle(e.target.value)}
+              maxLength={20}
+              autoCapitalize="none"
+              spellCheck={false}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveUsername();
+                if (e.key === 'Escape') setEditingHandle(false);
+              }}
+            />
+            {handleNote && (
+              <p className="tiny" style={{ margin: '4px 0 0', color: handleNote.startsWith('✓') ? 'var(--moss)' : 'var(--rust)' }}>
+                {handleNote}
+              </p>
+            )}
+            <p className="tiny faint" style={{ margin: '4px 0 6px' }}>
+              3–20 characters: letters, numbers, dots and underscores. Your old username becomes free
+              for anyone else to take, so tell people your Nook ID if you want to stay findable.
+            </p>
+            <div className="row" style={{ gap: 6 }}>
+              <button className="clay-btn grow" onClick={() => setEditingHandle(false)}>
+                Cancel
+              </button>
+              <button
+                className="slab grow"
+                onClick={saveUsername}
+                disabled={rolling || handleNote.startsWith('Someone') || handleNote.startsWith('Letters')}
+              >
+                {rolling ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            className="list-row"
+            onClick={() => {
+              setHandle(me.username);
+              setHandleNote('');
+              setEditingHandle(true);
+            }}
+          >
+            <IconUser size={19} />
+            <span className="grow">
+              <span className="list-row-label">@{me.username}</span>
+              <span className="list-row-sub">Change your username</span>
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="sheet-section">

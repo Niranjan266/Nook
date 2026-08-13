@@ -86,9 +86,15 @@ services:
       - key: VAPID_SUBJECT
         value: mailto:hello@niranjand.in
 
-      # Optional. Brevo sends over HTTPS, which matters here: Render blocks
-      # outbound SMTP on ports 25, 465 and 587, so a classic SMTP mailer would
-      # not work on this platform at all.
+      # Where the app lives — the link in the welcome email. Distinct from
+      # PUBLIC_URL, which is where this API lives; a button pointing there
+      # would open a JSON 404.
+      - key: APP_URL
+        value: https://nook.niranjand.in
+
+      # Brevo sends over HTTPS, which matters here: Render blocks outbound
+      # SMTP on ports 25, 465 and 587, so a classic SMTP mailer would not work
+      # on this platform at all.
       - key: BREVO_API_KEY
         sync: false
       - key: BREVO_SENDER_EMAIL

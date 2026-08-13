@@ -256,17 +256,44 @@ it was created with. Set them once and never change them.
 The public key is not a secret, but the client does not read it from an env var
 — it fetches it from the API at runtime, which is why there is no `VITE_` twin.
 
-### Email — Brevo (optional)
+### Email — Brevo
 
 | Name | Value |
 |---|---|
 | `BREVO_API_KEY` | *(your Brevo v3 key)* |
 | `BREVO_SENDER_EMAIL` | `no-reply@niranjand.in` |
 | `BREVO_SENDER_NAME` | `Nook` |
+| `APP_URL` | `https://nook.niranjand.in` |
 
-Omit and recovery codes print to the server log instead of being emailed.
-Everything still functions; you just have to read the logs to recover an account.
-The sender address must be verified in Brevo first or sends fail.
+Three emails go out: the **welcome** (on signup, only when an address was
+given), the **recovery code**, and the **email confirmation** code.
+
+`APP_URL` is easy to confuse with `PUBLIC_URL` and they are not the same.
+`PUBLIC_URL` is where the *API* lives; `APP_URL` is where the *app* lives, and
+it is what the "Open Nook" button in the welcome email points at. Point it at
+the API by mistake and the button opens a JSON 404. If you leave it empty it
+falls back to the first `CLIENT_ORIGIN`, which is correct in this setup.
+
+**Setting up Brevo:**
+
+1. [brevo.com](https://www.brevo.com) → sign up (free tier is 300 emails/day)
+2. **Senders, Domains & Dedicated IPs → Domains** → add `niranjand.in`
+3. Add the DKIM, SPF and DMARC records Brevo gives you at **BigRock**
+4. Wait for verification, then **SMTP & API → API Keys** → create a v3 key
+5. Put the key in Render (never in the repo, never in Vercel)
+
+Skipping domain verification is the usual reason "it worked in the dashboard
+but not from the app": Brevo accepts the API call and then silently refuses to
+deliver from an unverified sender.
+
+Omit `BREVO_API_KEY` entirely and every email prints to the server log instead.
+Nothing breaks — you just read the log to recover an account. `/api/health`
+reports `"mail":"console"` when that is happening.
+
+Worth knowing: **Render blocks outbound SMTP on ports 25, 465 and 587.** Brevo
+is used over its HTTPS API here, so it is unaffected — but a classic SMTP
+mailer such as Nodemailer pointed at a mail server would not work on this host
+at all.
 
 ### Calls (optional, but read this)
 

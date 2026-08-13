@@ -370,8 +370,9 @@ CREATE TABLE IF NOT EXISTS guest_links (
 -- mechanism — keep new columns here, never edit the CREATE TABLE above, or
 -- existing databases will silently miss the change.
 
--- A short, shareable code (nook-7f3k2q). Distinct from `username`: the
--- username is a permanent handle, this can be regenerated if it leaks.
+-- A short, shareable code (nook-7f3k2q). This is the permanent identity a
+-- person hands out; `username` is the changeable handle. Nothing references
+-- either as a key — rows join on `id` — so a username change rewrites nothing.
 ALTER TABLE users ADD COLUMN nook_id TEXT NOT NULL DEFAULT '';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_nook_id ON users (nook_id) WHERE nook_id <> '';
 

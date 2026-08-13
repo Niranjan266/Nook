@@ -72,8 +72,38 @@ export async function nookIdTaken(nookId) {
 }
 
 /**
- * Assign a fresh Nook ID, retrying on collision. The unique index is the real
+ * Change the handle people type to find you.
+ *
+ * Safe to do freely precisely because it is *not* the identity: every
+ * conversation, message and contact edge references the immutable `id`, and
+ * anyone holding your Nook ID still lands on you. Nothing to rewrite.
+ *
+ * The unique constraint is the real guard against two people racing for the
+ * same name; the route's availability check is only there to give a civil
+ * error instead of a 500.
+ */
+export async function setUsername(userId, username) {
+  const clean = String(username).trim().toLowerCase();
+  try {
+    await run('UPDATE users SET username = ?, updated_at = ? WHERE id = ?', [clean, now(), userId]);
+  } catch (err) {
+    if (/unique|constraint/i.test(err.message)) {
+      const conflict = new Error('Someone already has that username.');
+      conflict.status = 409;
+      throw conflict;
+    }
+    throw err;
+  }
+  return findUserById(userId);
+}
+
+/**
+ * Assign a Nook ID, retrying on collision. The unique index is the real
  * guarantee — this loop just avoids surfacing the constraint error.
+ *
+ * Called once at signup and by the backfill. There is deliberately no route
+ * that reaches this: the Nook ID is the one thing about an account that never
+ * changes, which is what makes it safe to change the username.
  */
 export async function claimNookId(userId, attempts = 8) {
   for (let i = 0; i < attempts; i += 1) {

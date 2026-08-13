@@ -58,16 +58,52 @@ router.get(
   })
 );
 
-/* ── your own Nook ID ─────────────────────────────────────────────────────── */
+/* ── change your username ─────────────────────────────────────────────────
+   The Nook ID is the permanent identity and is deliberately not editable —
+   there is no endpoint for it. The username is the changeable handle.
 
-router.post(
-  '/me/nook-id',
+   That split is what makes changing a username safe. A freed-up username can
+   be claimed by someone else, so if the username were also the identity, a
+   rename would hand a stranger the ability to be mistaken for you. Because
+   the Nook ID never moves, anyone who saved your code still reaches the real
+   you no matter what you call yourself.
+   ────────────────────────────────────────────────────────────────────────── */
+
+const usernameRule = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, 'Usernames need at least 3 characters.')
+  .max(20, 'Usernames max out at 20 characters.')
+  .regex(/^[a-z0-9_.]+$/, 'Letters, numbers, dots and underscores only.');
+
+router.get(
+  '/username-available/:username',
   asyncRoute(async (req, res) => {
-    // Regenerating is the whole reason this is separate from the username:
-    // if you have handed your code to the wrong person, you can burn it
-    // without changing the handle your friends know you by.
-    const nookId = await U.claimNookId(req.user.id);
-    res.json({ nookId });
+    const parsed = usernameRule.safeParse(req.params.username);
+    if (!parsed.success) return res.json({ available: false, reason: parsed.error.issues[0].message });
+
+    // Your current username is "available" to you — otherwise the form reads
+    // as an error the moment you open it.
+    if (parsed.data === req.user.username) return res.json({ available: true, reason: 'This is your username.' });
+
+    const taken = await U.usernameTaken(parsed.data);
+    res.json({ available: !taken, reason: taken ? 'Someone already has that one.' : '' });
+  })
+);
+
+router.patch(
+  '/me/username',
+  asyncRoute(async (req, res) => {
+    const { username } = z.object({ username: usernameRule }).parse(req.body);
+
+    if (username === req.user.username) {
+      return res.json({ username, unchanged: true });
+    }
+    if (await U.usernameTaken(username)) throw httpError(409, 'Someone already has that username.');
+
+    const updated = await U.setUsername(req.user.id, username);
+    res.json({ username: updated.username, nookId: updated.nookId });
   })
 );
 
