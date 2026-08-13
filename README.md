@@ -13,6 +13,7 @@ On Windows, double-click one of these — they install what's missing, start wha
 | **`Nook-Web.bat`** | Starts the API and the web app, opens your browser |
 | **`Nook-Mobile.bat`** | Starts the API and Expo, and points your phone at this computer |
 | **`Make-Keys.bat`** | Generates your JWT and push keys locally, for deployment |
+| **`Gmail-Auth.bat`** | Connects a Gmail account for sending mail (one-time) |
 | **`Stop-Nook.bat`** | Stops everything |
 
 Or by hand:
@@ -115,6 +116,7 @@ chat app/
 ├── mobile/            Expo + React Native
 │   ├── app/           routes: sign-in · chats · chat · thread · room · calls · you
 │   └── src/           theme · components · lib · stores
-└── docs/              RENDER-STEP-BY-STEP.md · BREVO-SETUP.md · GO-LIVE.md
-                       ENV-VARS.md · KEYS.md · DEPLOY.md · SETUP.md · DESIGN.md · ROADMAP.md
+└── docs/              RENDER-STEP-BY-STEP.md · GMAIL-SETUP.md · BREVO-SETUP.md
+                       GO-LIVE.md · ENV-VARS.md · KEYS.md · DEPLOY.md · SETUP.md
+                       DESIGN.md · ROADMAP.md
 ```

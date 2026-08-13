@@ -73,6 +73,26 @@ export const env = {
     senderName: process.env.BREVO_SENDER_NAME || 'Nook',
   },
 
+  /**
+   * Gmail over its HTTPS API. Not SMTP: Render blocks outbound 25/465/587 on
+   * free instances, so smtp.gmail.com times out there with no useful error.
+   * Port 443 is never blocked, which is why this route works everywhere.
+   */
+  gmail: {
+    clientId: (process.env.GMAIL_CLIENT_ID || '').trim(),
+    clientSecret: (process.env.GMAIL_CLIENT_SECRET || '').trim(),
+    refreshToken: (process.env.GMAIL_REFRESH_TOKEN || '').trim(),
+    sender: (process.env.GMAIL_SENDER || '').trim(),
+    senderName: process.env.GMAIL_SENDER_NAME || 'Nook',
+  },
+
+  /**
+   * `auto` picks Gmail if it is configured, then Brevo, then the console.
+   * Set it explicitly to pin one — useful when both are configured and you
+   * want to be certain which is in play.
+   */
+  mailProvider: (process.env.MAIL_PROVIDER || 'auto').trim().toLowerCase(),
+
   vapid: {
     publicKey: process.env.VAPID_PUBLIC_KEY || '',
     privateKey: process.env.VAPID_PRIVATE_KEY || '',

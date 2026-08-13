@@ -5,19 +5,39 @@
  * No API key? Codes are printed to the server console so dev still works.
  */
 import { env } from '../config/env.js';
+import { sendViaGmail, gmailReady } from './gmail.js';
 
 const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
-async function send({ to, subject, html, text }) {
-  if (!env.brevo.enabled) {
-    console.log('\n  ┌─ email (console fallback — no BREVO_API_KEY) ──────────────');
-    console.log(`  │ to      ${to}`);
-    console.log(`  │ subject ${subject}`);
-    console.log(`  │ ${text.replace(/\n/g, '\n  │ ')}`);
-    console.log('  └────────────────────────────────────────────────────────────\n');
-    return { delivered: false, channel: 'console' };
-  }
+/**
+ * Which transport is in play.
+ *
+ * `auto` prefers Gmail when it is configured, because configuring it is a
+ * deliberate act — nobody fills in three OAuth values by accident — then
+ * Brevo, then the console. Setting MAIL_PROVIDER explicitly pins one, which
+ * matters when both are configured and you need to know which sent a message.
+ */
+export function resolveProvider() {
+  const pinned = env.mailProvider;
+  if (pinned === 'gmail') return gmailReady() ? 'gmail' : 'console';
+  if (pinned === 'brevo') return env.brevo.enabled ? 'brevo' : 'console';
+  if (pinned === 'console') return 'console';
 
+  if (gmailReady()) return 'gmail';
+  if (env.brevo.enabled) return 'brevo';
+  return 'console';
+}
+
+function toConsole({ to, subject, text, why }) {
+  console.log(`\n  ┌─ email (console — ${why}) ─────────────────────────────`);
+  console.log(`  │ to      ${to}`);
+  console.log(`  │ subject ${subject}`);
+  console.log(`  │ ${text.replace(/\n/g, '\n  │ ')}`);
+  console.log('  └────────────────────────────────────────────────────────────\n');
+  return { delivered: false, channel: 'console' };
+}
+
+async function sendViaBrevo({ to, subject, html, text }) {
   const res = await fetch(BREVO_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -40,6 +60,31 @@ async function send({ to, subject, html, text }) {
     return { delivered: false, channel: 'brevo', error: detail };
   }
   return { delivered: true, channel: 'brevo' };
+}
+
+async function send({ to, subject, html, text }) {
+  const provider = resolveProvider();
+
+  if (provider === 'console') {
+    const why =
+      env.mailProvider === 'console'
+        ? 'MAIL_PROVIDER=console'
+        : 'no Gmail or Brevo credentials configured';
+    return toConsole({ to, subject, text, why });
+  }
+
+  try {
+    if (provider === 'gmail') {
+      await sendViaGmail({ to, subject, html, text });
+      return { delivered: true, channel: 'gmail' };
+    }
+    return await sendViaBrevo({ to, subject, html, text });
+  } catch (err) {
+    // Never throw out of here. Callers treat mail as a courtesy — a signup
+    // must not fail because a mail provider is having a bad afternoon.
+    console.error(`  email     ${provider} failed: ${err.message}`);
+    return { delivered: false, channel: provider, error: err.message };
+  }
 }
 
 const shell = (heading, lead, code) => `
@@ -225,4 +270,4 @@ export function sendWelcome({ to, displayName, username, nookId }) {
   });
 }
 
-export const mailProvider = () => (env.brevo.enabled ? 'brevo' : 'console');
+export const mailProvider = resolveProvider;

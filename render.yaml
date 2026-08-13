@@ -102,6 +102,25 @@ services:
       - key: BREVO_SENDER_NAME
         value: Nook
 
+      # Gmail, via its HTTPS API. Obtained by running Gmail-Auth.bat locally —
+      # the refresh token is a long-lived credential and belongs in this
+      # dashboard, not in the repo. SMTP is not an option on this host: Render
+      # blocks outbound 25/465/587 on free instances.
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: GMAIL_SENDER
+        sync: false
+      - key: GMAIL_SENDER_NAME
+        value: Nook
+
+      # auto prefers Gmail when configured, then Brevo, then logs to console.
+      - key: MAIL_PROVIDER
+        value: auto
+
       - key: STUN_URLS
         value: stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
       - key: TURN_URL
