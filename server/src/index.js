@@ -132,16 +132,29 @@ attachSockets(io);
 
 await migrate();
 
-// An empty database has nothing to look at, so fill it with the demo accounts.
-// Also honours SEED_DEMO=1 to re-seed a database that already has data.
-const { isEmpty, seedDemoData } = await import('./seed.js');
-if ((await isEmpty()) || process.env.SEED_DEMO === '1') {
+/**
+ * An empty database has nothing to look at, so development fills it with demo
+ * accounts. Those accounts have a published password ("nookdemo1"), so seeding
+ * them into a production deployment would hand anyone who has read this repo
+ * four working logins on the live app — and a brand-new Turso database is
+ * empty, which is exactly when the old condition fired.
+ *
+ * Production therefore never auto-seeds. SEED_DEMO=1 remains as a deliberate,
+ * explicit override for staging.
+ */
+const wantsSeed = process.env.SEED_DEMO === '1';
+if (wantsSeed || (!isProd && (await (await import('./seed.js')).isEmpty()))) {
+  const { seedDemoData } = await import('./seed.js');
+  if (isProd) console.warn('  seed      SEED_DEMO=1 in production — creating demo accounts');
   await seedDemoData();
 }
 
 startScheduler();
 
-server.listen(env.port, () => {
+// 0.0.0.0 rather than Node's default: a container platform's proxy reaches the
+// service over IPv4, and the default binds IPv6-any, which fails outright on
+// hosts where IPv6 is disabled.
+server.listen(env.port, '0.0.0.0', () => {
   console.log('');
   console.log('  ╭──────────────────────────────────────────────╮');
   console.log('  │  Nook — server                               │');

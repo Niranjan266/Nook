@@ -79,42 +79,41 @@ Two things about this variable:
 
 ## Where `PUBLIC_URL` comes from
 
-`PUBLIC_URL` is not a value you invent. It is **the address Northflank gives
-your service**, and it arrives in two stages.
+`PUBLIC_URL` is not a value you invent. It is **the address Render gives your
+service**, and it arrives in two stages.
 
-### Stage 1 — the free generated domain
+### Stage 1 — the free `onrender.com` domain
 
-The moment you create the service and expose port 4000, Northflank publishes it
-on a domain it generates for you, shaped like:
+The moment the service deploys, Render publishes it on a domain derived from
+the service name:
 
 ```
-https://p01--nook-api--7k2xqbvmn4rd.code.run
+https://nook-api.onrender.com
 ```
 
-Find it under **your service → Ports & DNS** (the "Public DNS" column), or on
-the service overview. It has working HTTPS immediately and needs no DNS setup at
-all. Use it as `PUBLIC_URL` for your first deploy — everything works.
+It is shown at the top of the service page and has working HTTPS immediately,
+with no DNS setup at all. Use it as `PUBLIC_URL` for your first deploy —
+everything works.
 
-> **While you are on the generated domain, `COOKIE_DOMAIN` must be empty.**
+> **While you are on that domain, `COOKIE_DOMAIN` must be empty.**
 >
-> A server can only set a cookie for its own domain. If `code.run` tries to
+> A server can only set a cookie for its own domain. If `onrender.com` tries to
 > issue `Domain=.niranjand.in`, the browser rejects the cookie outright and
 > nobody can stay signed in. Leave `COOKIE_DOMAIN` blank and `tokens.js` falls
 > back to `SameSite=None; Secure`, which is cross-site but functional.
 
 ### Stage 2 — your own subdomain
 
-Northflank → your service → **Domains** → **Add domain** → `nook-api.niranjand.in`.
-
-Northflank gives you two records to create at your DNS host:
+Render → your service → **Settings → Custom Domains** → **Add Custom Domain** →
+`nook-api.niranjand.in`. Render then shows one record to create at BigRock:
 
 | Type | Name | Value |
 |---|---|---|
-| `TXT` | `_nf-verification.nook-api` | *(the token Northflank shows)* |
-| `CNAME` | `nook-api` | *(the target Northflank shows)* |
+| `CNAME` | `nook-api` | `nook-api.onrender.com` |
 
+Custom domains and managed TLS are both included on the free instance type.
 Once it verifies, Let's Encrypt issues the certificate automatically. **Then**
-switch `PUBLIC_URL` to `https://nook-api.niranjand.in` and set
+switch `PUBLIC_URL` to `https://nook-api.niranjand.in`, set
 `COOKIE_DOMAIN=.niranjand.in`, and update `VITE_API_URL` in Vercel + redeploy.
 
 ---
@@ -162,9 +161,37 @@ for the change to propagate, then confirm all answers agree before adding
 
 ---
 
-## Northflank → your service → Environment
+## Render → your service → Environment
 
-This is the real backend, and this is where every secret lives.
+This is the real backend, and this is where every secret lives. `render.yaml`
+at the repo root already declares all of them, so Render prompts you for each
+one during **New → Blueprint**. Nothing secret is stored in the repo: every
+sensitive key is marked `sync: false`, which means "ask me, never commit".
+
+### What the free instance actually gives you
+
+| | |
+|---|---|
+| RAM / CPU | 512 MB, 0.1 CPU |
+| Credit card | Not required |
+| WebSockets | Supported — required here, and the reason Vercel can't host this half |
+| Custom domain + TLS | Included on free |
+| Filesystem | **Ephemeral.** Wiped on every redeploy, restart and spin-down |
+| Outbound SMTP | Blocked on ports 25/465/587 — Brevo's HTTPS API is unaffected |
+
+**The one real limitation:** Render spins the service down after **15 minutes
+with no inbound traffic**, and the next request takes about a minute to wake it.
+Inbound traffic includes WebSocket messages on existing connections, so an
+active conversation keeps it awake by itself; the delay is only felt by the
+first person to open the app after a quiet spell.
+
+If you want it awake permanently, a free external pinger (cron-job.org, no card)
+hitting `/api/health` every 10 minutes will do it — but note the arithmetic
+before you set that up. Render grants **750 free instance hours per month** and
+a 31-day month is 744 hours, so a permanently-awake service consumes almost the
+entire allowance and leaves ~6 hours of margin for the whole workspace. Run a
+second free service and you will be suspended before month end. Sleeping is the
+safer default.
 
 ### Required
 
@@ -173,7 +200,7 @@ This is the real backend, and this is where every secret lives.
 | `NODE_ENV` | `production` | Turns on secure cookies and disables verbose logging. |
 | `PORT` | `4000` | Must match the port you exposed on the service. |
 | `CLIENT_ORIGIN` | `https://nook.niranjand.in` | CORS allow-list. Comma-separate for more than one. A mismatch here is the classic "works locally, blocked in production". |
-| `PUBLIC_URL` | `https://nook-api.niranjand.in` | How the API refers to itself in media URLs and push payloads. See "Where `PUBLIC_URL` comes from" above — on your first deploy this is the `.code.run` domain. |
+| `PUBLIC_URL` | `https://nook-api.niranjand.in` | How the API refers to itself in media URLs and push payloads. See "Where `PUBLIC_URL` comes from" above — on your first deploy this is the `onrender.com` domain. |
 | `COOKIE_DOMAIN` | `.niranjand.in` | **Leading dot is required — and leave it empty until the custom domain is live.** See below. |
 | `TURSO_DATABASE_URL` | `libsql://nook-nook.aws-ap-south-1.turso.io` | Not a secret — it is just an address. |
 | `TURSO_AUTH_TOKEN` | *(your **rotated** token)* | Secret. Full read/write on the database. |
@@ -209,7 +236,7 @@ Cloudinary Console → Settings → Access Keys → **Generate New Key**, then d
 the old one.
 
 All three must be present or `env.js` sets `cloudinary.enabled = false` and the
-server silently falls back to writing files to local disk. On Northflank that
+server silently falls back to writing files to local disk. On Render that
 disk is wiped on every redeploy, so your images would quietly vanish.
 `GET /api/health` reports which mode is active — check it after deploying.
 
@@ -278,7 +305,7 @@ computer's LAN address, because `localhost` on a phone means the phone itself.
 Double-click **`Make-Keys.bat`**. It writes `MY-KEYS.txt` containing the two JWT
 secrets and the VAPID pair, generated on your machine by Node's crypto module.
 
-`MY-KEYS.txt` is in `.gitignore`. Copy the values into Northflank, then delete
+`MY-KEYS.txt` is in `.gitignore`. Copy the values into Render, then delete
 the file.
 
 **Do not ask anyone — including me — to generate these for you.** A secret that

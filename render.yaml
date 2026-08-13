@@ -1,85 +1,106 @@
-# Render blueprint for the Nook API.
+# Nook API — Render Blueprint
 #
-# In Render: New → Blueprint → point it at this repo. It reads this file.
-# Secrets marked `sync: false` are NOT stored here — you type them into the
-# Render dashboard once, and they never touch the repository.
+# Render reads this file from the repo root and creates the service for you, so
+# the dashboard form is prefilled and reproducible. In the dashboard:
+#   New  →  Blueprint  →  pick the Nook repo  →  Apply
+#
+# Only the frontend lives on Vercel. This is the always-listening half: Express
+# plus Socket.IO plus WebRTC signalling, which a serverless function cannot host
+# because it cannot hold a socket open between invocations.
 
 services:
   - type: web
     name: nook-api
-    runtime: node
-    plan: free # $7/mo "starter" stops the instance sleeping — see notes below
-    region: singapore # closest of Render's regions to India; also: oregon, frankfurt, ohio, virginia
-    rootDir: server
-    buildCommand: npm install --no-audit --no-fund
-    startCommand: node src/index.js
+    runtime: docker
+    plan: free
+    region: singapore # closest Render region to India — lowest round-trip for chat
+    branch: main
+
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+
+    # Render restarts the service if this stops returning 2xx. It reports which
+    # backing service actually won (turso vs sqlite-file, cloudinary vs
+    # local-disk), so a misconfigured deploy is visible rather than silent.
     healthCheckPath: /api/health
 
-    # Media lives here when Cloudinary isn't configured. Without a disk, Render's
-    # filesystem is ephemeral and every uploaded photo vanishes on redeploy.
-    # Disks are not available on the free plan — use Cloudinary, or upgrade.
-    # disk:
-    #   name: nook-uploads
-    #   mountPath: /opt/render/project/src/server/uploads
-    #   sizeGB: 5
+    autoDeploy: true
 
     envVars:
       - key: NODE_ENV
         value: production
+
+      # Render injects its own PORT and the Dockerfile defaults to 4000; both
+      # agree, and env.js reads process.env.PORT first either way.
       - key: PORT
         value: 4000
 
-      # Generated once by Render and kept. Changing these signs everyone out.
+      # CORS allow-list. An exact match is required: `credentials: true` with a
+      # wildcard origin is silently ignored by browsers.
+      - key: CLIENT_ORIGIN
+        value: https://nook.niranjand.in
+
+      # How the API refers to itself in media URLs and push payloads. Change
+      # this to the custom domain once it is verified.
+      - key: PUBLIC_URL
+        sync: false
+
+      # Leave EMPTY until nook-api.niranjand.in is live. A server can only set
+      # cookies for its own domain, so issuing Domain=.niranjand.in from an
+      # onrender.com host makes the browser discard the cookie and nobody stays
+      # signed in. Blank falls back to SameSite=None; Secure, which works
+      # cross-site.
+      - key: COOKIE_DOMAIN
+        sync: false
+
+      # sync: false means "prompt me, never store in git". Every secret below
+      # is typed into the Render dashboard once.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+
+      # Generate locally with Make-Keys.bat. Must differ from each other.
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
 
-      # ── you fill these in the dashboard ──────────────────────────────────
-      - key: TURSO_DATABASE_URL # libsql://nook-you.turso.io
-        sync: false
-      - key: TURSO_AUTH_TOKEN # from `turso db tokens create nook`
-        sync: false
-      - key: CLIENT_ORIGIN # https://nook.niranjand.in
-        sync: false
-      - key: PUBLIC_URL # https://nook-api.niranjand.in
-        sync: false
-      - key: COOKIE_DOMAIN # .niranjand.in  ← the leading dot matters
-        sync: false
-
-      # ── optional; everything degrades gracefully without them ────────────
+      # Free instances have an ephemeral filesystem that is wiped on every
+      # redeploy, restart and spin-down. Without Cloudinary configured the
+      # server falls back to local disk and every uploaded photo disappears.
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
-      - key: BREVO_API_KEY
-        sync: false
-      - key: BREVO_SENDER_EMAIL
-        sync: false
+
+      # Omit and a throwaway VAPID keypair is generated on every boot, which
+      # silently invalidates every existing push subscription on each restart —
+      # and free instances restart often.
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
       - key: VAPID_SUBJECT
+        value: mailto:hello@niranjand.in
+
+      # Optional. Brevo sends over HTTPS, which matters here: Render blocks
+      # outbound SMTP on ports 25, 465 and 587, so a classic SMTP mailer would
+      # not work on this platform at all.
+      - key: BREVO_API_KEY
         sync: false
+      - key: BREVO_SENDER_EMAIL
+        value: no-reply@niranjand.in
+      - key: BREVO_SENDER_NAME
+        value: Nook
+
+      - key: STUN_URLS
+        value: stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
       - key: TURN_URL
         sync: false
       - key: TURN_USERNAME
         sync: false
       - key: TURN_CREDENTIAL
         sync: false
-      - key: ALLOW_VERCEL_PREVIEWS
-        value: '0'
-# Notes on the free plan, so nothing here surprises you:
-#
-#   1. It sleeps after 15 minutes with no traffic. Sleeping drops every open
-#      socket, so messages stop arriving in real time until someone loads the
-#      app again and wakes it (~30 seconds cold start).
-#   2. No persistent disk, so set Cloudinary or uploaded media disappears on
-#      every deploy.
-#   3. 750 instance-hours a month across all your free services.
-#
-# For anything you'd ask a friend to actually use, the $7 starter plan removes
-# points 1 and 2.

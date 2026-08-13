@@ -18,7 +18,7 @@ You'll paste those values into the dashboards below, then delete the file. Nothi
 
 ```
   nook.niranjand.in      →  Vercel      the web app (static files)
-  nook-api.niranjand.in  →  Northflank  the API (Node + Socket.IO) — always-on, free
+  nook-api.niranjand.in  →  Render      the API (Node + Socket.IO) — free, no card
                          →  Turso       the database
 ```
 
@@ -49,22 +49,26 @@ git push -u origin main
 
 ---
 
-## Can I use MongoDB instead? (Northflank has it as an addon)
+## Why the database has to be Turso, not a file on the server
 
-**Yes, Northflank offers MongoDB** — their addons cover PostgreSQL, MySQL, MongoDB, Redis, MinIO, Memcached and RabbitMQ, with backups and TLS built in, and the free Sandbox includes **one database**.
+Render's free instances have an **ephemeral filesystem**. Anything written to
+disk is erased on every redeploy, every restart, and every spin-down after 15
+idle minutes — and Render explicitly states it may restart a free service at any
+time. Persistent disks exist, but only on paid instances.
 
-**But Nook no longer speaks MongoDB.** You asked to move to Turso, and that migration replaced the entire data layer: the schema, four data modules, all nine route files, the socket layer, the scheduler and the seed — roughly 2,000 lines, now SQL. Going back to Mongo means undoing all of it and re-testing every feature, for no gain. Search would also get *worse*: SQLite FTS5 gives ranked prefix matching, which the Mongo version never had.
+So a local `nook.db` on Render would not be a database; it would be a cache that
+silently empties itself several times a day, taking every account and message
+with it. `TURSO_DATABASE_URL` is not optional on this host.
 
-So you have two sensible choices, and MongoDB isn't one of them:
+Turso's free tier is 9 GB and 1 billion row reads a month, which this app will
+not come close to. Nothing to design or migrate either — the schema builds
+itself on first boot.
 
-| | **Turso** (recommended) | **SQLite on a Northflank volume** |
-|---|---|---|
-| Setup | One signup, two env vars | No signup, no keys at all |
-| Durability | Managed, replicated, backed up | Lives or dies with that one service |
-| If you delete the service | Data is safe | Data is gone |
-| Free tier | 9 GB, 1 billion row reads/month | Uses your Sandbox storage |
-
-Turso for anything you'd be upset to lose. The volume is fine for a throwaway trial — leave `TURSO_DATABASE_URL` empty, attach a volume at `/app/data`, and the server writes `nook.db` there automatically.
+**And MongoDB is no longer an option regardless of host.** The Turso migration
+replaced the entire data layer: schema, four data modules, all nine route files,
+the socket layer, scheduler and seed — roughly 2,000 lines, now SQL. Going back
+means undoing all of it for no gain, and search would get *worse*: SQLite FTS5
+gives ranked prefix matching that the Mongo version never had.
 
 ---
 
@@ -79,40 +83,75 @@ Keep both in a password manager. Nothing to design or migrate — the schema bui
 
 ---
 
-## 2 · The API — Northflank — 10 min
+## 2 · The API — Render — 10 min
 
-> **Why not Render:** its free plan sleeps after 15 minutes idle, which drops every WebSocket. For a chat app that's the one thing you can't really live with. Northflank's free Sandbox is **always-on** — no cold starts, no pinger needed, no credit card. Render's config is still in the repo (`render.yaml`) if you'd rather use it; see the comparison at the bottom.
+No credit card. `render.yaml` at the repo root already describes the whole
+service, so Render fills in the form and simply asks you for the secrets.
 
-- [ ] [northflank.com](https://northflank.com) → sign up → connect GitHub
-- [ ] **Create new → Service → Combined service** (build + deploy in one)
-- [ ] Repository: your `Nook` repo, branch `main`
-- [ ] Build type: **Dockerfile**
-      - Dockerfile path: `/server/Dockerfile`
-      - Build context: `/server`
-- [ ] Port: **4000**, protocol **HTTP**, and tick **Publicly expose**
-- [ ] Resources: the smallest plan — Nook idles at well under 200 MB
-
-**Environment variables** (Northflank calls these *Secrets* → *Environment variables*):
+- [ ] [render.com](https://render.com) → sign up → connect GitHub
+- [ ] **New → Blueprint** → pick the `Nook` repo → **Apply**
+- [ ] Render reads `render.yaml`: Docker runtime, `/server/Dockerfile`, free instance, Singapore, health check on `/api/health`
+- [ ] It prompts for each `sync: false` variable. Fill in:
 
 | Variable | Value |
 |---|---|
-| `NODE_ENV` | `production` |
-| `PORT` | `4000` |
-| `JWT_ACCESS_SECRET` | generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
-| `JWT_REFRESH_SECRET` | run it **again** — must be different |
 | `TURSO_DATABASE_URL` | your `libsql://…` URL |
 | `TURSO_AUTH_TOKEN` | your token |
-| `CLIENT_ORIGIN` | `https://nook.niranjand.in` |
-| `PUBLIC_URL` | `https://nook-api.niranjand.in` |
-| `COOKIE_DOMAIN` | `.niranjand.in` ← **the leading dot matters** |
+| `PUBLIC_URL` | `https://nook-api.onrender.com` — the domain Render just gave you |
+| `COOKIE_DOMAIN` | **leave empty for now** (see below) |
+| `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | from Cloudinary |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | from `Make-Keys.bat` |
+| `BREVO_API_KEY` | optional |
+| `TURN_*` | optional |
 
-- [ ] Deploy, and wait for the build (~2–3 min the first time)
-- [ ] **Domains** → add `nook-api.niranjand.in`, link it to port 4000
-- [ ] Add the CNAME Northflank shows you at your DNS provider
-- [ ] Certificate is issued automatically via Let's Encrypt
-- [ ] Check `https://nook-api.niranjand.in/api/health` → `{"ok":true,…}`
+The two JWT secrets are marked `generateValue: true`, so Render creates them
+itself and you never see or handle them. That is strictly safer than pasting.
 
-**Free Sandbox gives you:** 2 services, 1 database, 2 cron jobs, always-on compute, ~2 GB storage, 500 build minutes/month. You're using one service. Nothing sleeps.
+- [ ] Deploy and wait (~3–4 min the first time — it builds the image)
+- [ ] Check `https://nook-api.onrender.com/api/health`
+
+```jsonc
+{ "db": "turso", "media": "cloudinary", "push": "configured" }
+```
+
+If any of those reads `sqlite-file`, `local-disk` or `ephemeral`, a variable
+didn't take. Fix it before going further.
+
+- [ ] In Vercel set `VITE_API_URL` to that same URL, redeploy, and confirm sign-up works
+
+**Then, and only then, move to the custom domain:**
+
+- [ ] **Settings → Custom Domains** → add `nook-api.niranjand.in`
+- [ ] Create the `CNAME` Render shows you at BigRock (see §6 — fix the nameservers first)
+- [ ] TLS is issued automatically via Let's Encrypt, free instance included
+- [ ] Now switch `PUBLIC_URL` → `https://nook-api.niranjand.in` and set `COOKIE_DOMAIN` → `.niranjand.in`
+- [ ] Update `VITE_API_URL` in Vercel and redeploy
+
+> **Why `COOKIE_DOMAIN` stays empty until this point.** A server can only set a
+> cookie for its own domain. An `onrender.com` host issuing
+> `Domain=.niranjand.in` has the cookie thrown away by the browser, and nobody
+> can stay signed in. Blank makes `tokens.js` fall back to
+> `SameSite=None; Secure`, which is cross-site but works.
+
+### The one thing to know about the free instance
+
+Render spins the service down after **15 minutes with no inbound traffic**, and
+the next request takes about a minute to wake it. Inbound traffic includes
+WebSocket messages on open connections, so an active conversation keeps itself
+alive — the wait is only paid by the first person to open the app after a quiet
+spell.
+
+You *can* keep it up permanently with a free pinger (cron-job.org, no card)
+hitting `/api/health` every 10 minutes. Do the arithmetic first: Render grants
+**750 free instance hours a month**, and a 31-day month is 744 hours. A
+permanently-awake service therefore eats almost the whole allowance and leaves
+about six hours of margin for the entire workspace — add a second free service
+and everything is suspended before month end. Letting it sleep is the safer
+default.
+
+Also note: the filesystem is **ephemeral** on free instances, wiped on every
+redeploy, restart and spin-down. That is why Turso and Cloudinary are not
+optional here — anything written to local disk is already gone.
 
 ---
 
@@ -198,7 +237,7 @@ At whoever manages `niranjand.in`:
 | Type | Name | Value |
 |---|---|---|
 | CNAME | `nook` | `cname.vercel-dns.com` |
-| CNAME | `nook-api` | whatever Northflank shows you in **Domains** |
+| CNAME | `nook-api` | `nook-api.onrender.com` (Render shows the exact value) |
 
 Copy the exact values each host displays — they differ per account and per region.
 
@@ -217,15 +256,27 @@ https://nook.niranjand.in                  → the sign-in screen
 
 I checked rather than going from memory — this space changes constantly and a lot of the advice online is out of date.
 
-| Host | Always-on free? | Verdict for a chat app |
-|---|---|---|
-| **Northflank** | **Yes** — Sandbox tier, no cold starts | **Use this.** 2 services, 1 database, 2 cron jobs, ~2 GB storage, no credit card. |
-| **Render** | No — sleeps at 15 min | Workable with a pinger, but 750 hrs/month means one service and no margin. |
-| **Fly.io** | No | The free allowance ended; it's trial credit then pay-as-you-go. |
-| **Koyeb** | No | Acquired by Mistral in early 2026; free tier closed to new signups. |
-| **Railway** | No | Trial credits, then paid. No standing free tier. |
-| **Oracle Cloud Always Free** | Technically yes | See below — genuinely free forever, but a bad fit here. |
-| **Vercel / Netlify functions** | N/A | Serverless. Cannot hold a WebSocket at all. |
+Checked against each provider's own documentation, not listicles — this space
+changes constantly and most of the advice online is stale.
+
+| Host | Card? | Always-on? | Verdict for a chat app |
+|---|---|---|---|
+| **Render** | No | No — sleeps at 15 min, ~1 min wake | **Use this.** 512 MB, WebSockets, custom domain + TLS on free. The sleep is the price; an active chat keeps itself awake. |
+| **Back4app Containers** | No | Within quota | 256 MB is tight once `sharp`/libvips loads, and 600 active hours/month is ~144 short of a full month. |
+| **Hugging Face Spaces** | No | Sleeps only after 48 h | Far more generous CPU/RAM, but built for ML demos, no custom domain on free, ephemeral disk. Off-label. |
+| **Northflank** | Disputed | Yes | Sandbox tier is genuinely always-on, but sources now conflict on whether a card is required for verification. |
+| **Fly.io** | Yes | Yes | Free allowance ended; trial credit, then pay-as-you-go. |
+| **Koyeb** | — | — | Acquired by Mistral. Pricing now starts at $29/mo; no free tier. |
+| **Railway** | Yes | Yes | Trial credits, then paid. No standing free tier. |
+| **Oracle Always Free** | Yes | Technically | See below — free forever, but a bad fit here. |
+| **Vercel / Netlify functions** | No | N/A | Serverless. Cannot hold a WebSocket at all. |
+
+**On "open source":** none of the managed platforms above are. If that is the
+priority, the honest answer is [Coolify](https://coolify.io) or
+[Dokploy](https://dokploy.com) — genuinely open-source, self-hosted PaaS that
+would run this Dockerfile with no vendor limits. Both need a server you rent
+(roughly ₹350–500/month). Open source and free-of-charge are different things,
+and no amount of searching collapses them into one.
 
 ### About Oracle Always Free
 
@@ -294,7 +345,7 @@ iOS needs an Apple Developer account (₹8,200/year). Android sideloading needs 
 | | Your setup |
 |---|---|
 | Vercel Hobby | ₹0 |
-| Northflank Sandbox | ₹0 — **always-on**, no credit card |
+| Render free instance | ₹0 — no credit card; sleeps after 15 min idle |
 | Turso | ₹0 — genuinely generous |
 | Cloudinary | ₹0 — 25 GB |
 | TURN (Open Relay) | ₹0 |
