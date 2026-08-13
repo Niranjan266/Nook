@@ -98,11 +98,13 @@ chat app/
 │       ├── components/Avatar · Sheet · Icon · Lightbox · Toasts
 │       └── features/  auth · shell · chat · calls · sheets
 ├── server/            Express + Socket.IO + libSQL
-├── mobile/            Expo + React Native
 │   └── src/
-│       ├── models/    User · Conversation · Message · Call · PushSubscription
-│       ├── routes/    auth · users · conversations · messages · media · push · calls
+│       ├── db/        schema.sql · users · conversations · messages · misc
+│       ├── routes/    auth · users · conversations · messages · rooms · spaces · media · push · calls
 │       ├── sockets/   connection, messaging, typing, presence, call signalling
-│       └── services/  media · mail · push · tokens · messages
-└── docs/              DESIGN.md · SETUP.md · API.md
+│       └── services/  media · mail · push · tokens · messages · scheduler
+├── mobile/            Expo + React Native
+│   ├── app/           routes: sign-in · chats · chat · thread · room · calls · you
+│   └── src/           theme · components · lib · stores
+└── docs/              GO-LIVE.md · KEYS.md · DEPLOY.md · SETUP.md · DESIGN.md · ROADMAP.md
 ```
