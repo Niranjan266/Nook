@@ -13,7 +13,7 @@ import {
   attachSession,
   readRefreshToken,
 } from '../services/tokens.js';
-import { sendRecoveryCode, sendEmailVerification, sendWelcome } from '../services/mail.js';
+import { sendRecoveryCode, sendEmailVerification, sendWelcome, mailProvider } from '../services/mail.js';
 
 const router = Router();
 
@@ -195,6 +195,57 @@ router.post(
 
     await U.updateUser(req.user.id, { passwordHash: await hashPassword(next) });
     res.json({ ok: true });
+  })
+);
+
+/* ── send yourself a test email ────────────────────────────────────────────
+   Deliberately only to the address already on your own account. Accepting a
+   recipient from the request body would turn this into an open relay: anyone
+   with an account could make your server send mail to anybody, and your
+   sending domain would wear the consequences.
+   ────────────────────────────────────────────────────────────────────────── */
+
+const testMailLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Five test emails an hour is plenty. Try again later.' },
+});
+
+router.post(
+  '/test-email',
+  requireAuth,
+  testMailLimit,
+  asyncRoute(async (req, res) => {
+    if (!req.user.email) {
+      throw httpError(400, 'Add an email address to your account first, in Settings.');
+    }
+
+    const provider = mailProvider();
+    const result = await sendWelcome({
+      to: req.user.email,
+      displayName: req.user.displayName,
+      username: req.user.username,
+      nookId: req.user.nookId,
+    });
+
+    // Report what actually happened rather than a bare ok:true. "Sent" when
+    // nothing left the building is exactly the kind of reassurance that costs
+    // an hour of looking in the wrong place.
+    res.json({
+      to: req.user.email,
+      provider,
+      delivered: result.delivered,
+      channel: result.channel,
+      error: result.error || '',
+      note:
+        result.channel === 'console'
+          ? 'No mail provider is configured, so this was printed to the server log instead of sent.'
+          : result.delivered
+            ? 'Handed to the provider. If it does not arrive, check their delivery log and your spam folder.'
+            : 'The provider refused it. The error is above and in the server log.',
+    });
   })
 );
 

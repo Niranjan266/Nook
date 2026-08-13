@@ -49,6 +49,11 @@ export default function SettingsSheet() {
   const [editingHandle, setEditingHandle] = useState(false);
   const [handle, setHandle] = useState(me?.username || '');
   const [handleNote, setHandleNote] = useState('');
+  const [emailStep, setEmailStep] = useState<null | 'edit' | 'code'>(null);
+  const [emailDraft, setEmailDraft] = useState(me?.email || '');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailChannel, setEmailChannel] = useState('');
 
   const open = sheet === 'settings';
   if (!me) return null;
@@ -126,6 +131,60 @@ export default function SettingsSheet() {
       setHandleNote(r.available ? '✓ Available' : r.reason);
     } catch {
       setHandleNote('');
+    }
+  };
+
+  const saveEmail = async () => {
+    setEmailBusy(true);
+    try {
+      const r = await post<{ channel: string }>('/auth/email', { email: emailDraft.trim() });
+      setEmailChannel(r.channel || '');
+      setEmailCode('');
+      setEmailStep('code');
+      // Reflect the pending address immediately; it is unverified until the
+      // code comes back, which the badge above makes clear.
+      setMe({ ...me, email: emailDraft.trim().toLowerCase(), emailVerified: false });
+    } catch (err: any) {
+      toast(err?.message || 'Could not send the code.', true);
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const verifyEmail = async () => {
+    setEmailBusy(true);
+    try {
+      const r = await post<{ user: typeof me }>('/auth/email/verify', { code: emailCode });
+      if (r.user) setMe(r.user);
+      setEmailStep(null);
+      toast('Email confirmed');
+    } catch (err: any) {
+      toast(err?.message || 'That code is not right.', true);
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const sendTest = async () => {
+    setEmailBusy(true);
+    try {
+      const r = await post<{ channel: string; delivered: boolean; error: string; note: string }>(
+        '/auth/test-email'
+      );
+      // Say what actually happened. "Sent" when nothing left the building is
+      // the kind of reassurance that costs an hour of looking in the wrong place.
+      toast(
+        r.channel === 'console'
+          ? 'No mail provider configured — it went to the server log.'
+          : r.delivered
+            ? `Sent via ${r.channel}. Check your inbox and spam folder.`
+            : `${r.channel} refused it: ${r.error}`,
+        !r.delivered
+      );
+    } catch (err: any) {
+      toast(err?.message || 'Could not send the test.', true);
+    } finally {
+      setEmailBusy(false);
     }
   };
 
@@ -272,6 +331,99 @@ export default function SettingsSheet() {
               <span className="list-row-sub">Change your username</span>
             </span>
           </button>
+        )}
+      </div>
+
+      <div className="sheet-section">
+        <span className="eyebrow">Email</span>
+        <p className="tiny faint" style={{ marginBottom: 6 }}>
+          Optional, and only ever used to get you back in if you forget your password. Confirming it
+          also lets a Google sign-in recognise this account as yours.
+        </p>
+
+        {me.email && !emailStep && (
+          <p className="small" style={{ margin: '0 0 6px' }}>
+            {me.email}{' '}
+            {me.emailVerified ? (
+              <span className="chip" style={{ color: 'var(--moss)' }}>
+                <IconCheck size={13} /> Confirmed
+              </span>
+            ) : (
+              <span className="chip" style={{ color: 'var(--ochre)' }}>
+                Not confirmed
+              </span>
+            )}
+          </p>
+        )}
+
+        {emailStep === 'code' ? (
+          <>
+            <input
+              className="groove"
+              aria-label="Six-digit code"
+              value={emailCode}
+              onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="123456"
+              inputMode="numeric"
+              autoFocus
+            />
+            <p className="tiny faint" style={{ margin: '4px 0 6px' }}>
+              We sent a six-digit code to {emailDraft}. It expires in 15 minutes.
+              {emailChannel === 'console' && ' No mail provider is configured, so it was printed to the server log.'}
+            </p>
+            <div className="row" style={{ gap: 6 }}>
+              <button className="clay-btn grow" onClick={() => setEmailStep(null)}>
+                Cancel
+              </button>
+              <button className="slab grow" onClick={verifyEmail} disabled={emailCode.length !== 6 || emailBusy}>
+                {emailBusy ? 'Checking…' : 'Confirm'}
+              </button>
+            </div>
+          </>
+        ) : emailStep === 'edit' ? (
+          <>
+            <input
+              className="groove"
+              aria-label="Email address"
+              type="email"
+              value={emailDraft}
+              onChange={(e) => setEmailDraft(e.target.value)}
+              placeholder="you@example.com"
+              autoCapitalize="none"
+              spellCheck={false}
+              autoFocus
+            />
+            <div className="row" style={{ gap: 6, marginTop: 6 }}>
+              <button className="clay-btn grow" onClick={() => setEmailStep(null)}>
+                Cancel
+              </button>
+              <button className="slab grow" onClick={saveEmail} disabled={!emailDraft.includes('@') || emailBusy}>
+                {emailBusy ? 'Sending…' : 'Send me a code'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              className="list-row"
+              onClick={() => {
+                setEmailDraft(me.email || '');
+                setEmailStep('edit');
+              }}
+            >
+              <IconBell size={19} />
+              <span className="grow">
+                <span className="list-row-label">{me.email ? 'Change email' : 'Add an email'}</span>
+                <span className="list-row-sub">For account recovery only</span>
+              </span>
+            </button>
+
+            {me.email && (
+              <button className="clay-btn" style={{ marginTop: 6 }} onClick={sendTest} disabled={emailBusy}>
+                {emailBusy ? 'Sending…' : 'Send me a test email'}
+              </button>
+            )}
+          </>
         )}
       </div>
 
