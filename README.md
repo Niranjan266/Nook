@@ -116,7 +116,7 @@ chat app/
 ├── mobile/            Expo + React Native
 │   ├── app/           routes: sign-in · chats · chat · thread · room · calls · you
 │   └── src/           theme · components · lib · stores
-└── docs/              RENDER-STEP-BY-STEP.md · GMAIL-SETUP.md · BREVO-SETUP.md
-                       GO-LIVE.md · ENV-VARS.md · KEYS.md · DEPLOY.md · SETUP.md
-                       DESIGN.md · ROADMAP.md
+└── docs/              RENDER-STEP-BY-STEP.md · GOOGLE-LOGIN-SETUP.md
+                       GMAIL-SETUP.md · BREVO-SETUP.md · GO-LIVE.md · ENV-VARS.md
+                       KEYS.md · DEPLOY.md · SETUP.md · DESIGN.md · ROADMAP.md
 ```

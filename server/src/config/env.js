@@ -87,6 +87,16 @@ export const env = {
   },
 
   /**
+   * Sign in with Google. Uses the server-side authorization-code flow, so a
+   * client secret is required — unlike the browser ID-token flow, which needs
+   * only the ID but forces you to use Google's own button.
+   */
+  google: {
+    clientId: (process.env.GOOGLE_CLIENT_ID || '').trim(),
+    clientSecret: (process.env.GOOGLE_CLIENT_SECRET || '').trim(),
+  },
+
+  /**
    * `auto` picks Gmail if it is configured, then Brevo, then the console.
    * Set it explicitly to pin one — useful when both are configured and you
    * want to be certain which is in play.

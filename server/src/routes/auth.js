@@ -59,6 +59,7 @@ async function me(user) {
     privacy: user.privacy,
     settings: user.settings,
     quietHours: user.quietHours,
+    passwordless: user.passwordless,
     contacts,
     blocked,
     folders,
@@ -129,6 +130,13 @@ router.post(
 
     const user = await U.findUserByUsername(username);
     if (!user) throw httpError(401, 'No account with that username.');
+
+    // Without this, someone who signed up through Google would be told their
+    // password is wrong — and would keep trying passwords for an account that
+    // has never had one.
+    if (user.passwordless)
+      throw httpError(401, 'This account signs in with Google. Use the Google button below.');
+
     if (!(await verifyPassword(user.passwordHash, password)))
       throw httpError(401, 'That password does not match.');
 

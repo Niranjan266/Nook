@@ -117,6 +117,17 @@ services:
       - key: GMAIL_SENDER_NAME
         value: Nook
 
+
+      # Sign in with Google. Server-side authorization-code flow, so a secret
+      # is required. Redirect URI to register in Google Cloud Console:
+      #   https://nook-api.niranjand.in/api/auth/google/callback
+      # (and the onrender.com equivalent while you are still on that domain —
+      # Google matches it exactly, including the scheme and any trailing slash)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+
       # auto prefers Gmail when configured, then Brevo, then logs to console.
       - key: MAIL_PROVIDER
         value: auto

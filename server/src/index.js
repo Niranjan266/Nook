@@ -17,6 +17,7 @@ import { attachSockets } from './sockets/index.js';
 import { startScheduler } from './services/scheduler.js';
 
 import authRoutes from './routes/auth.js';
+import googleRoutes from './routes/google.js';
 import userRoutes from './routes/users.js';
 import conversationRoutes from './routes/conversations.js';
 import messageRoutes from './routes/messages.js';
@@ -80,6 +81,9 @@ app.get('/api/health', (req, res) =>
   })
 );
 
+// Mounted before /api/auth so its own paths win; the auth router has no
+// conflicting routes, but the ordering makes that guarantee explicit.
+app.use('/api/auth/google', googleRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/conversations', conversationRoutes);

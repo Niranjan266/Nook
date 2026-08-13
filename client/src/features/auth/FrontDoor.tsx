@@ -2,10 +2,38 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { useAuth } from '@/stores/auth';
 import { get, post, setToken, ApiError } from '@/lib/api';
+import { API_BASE } from '@/lib/config';
 import { spring, stepIn } from '@/lib/motion';
 import { IconCheck, IconWarning } from '@/components/Icon';
 
 type Step = 'in' | 'up' | 'recover' | 'reset';
+
+/**
+ * Google's mark, inline.
+ *
+ * Their brand guidelines require the four-colour "G" on a sign-in control, and
+ * it is the one part of this screen that cannot be redrawn in our palette. The
+ * rest of the button is ours — Slab shape, our type, our spacing — so it reads
+ * as a Nook control that happens to carry Google's mark, rather than Google's
+ * button dropped into someone else's design.
+ */
+const GoogleMark = () => (
+  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+    <path
+      fill="#4285F4"
+      d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"
+    />
+    <path
+      fill="#34A853"
+      d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.4 46 24 46z"
+    />
+    <path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.3-2.9.7-4.2v-5.7H4.5A22 22 0 0 0 2 24c0 3.6.9 6.9 2.5 9.9l7.3-5.7z" />
+    <path
+      fill="#EA4335"
+      d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.1 29.9 2 24 2 15.4 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"
+    />
+  </svg>
+);
 
 const HEADINGS: Record<Step, { title: string; sub: string }> = {
   in: { title: 'Welcome back', sub: 'Your corner is exactly where you left it.' },
@@ -38,6 +66,56 @@ export default function FrontDoor() {
   const [code, setCode] = useState('');
   const [notice, setNotice] = useState('');
   const [avail, setAvail] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [googleOn, setGoogleOn] = useState(false);
+
+  /* Only offer the button if the server can actually honour it — otherwise it
+     is a control that leads to a 503, which is worse than no control. */
+  useEffect(() => {
+    get<{ available: boolean }>('/auth/google/available')
+      .then((r) => setGoogleOn(r.available))
+      .catch(() => setGoogleOn(false));
+  }, []);
+
+  /**
+   * Coming back from Google.
+   *
+   * The callback redirects here with `?g=<one-time code>`. Trade it for a
+   * session, then strip it from the URL with replaceState so it never reaches
+   * the history stack or a bookmark — it is single-use, but a spent code
+   * sitting in the address bar invites someone to try it anyway.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const handoff = params.get('g');
+    const failed = params.get('google_error');
+
+    if (!handoff && !failed) return;
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (failed) {
+      setError(
+        failed === 'access_denied'
+          ? 'Google sign-in was cancelled.'
+          : failed === 'unconfigured'
+            ? 'Google sign-in is not set up on this server yet.'
+            : 'Google sign-in did not complete. Try again.'
+      );
+      return;
+    }
+
+    setBusy(true);
+    post<{ accessToken: string }>('/auth/google/exchange', { code: handoff })
+      .then(async (data) => {
+        setToken(data.accessToken);
+        await useAuth.getState().init();
+        await openDoor();
+      })
+      .catch((err) => {
+        setError(err instanceof ApiError ? err.message : 'Google sign-in did not complete. Try again.');
+        setBusy(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ── the mark leans toward the cursor ─────────────────────────────────── */
   const mx = useMotionValue(0);
@@ -306,6 +384,29 @@ export default function FrontDoor() {
                       ? 'Send me a code'
                       : 'Set password and go in'}
             </button>
+
+            {/* Only on the two steps where it means something. On "forgot
+                password" it would be a non-sequitur, and during a reset the
+                person is mid-way through a different flow. */}
+            {googleOn && (step === 'in' || step === 'up') && (
+              <>
+                <div className="door-or" aria-hidden="true">
+                  <span>or</span>
+                </div>
+                <button
+                  type="button"
+                  className="slab slab-quiet slab-block google-btn"
+                  onClick={() => {
+                    // A full-page navigation, not a popup: popups are blocked
+                    // on some mobile browsers and break the back button.
+                    window.location.href = `${API_BASE}/api/auth/google/start`;
+                  }}
+                >
+                  <GoogleMark />
+                  Continue with Google
+                </button>
+              </>
+            )}
 
             <div className="door-switch">
               {step === 'in' && (

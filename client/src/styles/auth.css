@@ -324,3 +324,35 @@
     padding-top: var(--s-5);
   }
 }
+
+/* ── "or", and Continue with Google ────────────────────────────────────────
+   The button is a Slab in the quiet variant: it must read as clearly
+   secondary to the primary action above it, while still being obviously
+   pressable. Google's mark is the only foreign element on the screen, and
+   their brand terms require it.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.door-or {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-4) 0 var(--s-3);
+  color: var(--ink-faint);
+  font-size: var(--t-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.door-or::before,
+.door-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--hairline, rgba(30, 26, 23, 0.12));
+}
+
+.google-btn {
+  gap: var(--s-3);
+}
+.google-btn svg {
+  flex: 0 0 auto;
+}

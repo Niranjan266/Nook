@@ -383,3 +383,14 @@ ALTER TABLE user_contacts ADD COLUMN nickname TEXT NOT NULL DEFAULT '';
 -- How long a snap stays open, in seconds. 0 means the viewer closes it.
 -- Only meaningful when view_once = 1.
 ALTER TABLE messages ADD COLUMN view_seconds INTEGER NOT NULL DEFAULT 10;
+
+-- Google sign-in. Empty for password accounts; the partial index lets many
+-- rows share '' while keeping real subjects unique. `sub` is Google's stable
+-- per-user id — the email is not, because people change it.
+ALTER TABLE users ADD COLUMN google_sub TEXT NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users (google_sub) WHERE google_sub <> '';
+
+-- True when the account has no usable password: created through Google and
+-- never given one. Without this the UI cannot tell "wrong password" from
+-- "this account does not sign in that way".
+ALTER TABLE users ADD COLUMN passwordless INTEGER NOT NULL DEFAULT 0;

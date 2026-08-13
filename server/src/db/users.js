@@ -157,6 +157,8 @@ export function hydrateUser(row) {
     id: row.id,
     username: row.username,
     nookId: row.nook_id || '',
+    googleSub: row.google_sub || '',
+    passwordless: Boolean(row.passwordless),
     displayName: row.display_name,
     passwordHash: row.password_hash,
     email: row.email,
@@ -184,6 +186,49 @@ export const findUserByUsername = async (username) =>
 export const findUserByNookId = async (nookId) =>
   hydrateUser(await one(`${SELECT} WHERE nook_id = ?`, [normaliseNookId(nookId)]));
 
+/** Google's `sub` — stable per account. Emails are not; people change them. */
+export const findUserByGoogleSub = async (sub) =>
+  hydrateUser(await one(`${SELECT} WHERE google_sub = ?`, [String(sub)]));
+
+/**
+ * Only ever called with a *verified* email on both sides — see the linking
+ * rules in routes/google.js. Matching on an unverified address would let
+ * someone claim an account by typing a stranger's email into their profile.
+ */
+export const findUserByVerifiedEmail = async (email) =>
+  hydrateUser(
+    await one(`${SELECT} WHERE email = ? AND email_verified = 1`, [String(email).toLowerCase()])
+  );
+
+export const linkGoogle = (userId, sub) =>
+  run('UPDATE users SET google_sub = ?, updated_at = ? WHERE id = ?', [String(sub), now(), userId]);
+
+/**
+ * A username derived from a Google email, made unique.
+ *
+ * The local part is not guaranteed to be a legal username — it may be too
+ * short, or full of characters we do not allow — so it is cleaned first and
+ * padded if it collapses to almost nothing. The numeric suffix walks upward
+ * rather than being random so the first person to sign up as "ram" gets "ram".
+ */
+export async function uniqueUsernameFrom(seed) {
+  let base = String(seed || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_.]/g, '')
+    .replace(/^[._]+|[._]+$/g, '')
+    .slice(0, 16);
+
+  if (base.length < 3) base = `nook${base}`.slice(0, 16);
+
+  if (!(await usernameTaken(base))) return base;
+  for (let i = 2; i < 1000; i += 1) {
+    const candidate = `${base.slice(0, 20 - String(i).length)}${i}`;
+    if (!(await usernameTaken(candidate))) return candidate;
+  }
+  // Astronomically unlikely; still better than looping forever.
+  return `${base.slice(0, 12)}${crypto.randomBytes(4).toString('hex')}`;
+}
+
 export async function usernameTaken(username) {
   const row = await one('SELECT 1 AS x FROM users WHERE username = ?', [String(username).toLowerCase()]);
   return Boolean(row);
@@ -195,20 +240,38 @@ export async function findUsersByIds(ids) {
   return rows.map(hydrateUser);
 }
 
-export async function createUser({ username, displayName, passwordHash, email = '', about, accent, privacy }) {
+export async function createUser({
+  username,
+  displayName,
+  passwordHash,
+  email = '',
+  about,
+  accent,
+  privacy,
+  // Google sign-up extras. Defaults keep every existing caller unchanged.
+  googleSub = '',
+  emailVerified = false,
+  passwordless = false,
+  avatarUrl = '',
+}) {
   const id = newId();
   const t = now();
   await run(
     `INSERT INTO users
-       (id, username, display_name, password_hash, email, about, accent,
+       (id, username, display_name, password_hash, email, email_verified, avatar_url,
+        google_sub, passwordless, about, accent,
         privacy, settings, quiet_hours, last_seen, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       String(username).toLowerCase(),
       displayName,
       passwordHash,
       email || '',
+      bool(emailVerified),
+      avatarUrl || '',
+      googleSub || '',
+      bool(passwordless),
       about || 'Somewhere quiet.',
       accent || 'terracotta',
       toJson({ ...DEFAULT_PRIVACY, ...(privacy || {}) }),
