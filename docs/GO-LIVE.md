@@ -9,9 +9,9 @@ Tick these in order. About 30 minutes, ₹0 to start.
 ## Where each piece goes
 
 ```
-  nook.niranjand.in      →  Vercel     the web app (static files)
-  nook-api.niranjand.in  →  Render     the API (Node + Socket.IO)
-                         →  Turso      the database
+  nook.niranjand.in      →  Vercel      the web app (static files)
+  nook-api.niranjand.in  →  Northflank  the API (Node + Socket.IO) — always-on, free
+                         →  Turso       the database
 ```
 
 **Vercel cannot host the API.** Its functions are serverless — they start per request and stop. Socket.IO needs a connection held open the whole time the app is on screen. No setting changes that, which is why there are two hosts.
@@ -52,7 +52,45 @@ Keep both in a password manager. Nothing to design or migrate — the schema bui
 
 ---
 
-## 2 · Render (the API) — 10 min
+## 2 · The API — Northflank — 10 min
+
+> **Why not Render:** its free plan sleeps after 15 minutes idle, which drops every WebSocket. For a chat app that's the one thing you can't really live with. Northflank's free Sandbox is **always-on** — no cold starts, no pinger needed, no credit card. Render's config is still in the repo (`render.yaml`) if you'd rather use it; see the comparison at the bottom.
+
+- [ ] [northflank.com](https://northflank.com) → sign up → connect GitHub
+- [ ] **Create new → Service → Combined service** (build + deploy in one)
+- [ ] Repository: your `Nook` repo, branch `main`
+- [ ] Build type: **Dockerfile**
+      - Dockerfile path: `/server/Dockerfile`
+      - Build context: `/server`
+- [ ] Port: **4000**, protocol **HTTP**, and tick **Publicly expose**
+- [ ] Resources: the smallest plan — Nook idles at well under 200 MB
+
+**Environment variables** (Northflank calls these *Secrets* → *Environment variables*):
+
+| Variable | Value |
+|---|---|
+| `NODE_ENV` | `production` |
+| `PORT` | `4000` |
+| `JWT_ACCESS_SECRET` | generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `JWT_REFRESH_SECRET` | run it **again** — must be different |
+| `TURSO_DATABASE_URL` | your `libsql://…` URL |
+| `TURSO_AUTH_TOKEN` | your token |
+| `CLIENT_ORIGIN` | `https://nook.niranjand.in` |
+| `PUBLIC_URL` | `https://nook-api.niranjand.in` |
+| `COOKIE_DOMAIN` | `.niranjand.in` ← **the leading dot matters** |
+
+- [ ] Deploy, and wait for the build (~2–3 min the first time)
+- [ ] **Domains** → add `nook-api.niranjand.in`, link it to port 4000
+- [ ] Add the CNAME Northflank shows you at your DNS provider
+- [ ] Certificate is issued automatically via Let's Encrypt
+- [ ] Check `https://nook-api.niranjand.in/api/health` → `{"ok":true,…}`
+
+**Free Sandbox gives you:** 2 services, 1 database, 2 cron jobs, always-on compute, ~2 GB storage, 500 build minutes/month. You're using one service. Nothing sleeps.
+
+---
+
+<details>
+<summary><b>Using Render instead (click to expand)</b></summary>
 
 - [ ] [render.com](https://render.com) → sign in with GitHub
 - [ ] **New → Blueprint** → pick your repo. It reads `render.yaml` automatically.
@@ -74,9 +112,11 @@ Keep both in a password manager. Nothing to design or migrate — the schema bui
 - [ ] Wait for Render to say *Certificate issued* (usually a few minutes)
 - [ ] Open `https://nook-api.niranjand.in/api/health` → should return `{"ok":true,…}`
 
-**Two things about the free plan, plainly:**
-1. It **sleeps after 15 minutes idle.** Sleeping drops every socket, so live messaging stops until someone opens the app (~30s wake).
-2. **No persistent disk** — uploaded photos are deleted on every deploy. So on free, do step 3.
+**Two things about Render's free plan, plainly:**
+1. It **sleeps after 15 minutes idle** — every socket drops, live messaging stops, ~30s to wake. Add an uptime pinger ([UptimeRobot](https://uptimerobot.com), every 10 min on `/api/health`). Note the free tier gives 750 instance-hours a month and a month is 720–744, so one always-awake service *just* fits with nothing spare.
+2. **No persistent disk** — uploaded photos are deleted on every deploy.
+
+</details>
 
 $7/month removes both. It's the one upgrade I'd make before showing this to anyone.
 
@@ -131,11 +171,11 @@ At whoever manages `niranjand.in`:
 | Type | Name | Value |
 |---|---|---|
 | CNAME | `nook` | `cname.vercel-dns.com` |
-| CNAME | `nook-api` | `nook-api.onrender.com` |
+| CNAME | `nook-api` | whatever Northflank shows you in **Domains** |
 
-Both hosts show you the exact value to use — copy theirs rather than mine if they differ.
+Copy the exact values each host displays — they differ per account and per region.
 
-**If you use Cloudflare DNS:** set both records to **DNS only** (grey cloud), not proxied. Cloudflare's proxy in front of Render can interfere with WebSocket upgrades, and you'd spend an evening debugging "messages only appear after a refresh".
+**If you use Cloudflare DNS:** set both records to **DNS only** (grey cloud), not proxied. Cloudflare's proxy in front of your API can interfere with WebSocket upgrades, and it also blocks Let's Encrypt from validating the domain — you'd get a certificate stuck "pending" and messages that only appear after a refresh.
 
 Give DNS 5–30 minutes. Then check:
 
@@ -146,41 +186,35 @@ https://nook.niranjand.in                  → the sign-in screen
 
 ---
 
-## 7 · Staying on free — what it actually means
+## 7 · Where the free API hosts actually stand (August 2026)
 
-Free works. Here is exactly what you're accepting, and what to do about each.
+I checked rather than going from memory — this space changes constantly and a lot of the advice online is out of date.
 
-### The sleeping problem — the one that matters for chat
+| Host | Always-on free? | Verdict for a chat app |
+|---|---|---|
+| **Northflank** | **Yes** — Sandbox tier, no cold starts | **Use this.** 2 services, 1 database, 2 cron jobs, ~2 GB storage, no credit card. |
+| **Render** | No — sleeps at 15 min | Workable with a pinger, but 750 hrs/month means one service and no margin. |
+| **Fly.io** | No | The free allowance ended; it's trial credit then pay-as-you-go. |
+| **Koyeb** | No | Acquired by Mistral in early 2026; free tier closed to new signups. |
+| **Railway** | No | Trial credits, then paid. No standing free tier. |
+| **Oracle Cloud Always Free** | Technically yes | See below — genuinely free forever, but a bad fit here. |
+| **Vercel / Netlify functions** | N/A | Serverless. Cannot hold a WebSocket at all. |
 
-Render free spins the instance down after **15 minutes with no traffic**. When it sleeps:
+### About Oracle Always Free
 
-- every open WebSocket drops, so **live messaging stops**
-- the next request takes **~30 seconds** to wake it
-- push notifications for that period never fire, because nothing is running to send them
+It looks like the obvious winner — a real VM, 2 OCPU / 12 GB ARM (reduced from 4/24 in June 2026), free permanently. Two reasons I'd steer you away for *this*:
 
-For a chat app this is the real cost. Someone messages you at 11pm, the server is asleep, and you get nothing until you open the app yourself.
+1. **The idle-reclaim policy.** Oracle reclaims instances whose 95th-percentile CPU stays under 20% over 7 days. A chat app used by a handful of friends will sit far below that — you'd be running a fake workload purely to keep your server alive.
+2. **You'd be managing a Linux box.** Nginx, TLS renewal, systemd, security updates, firewall rules. That's a real ongoing job, not a deploy step.
 
-**The workaround:** ping it. A free uptime monitor hitting `https://nook-api.niranjand.in/api/health` every 10 minutes keeps it awake.
+Worth it if you want several projects on one machine and enjoy sysadmin. Not worth it for one chat app.
 
-- [ ] [UptimeRobot](https://uptimerobot.com) or [cron-job.org](https://cron-job.org), both free — 10-minute interval, HTTP GET on `/api/health`
+### Still worth doing on any host
 
-**The honest catch:** Render's free tier allows **750 instance-hours per month** across your whole account. A month is 720–744 hours, so one always-awake free service *just* fits — with nothing spare. Add a second free service and you'll run out and everything stops until the month rolls over.
-
-So: one free service, one pinger, and it behaves like a real app. That's a legitimate setup, not a hack — just know the ceiling you're sitting under.
-
-### Cloudinary is not optional for you
-
-Render free has **no persistent disk**. Without Cloudinary, every uploaded photo and voice note is deleted on each deploy *and* each wake from sleep. Step 3 isn't a nice-to-have on this plan.
-
-### Also worth 10 minutes
-
-- [ ] **VAPID keys** — `npx web-push generate-vapid-keys`, put the pair in Render. Without them the server generates new keys on every restart — and on free it restarts constantly — so notifications silently stop working for everyone.
+- [ ] **VAPID keys** — `npx web-push generate-vapid-keys`, set the pair. Without them the server makes new keys on every restart and everyone's notifications silently stop.
+- [ ] **Cloudinary** — media survives deploys and redeploys. Free 25 GB.
 - [ ] **TURN** — free at [Metered Open Relay](https://www.metered.ca/tools/openrelay/). Without it calls fail for roughly 20% of people, mostly on mobile data.
 - [ ] **Brevo** — only for password-recovery emails. Accounts are username + password, so genuinely optional.
-
-### When to actually pay
-
-$7/month is worth it the moment someone other than you relies on the app. It removes the sleeping, gives you a real disk, and you stop thinking about instance-hours. Until then, free plus a pinger is fine.
 
 ---
 
@@ -230,13 +264,15 @@ iOS needs an Apple Developer account (₹8,200/year). Android sideloading needs 
 
 ## What it costs
 
-| | Your setup (free) | If you upgrade later |
-|---|---|---|
-| Vercel Hobby | ₹0 | ₹0 |
-| Render | ₹0 — sleeps, no disk, 750 hrs/mo | Starter **$7/mo** |
-| Turso | ₹0 — genuinely generous | ₹0 |
-| Cloudinary | ₹0 — 25 GB | ₹0 |
-| TURN (Open Relay) | ₹0 | ₹0 |
-| Custom domain on Render | ₹0 — 2 included | ₹0 |
-| `niranjand.in` | already yours | already yours |
-| **Total** | **₹0** | **~₹600/month** |
+| | Your setup |
+|---|---|
+| Vercel Hobby | ₹0 |
+| Northflank Sandbox | ₹0 — **always-on**, no credit card |
+| Turso | ₹0 — genuinely generous |
+| Cloudinary | ₹0 — 25 GB |
+| TURN (Open Relay) | ₹0 |
+| Custom domains + TLS | ₹0 on both hosts |
+| `niranjand.in` | already yours |
+| **Total** | **₹0/month, nothing sleeping** |
+
+You only start paying when you outgrow one service or 2 GB of storage — which for a private chat app among friends is a long way off.
