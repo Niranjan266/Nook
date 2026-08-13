@@ -40,11 +40,11 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN # from `turso db tokens create nook`
         sync: false
-      - key: CLIENT_ORIGIN # https://app.yoursite.com
+      - key: CLIENT_ORIGIN # https://nook.niranjand.in
         sync: false
-      - key: PUBLIC_URL # https://api.yoursite.com
+      - key: PUBLIC_URL # https://nook-api.niranjand.in
         sync: false
-      - key: COOKIE_DOMAIN # .yoursite.com  ← the leading dot matters
+      - key: COOKIE_DOMAIN # .niranjand.in  ← the leading dot matters
         sync: false
 
       # ── optional; everything degrades gracefully without them ────────────

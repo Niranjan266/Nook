@@ -9,12 +9,16 @@ Tick these in order. About 30 minutes, ₹0 to start.
 ## Where each piece goes
 
 ```
-  app.yoursite.com  →  Vercel     the web app (static files)
-  api.yoursite.com  →  Render     the API (Node + Socket.IO)
-                    →  Turso      the database
+  nook.niranjand.in      →  Vercel     the web app (static files)
+  nook-api.niranjand.in  →  Render     the API (Node + Socket.IO)
+                         →  Turso      the database
 ```
 
 **Vercel cannot host the API.** Its functions are serverless — they start per request and stop. Socket.IO needs a connection held open the whole time the app is on screen. No setting changes that, which is why there are two hosts.
+
+**Both subdomains of `niranjand.in` is exactly right.** The session cookie is set on `.niranjand.in`, which makes it *first-party* for both — so Safari's tracking prevention and Chrome's third-party cookie removal leave it alone, and nobody gets signed out on reload. You get this for free by using two subdomains of a domain you already own.
+
+Custom domains work on Render's **free** plan: two included, with automatic Let's Encrypt certificates. You only need one.
 
 ---
 
@@ -59,11 +63,16 @@ Keep both in a password manager. Nothing to design or migrate — the schema bui
 |---|---|
 | `TURSO_DATABASE_URL` | your `libsql://…` URL |
 | `TURSO_AUTH_TOKEN` | your token |
-| `CLIENT_ORIGIN` | `https://nook.vercel.app` — update after step 4 |
-| `PUBLIC_URL` | your Render URL, e.g. `https://nook-api.onrender.com` |
-| `ALLOW_VERCEL_PREVIEWS` | `1` while setting up |
+| `CLIENT_ORIGIN` | `https://nook.niranjand.in` |
+| `PUBLIC_URL` | `https://nook-api.niranjand.in` |
+| `COOKIE_DOMAIN` | `.niranjand.in` ← **the leading dot matters** |
+| `ALLOW_VERCEL_PREVIEWS` | `1` while setting up, `0` after |
 
-- [ ] Deploy, then open `https://YOUR-API.onrender.com/api/health` → should return `{"ok":true,…}`
+- [ ] **Settings → Custom Domain** → add `nook-api.niranjand.in`
+- [ ] At your DNS provider, add the **CNAME** Render shows you:
+      `nook-api` → `nook-api.onrender.com`
+- [ ] Wait for Render to say *Certificate issued* (usually a few minutes)
+- [ ] Open `https://nook-api.niranjand.in/api/health` → should return `{"ok":true,…}`
 
 **Two things about the free plan, plainly:**
 1. It **sleeps after 15 minutes idle.** Sleeping drops every socket, so live messaging stops until someone opens the app (~30s wake).
@@ -92,12 +101,15 @@ Skip only if you're on a paid Render plan with a disk attached.
 
 | Variable | Value |
 |---|---|
-| `VITE_API_URL` | your Render URL, no trailing slash |
+| `VITE_API_URL` | `https://nook-api.niranjand.in` — no trailing slash |
 
 - [ ] Deploy
-- [ ] Copy your Vercel URL back into Render's `CLIENT_ORIGIN`, then **redeploy Render**
+- [ ] **Settings → Domains** → add `nook.niranjand.in`
+- [ ] At your DNS provider, add the **CNAME** Vercel shows you:
+      `nook` → `cname.vercel-dns.com`
+- [ ] Once the domain is verified, **redeploy** so `VITE_API_URL` is baked in
 
-This is baked in at build time, so any later change to `VITE_API_URL` needs a redeploy, not just a save.
+`VITE_API_URL` is compiled into the JavaScript at build time, so changing it later means a redeploy — saving the variable alone does nothing.
 
 ---
 
@@ -112,29 +124,63 @@ If all four pass, you're live.
 
 ---
 
-## 6 · A domain — later, but do it
+## 6 · DNS, both records in one place
 
-Everything works on `nook.vercel.app` + `nook-api.onrender.com` **except staying signed in**. On unrelated domains the session cookie is *third-party*: Safari blocks those today and Chrome is phasing them out, so people get silently signed out on reload.
+At whoever manages `niranjand.in`:
 
-One domain fixes it (~₹800/year from Namecheap, Cloudflare or GoDaddy):
+| Type | Name | Value |
+|---|---|---|
+| CNAME | `nook` | `cname.vercel-dns.com` |
+| CNAME | `nook-api` | `nook-api.onrender.com` |
 
-- [ ] Vercel → Settings → Domains → `app.yoursite.com`, add the CNAME it shows you
-- [ ] Render → Settings → Custom Domain → `api.yoursite.com`, same
-- [ ] Render env: `COOKIE_DOMAIN` = `.yoursite.com` — **the leading dot matters**
-- [ ] Render env: `CLIENT_ORIGIN` = `https://app.yoursite.com`, `PUBLIC_URL` = `https://api.yoursite.com`
-- [ ] Vercel env: `VITE_API_URL` = `https://api.yoursite.com` → **redeploy**
-- [ ] Render env: `ALLOW_VERCEL_PREVIEWS` = `0`
+Both hosts show you the exact value to use — copy theirs rather than mine if they differ.
 
-Now both are subdomains of one site, the cookie is first-party, and nothing blocks it.
+**If you use Cloudflare DNS:** set both records to **DNS only** (grey cloud), not proxied. Cloudflare's proxy in front of Render can interfere with WebSocket upgrades, and you'd spend an evening debugging "messages only appear after a refresh".
+
+Give DNS 5–30 minutes. Then check:
+
+```
+https://nook-api.niranjand.in/api/health   → {"ok":true,…}
+https://nook.niranjand.in                  → the sign-in screen
+```
 
 ---
 
-## 7 · Worth doing before real people use it
+## 7 · Staying on free — what it actually means
 
-- [ ] **VAPID keys** — `npx web-push generate-vapid-keys`, put the pair in Render. Without them the server makes new keys every restart, which silently kills everyone's notifications.
-- [ ] **TURN** — free at [Metered Open Relay](https://www.metered.ca/tools/openrelay/). Without it, calls fail for roughly 20% of people, mostly on mobile networks.
-- [ ] **Render Starter, $7/mo** — no sleeping, real disk.
-- [ ] **Brevo** — only if you want password-recovery emails. Nook accounts are username + password, so this is genuinely optional.
+Free works. Here is exactly what you're accepting, and what to do about each.
+
+### The sleeping problem — the one that matters for chat
+
+Render free spins the instance down after **15 minutes with no traffic**. When it sleeps:
+
+- every open WebSocket drops, so **live messaging stops**
+- the next request takes **~30 seconds** to wake it
+- push notifications for that period never fire, because nothing is running to send them
+
+For a chat app this is the real cost. Someone messages you at 11pm, the server is asleep, and you get nothing until you open the app yourself.
+
+**The workaround:** ping it. A free uptime monitor hitting `https://nook-api.niranjand.in/api/health` every 10 minutes keeps it awake.
+
+- [ ] [UptimeRobot](https://uptimerobot.com) or [cron-job.org](https://cron-job.org), both free — 10-minute interval, HTTP GET on `/api/health`
+
+**The honest catch:** Render's free tier allows **750 instance-hours per month** across your whole account. A month is 720–744 hours, so one always-awake free service *just* fits — with nothing spare. Add a second free service and you'll run out and everything stops until the month rolls over.
+
+So: one free service, one pinger, and it behaves like a real app. That's a legitimate setup, not a hack — just know the ceiling you're sitting under.
+
+### Cloudinary is not optional for you
+
+Render free has **no persistent disk**. Without Cloudinary, every uploaded photo and voice note is deleted on each deploy *and* each wake from sleep. Step 3 isn't a nice-to-have on this plan.
+
+### Also worth 10 minutes
+
+- [ ] **VAPID keys** — `npx web-push generate-vapid-keys`, put the pair in Render. Without them the server generates new keys on every restart — and on free it restarts constantly — so notifications silently stop working for everyone.
+- [ ] **TURN** — free at [Metered Open Relay](https://www.metered.ca/tools/openrelay/). Without it calls fail for roughly 20% of people, mostly on mobile data.
+- [ ] **Brevo** — only for password-recovery emails. Accounts are username + password, so genuinely optional.
+
+### When to actually pay
+
+$7/month is worth it the moment someone other than you relies on the app. It removes the sleeping, gives you a real disk, and you stop thinking about instance-hours. Until then, free plus a pinger is fine.
 
 ---
 
@@ -170,24 +216,27 @@ iOS needs an Apple Developer account (₹8,200/year). Android sideloading needs 
 | Symptom | Cause |
 |---|---|
 | Vercel build fails immediately | Root Directory isn't `client` |
-| Blank page, CORS error in console | `CLIENT_ORIGIN` doesn't match your Vercel URL exactly, `https://` included |
-| Signed out on every reload | Third-party cookie — do step 6 |
-| Messages need a refresh to appear | Socket blocked, or the free instance is asleep |
-| Photos 404 after a deploy | Render free wiped the disk — do step 3 |
-| First load takes 30 seconds | Free instance cold start. Expected. |
-| Calls ring but never connect | You need TURN — step 7 |
+| Blank page, CORS error in console | `CLIENT_ORIGIN` isn't exactly `https://nook.niranjand.in` |
+| Signed out on every reload | `COOKIE_DOMAIN` missing or without the leading dot |
+| Messages need a refresh to appear | Free instance asleep, or Cloudflare proxying the API — set DNS to grey cloud |
+| Photos vanish after a deploy | No disk on Render free — you need Cloudinary |
+| First load takes 30 seconds | Free instance cold start. Add the uptime pinger. |
+| Calls ring but never connect | You need TURN |
+| Notifications stopped working | VAPID keys not set, so they rotated on a restart |
 | `SQLITE_UNKNOWN: unauthorized` | `TURSO_AUTH_TOKEN` wrong or expired — regenerate |
+| Domain shows "certificate pending" for ages | CNAME wrong, or Cloudflare proxy is on — Render can't validate through it |
 
 ---
 
 ## What it costs
 
-| | Free | Recommended |
+| | Your setup (free) | If you upgrade later |
 |---|---|---|
-| Vercel | Hobby | Hobby |
-| Render | Free — sleeps, no disk | Starter **$7/mo** |
-| Turso | Free — genuinely generous | Free |
-| Cloudinary | Free 25 GB | Free |
-| TURN | Open Relay | Free |
-| Domain | — | ~₹800/year |
-| **Total** | **₹0** | **~₹700/month** |
+| Vercel Hobby | ₹0 | ₹0 |
+| Render | ₹0 — sleeps, no disk, 750 hrs/mo | Starter **$7/mo** |
+| Turso | ₹0 — genuinely generous | ₹0 |
+| Cloudinary | ₹0 — 25 GB | ₹0 |
+| TURN (Open Relay) | ₹0 | ₹0 |
+| Custom domain on Render | ₹0 — 2 included | ₹0 |
+| `niranjand.in` | already yours | already yours |
+| **Total** | **₹0** | **~₹600/month** |
