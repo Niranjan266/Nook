@@ -21,6 +21,7 @@ import {
   IconLock,
   IconCheck,
   IconClose,
+  IconClockSmall,
 } from '@/components/Icon';
 import type { Conversation as Convo } from '@/lib/types';
 
@@ -110,7 +111,24 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
     );
   };
 
-  const wp = conversation.wallpaper;
+  /**
+   * In a direct chat the wallpaper belongs to both people, so choosing one
+   * only *proposes* it until the other accepts. That is the right rule — but
+   * it meant the person who chose saw absolutely nothing happen: the sheet
+   * closed, a toast said "suggested", and the background stayed exactly as it
+   * was. Indistinguishable from the feature being broken, which is how it was
+   * reported.
+   *
+   * So the proposer sees their own pending look straight away. The room does
+   * not truly change until the other person agrees — the banner below says so
+   * — but you can see what you picked.
+   */
+  const pendingMine =
+    conversation.wallpaper.proposal && conversation.wallpaper.proposal.by === meId
+      ? conversation.wallpaper.proposal
+      : null;
+
+  const wp = pendingMine ? { ...conversation.wallpaper, ...pendingMine } : conversation.wallpaper;
 
   /**
    * The room has a time of day. If a schedule is on, the evening look replaces
@@ -340,6 +358,26 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
               >
                 <IconClose size={16} />
               </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Your own pending suggestion. You can already see it — this says why
+            the other person still can't, so silence doesn't read as failure. */}
+        <AnimatePresence>
+          {pendingMine && (
+            <motion.div
+              className="clay clay-2 wp-pending"
+              initial={{ opacity: 0, y: -18 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -18 }}
+              transition={spring}
+            >
+              <IconClockSmall size={15} />
+              <span className="tiny">
+                Only you can see this until{' '}
+                {conversation.partner?.displayName?.split(' ')[0] || 'they'} accepts it.
+              </span>
             </motion.div>
           )}
         </AnimatePresence>

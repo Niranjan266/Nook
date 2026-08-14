@@ -1421,3 +1421,24 @@
     border-radius: var(--r-clay, 20px);
   }
 }
+
+/* Your own wallpaper suggestion, still waiting on the other person. Sits where
+   their accept banner would, but quiet — it is information, not a decision. */
+.wp-pending {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  max-width: calc(100% - 32px);
+  color: var(--ink-soft, var(--ink));
+  opacity: 0.92;
+}
+.wp-pending svg {
+  flex: none;
+  opacity: 0.7;
+}
