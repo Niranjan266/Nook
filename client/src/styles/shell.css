@@ -538,3 +538,93 @@ button.list-row:active {
     padding-top: var(--s-5);
   }
 }
+
+/* ── the arrival banner ────────────────────────────────────────────────────
+   Clay, because it is an object that has physically dropped onto the screen —
+   puffy, no border, soft dual shadow. Slab would read as a control you must
+   act on, and this is something you may equally ignore.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.msg-banner {
+  position: fixed;
+  top: calc(var(--s-3) + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90; /* above sheets, below a call overlay */
+  width: min(420px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 10px 10px 10px 12px;
+  border-radius: var(--r-clay);
+  background: var(--clay-surface);
+  box-shadow:
+    0 14px 34px rgba(30, 26, 23, 0.22),
+    0 2px 0 rgba(255, 255, 255, 0.5) inset;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: pan-x; /* let the vertical drag through to the gesture */
+}
+.msg-banner:active {
+  cursor: grabbing;
+}
+
+.msg-banner-open {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.msg-banner-title {
+  font-weight: 600;
+  font-size: var(--t-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg-banner-body {
+  font-size: var(--t-sm);
+  color: var(--ink-faint);
+  /* Two lines maximum: enough to know whether it needs you now. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.msg-banner-x {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--clay-sunk);
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.msg-banner-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  transform-origin: left;
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-banner-timer {
+    display: none;
+  }
+}

@@ -33,7 +33,8 @@ import ThreadPanel from '@/features/chat/ThreadPanel';
 import { registerServiceWorker } from '@/lib/push';
 import { setToken } from '@/lib/api';
 import { IMPERSONATE_KEY } from '@/lib/adminApi';
-import { initTitle, watchFocus } from '@/lib/notify';
+import { initTitle, watchFocus, onBanner } from '@/lib/notify';
+import MessageBanner, { type BannerMessage } from '@/components/MessageBanner';
 import { setCacheScope } from '@/lib/outbox';
 import { usePhone, useNarrow } from '@/lib/useMediaQuery';
 import { spring } from '@/lib/motion';
@@ -151,6 +152,30 @@ function Nook() {
     }
   }, [me?.id]);
 
+  /**
+   * The arrival banner lives here rather than inside the chat view, so it
+   * survives switching conversations and appears over sheets too — an
+   * interruption that vanishes when you navigate is not an interruption.
+   */
+  const [banner, setBanner] = useState<BannerMessage | null>(null);
+  useEffect(
+    () =>
+      onBanner((m) =>
+        setBanner({
+          // A fresh id per arrival restarts the dwell timer instead of
+          // inheriting whatever was left of the previous one's.
+          id: `${m.conversationId}:${Date.now()}`,
+          conversationId: m.conversationId,
+          title: m.conversationName || m.senderName,
+          body: m.preview,
+          avatarUrl: m.avatarUrl,
+          accent: m.accent,
+          onOpen: () => m.onOpen(m.conversationId),
+        })
+      ),
+    []
+  );
+
   useSocketBridge(Boolean(me));
 
   if (status === 'loading') {
@@ -207,6 +232,7 @@ function Nook() {
       <ThreadPanel />
       <CallOverlay />
       <Lightbox />
+      <MessageBanner message={banner} onDismiss={() => setBanner(null)} />
       <Toasts />
       <OfflineBar />
     </>

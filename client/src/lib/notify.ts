@@ -61,8 +61,9 @@ interface Incoming {
   muted: boolean;
   sound: SoundId;
   soundOn: boolean;
+  avatarUrl?: string;
+  accent?: string;
   onOpen: (conversationId: string) => void;
-  toast: (text: string) => void;
 }
 
 export function messageArrived({
@@ -74,8 +75,9 @@ export function messageArrived({
   muted,
   sound,
   soundOn,
+  avatarUrl,
+  accent,
   onOpen,
-  toast,
 }: Incoming) {
   // Muting a conversation should mean muting it — including the badge, or the
   // number keeps demanding attention the person explicitly declined to give.
@@ -92,30 +94,105 @@ export function messageArrived({
   if (soundOn) playSound(sound);
 
   if (hidden && canNotify()) {
-    try {
-      const n = new Notification(conversationName || senderName, {
-        body: preview,
-        // One notification per conversation: five messages from one person
-        // should update a single notification, not produce five.
-        tag: `nook:${conversationId}`,
-        icon: '/logo.svg',
-        badge: '/logo.svg',
-        silent: soundOn, // the sound already played; don't play the OS one too
-      });
-      n.onclick = () => {
-        window.focus();
-        onOpen(conversationId);
-        n.close();
-      };
-      live.set(conversationId, n);
-    } catch {
-      /* Some browsers refuse constructed Notifications outside a service
-         worker. The title and sound still did their job. */
-    }
+    void systemNotification({ conversationId, conversationName, senderName, preview, avatarUrl, soundOn, onOpen });
   } else if (!hidden) {
-    toast(`${senderName}: ${preview}`);
+    // In-app: our own banner, not the browser's, so it wears the app's
+    // materials and can be tapped straight through to the conversation.
+    banner({ conversationId, conversationName, senderName, preview, avatarUrl, accent, onOpen });
   }
 }
+
+/**
+ * The Chrome / Android / desktop notification.
+ *
+ * Raised through the service worker registration rather than
+ * `new Notification(...)`. That matters: Android Chrome does not support the
+ * constructor at all — it throws — and the registration form is the only one
+ * that accepts action buttons, so Reply and Mark read can appear the way they
+ * do on WhatsApp. The constructor stays as a fallback for desktop browsers
+ * with no active worker.
+ */
+async function systemNotification({
+  conversationId,
+  conversationName,
+  senderName,
+  preview,
+  avatarUrl,
+  soundOn,
+  onOpen,
+}: Pick<
+  Incoming,
+  'conversationId' | 'conversationName' | 'senderName' | 'preview' | 'avatarUrl' | 'soundOn' | 'onOpen'
+>) {
+  const title = conversationName || senderName;
+  const options: NotificationOptions & {
+    actions?: { action: string; title: string }[];
+    renotify?: boolean;
+  } = {
+    body: preview,
+    // One per conversation: five messages from one person update a single
+    // notification rather than stacking five.
+    tag: `nook:${conversationId}`,
+    renotify: true,
+    // Their photo, like every messaging app — far easier to recognise at a
+    // glance than the same logo repeated for everyone.
+    icon: avatarUrl || '/logo.svg',
+    badge: '/logo.svg',
+    silent: soundOn, // the in-app sound already played; do not double it
+    data: { conversationId },
+  };
+
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) {
+      // `actions` is real and widely supported but missing from the DOM
+      // typings for showNotification, which only know the constructor's
+      // narrower option set. The cast is the type checker being behind the
+      // platform, not a shortcut.
+      await reg.showNotification(title, {
+        ...options,
+        actions: [
+          { action: 'reply', title: 'Reply' },
+          { action: 'read', title: 'Mark read' },
+        ],
+      } as NotificationOptions);
+      return;
+    }
+  } catch {
+    /* fall through to the constructor */
+  }
+
+  try {
+    const n = new Notification(title, options);
+    n.onclick = () => {
+      window.focus();
+      onOpen(conversationId);
+      n.close();
+    };
+    live.set(conversationId, n);
+  } catch {
+    /* Nothing left to try. The title count and the sound still did their job. */
+  }
+}
+
+/* ── the in-app banner ────────────────────────────────────────────────────
+   Registered by the shell so this module stays free of React.
+   ────────────────────────────────────────────────────────────────────────── */
+
+type BannerFn = (m: {
+  conversationId: string;
+  conversationName: string;
+  senderName: string;
+  preview: string;
+  avatarUrl?: string;
+  accent?: string;
+  onOpen: (id: string) => void;
+}) => void;
+
+let banner: BannerFn = () => {};
+export const onBanner = (fn: BannerFn) => {
+  banner = fn;
+};
 
 /** Coming back to the tab clears the count — you have seen it. */
 export function watchFocus() {

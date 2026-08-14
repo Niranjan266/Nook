@@ -45,8 +45,9 @@ export function useSocketBridge(enabled: boolean) {
         muted: Boolean(convo?.muted),
         sound: (convo?.sound as SoundId) || 'default',
         soundOn: me.settings?.soundOn ?? true,
+        avatarUrl: convo?.avatarUrl || m.sender?.avatarUrl || '',
+        accent: convo?.partner?.accent || m.sender?.accent,
         onOpen: (id) => chat().setActive(id),
-        toast: (text) => ui().toast(text),
       });
     });
     socket.on('message:edit', (m) => chat().onMessageUpdate(m));
