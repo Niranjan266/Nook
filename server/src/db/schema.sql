@@ -394,3 +394,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users (google_sub) WHE
 -- never given one. Without this the UI cannot tell "wrong password" from
 -- "this account does not sign in that way".
 ALTER TABLE users ADD COLUMN passwordless INTEGER NOT NULL DEFAULT 0;
+
+-- Suspended accounts can still be read by their owner's existing session until
+-- it expires; the auth middleware refuses them on the next request.
+ALTER TABLE users ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0;
+
+-- Every administrative action, append-only. The point of an audit trail is
+-- that it is boring to write and impossible to argue with later, so nothing
+-- here is updatable and nothing is deleted.
+CREATE TABLE IF NOT EXISTS admin_audit (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor     TEXT NOT NULL,           -- which admin identity did it
+  action    TEXT NOT NULL,           -- 'sign-in', 'suspend', 'open-account', …
+  target_id TEXT NOT NULL DEFAULT '',
+  detail    TEXT NOT NULL DEFAULT '',
+  ip        TEXT NOT NULL DEFAULT '',
+  at        INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_at ON admin_audit (at DESC);

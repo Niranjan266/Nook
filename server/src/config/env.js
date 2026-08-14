@@ -97,6 +97,20 @@ export const env = {
   },
 
   /**
+   * The admin panel at /nookcontrol.
+   *
+   * `ADMIN_PASSWORD_HASH` holds a bcrypt hash, never the password itself — a
+   * plaintext admin password in an environment variable is readable by anyone
+   * with dashboard access and shows up in screenshots. Generate one with
+   * Make-Admin.bat.
+   */
+  admin: {
+    emails: process.env.ADMIN_EMAILS || 'supportnookchat@gmail.com',
+    username: (process.env.ADMIN_USERNAME || '').trim(),
+    passwordHash: (process.env.ADMIN_PASSWORD_HASH || '').trim(),
+  },
+
+  /**
    * `auto` picks Gmail if it is configured, then Brevo, then the console.
    * Set it explicitly to pin one — useful when both are configured and you
    * want to be certain which is in play.

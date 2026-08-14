@@ -11,6 +11,13 @@ export async function requireAuth(req, res, next) {
     const { sub } = verifyAccess(token);
     const user = await findUserById(sub);
     if (!user) return res.status(401).json({ error: 'Account no longer exists.' });
+
+    // Checked on every request rather than at sign-in, so suspending somebody
+    // takes effect on their next action instead of whenever their token
+    // happens to expire.
+    if (user.suspended)
+      return res.status(403).json({ error: 'This account has been suspended.', code: 'SUSPENDED' });
+
     req.user = user;
 
     // The serialisers read nicknames synchronously, so this viewer's map has
