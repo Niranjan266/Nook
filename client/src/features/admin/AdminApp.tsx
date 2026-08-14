@@ -63,6 +63,42 @@ function SignIn({ onIn }: { onIn: () => void }) {
       });
   }, []);
 
+  /**
+   * Coming back from Google. The callback sends admin sign-ins to
+   * /nookcontrol?g=<code>; the code is traded for an admin token and stripped
+   * from the URL immediately — it is single-use, but a spent code sitting in
+   * the address bar invites someone to try it.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const handoff = params.get('g');
+    const failed = params.get('google_error');
+    if (!handoff && !failed) return;
+
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (failed) {
+      setError(
+        failed === 'access_denied'
+          ? 'Google sign-in was cancelled.'
+          : 'Google sign-in did not complete. Try again.'
+      );
+      return;
+    }
+
+    setBusy(true);
+    adminPost<{ token: string }>('/sign-in/google', { code: handoff })
+      .then(({ token }) => {
+        setAdminToken(token);
+        onIn();
+      })
+      .catch((e) => {
+        setError(e.message || 'That Google account is not an administrator here.');
+        setBusy(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);

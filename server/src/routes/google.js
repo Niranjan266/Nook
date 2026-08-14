@@ -78,29 +78,37 @@ setInterval(() => {
 
 const stateSecret = () => env.accessSecret;
 
-function makeState() {
-  const payload = Buffer.from(JSON.stringify({ n: crypto.randomBytes(8).toString('hex'), t: Date.now() })).toString(
-    'base64url'
-  );
+function makeState({ admin = false } = {}) {
+  const payload = Buffer.from(
+    JSON.stringify({ n: crypto.randomBytes(8).toString('hex'), t: Date.now(), a: admin ? 1 : 0 })
+  ).toString('base64url');
   const sig = crypto.createHmac('sha256', stateSecret()).update(payload).digest('base64url');
   return `${payload}.${sig}`;
 }
 
-function validState(state) {
+/**
+ * Returns the decoded state when the signature holds, otherwise null.
+ *
+ * The `admin` flag travels inside the signed payload rather than as its own
+ * query parameter, so it cannot be added on the way back — someone who edits
+ * the callback URL invalidates the signature rather than promoting themselves.
+ */
+function readState(state) {
   const [payload, sig] = String(state || '').split('.');
-  if (!payload || !sig) return false;
+  if (!payload || !sig) return null;
 
   const expected = crypto.createHmac('sha256', stateSecret()).update(payload).digest('base64url');
   // timingSafeEqual throws on length mismatch, which is itself a signal, so
   // compare lengths first.
-  if (sig.length !== expected.length) return false;
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+  if (sig.length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
 
   try {
-    const { t } = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    return Date.now() - t < 10 * 60_000; // ten minutes to finish signing in
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (Date.now() - parsed.t >= 10 * 60_000) return null; // ten minutes to finish
+    return parsed;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -115,7 +123,9 @@ router.get('/start', (req, res) => {
     redirect_uri: redirectUri(),
     response_type: 'code',
     scope: 'openid email profile',
-    state: makeState(),
+    // `?admin=1` from the panel. Sealed into the signed state so it survives
+    // the round trip without being forgeable.
+    state: makeState({ admin: req.query.admin === '1' }),
     // Nook needs the identity once, not ongoing access, so no refresh token is
     // requested. Less to store, less to leak.
     access_type: 'online',
@@ -127,18 +137,25 @@ router.get('/start', (req, res) => {
 
 /* ── 2 · callback ─────────────────────────────────────────────────────────── */
 
-/** Send the browser back to the app, with a reason when it did not work. */
-const bounce = (res, params) => res.redirect(`${env.appUrl}/?${new URLSearchParams(params).toString()}`);
+/**
+ * Send the browser back where it came from, with a reason when it did not
+ * work. Admin sign-ins return to /nookcontrol; everyone else to the app.
+ */
+const bounce = (res, params, admin = false) =>
+  res.redirect(`${env.appUrl}${admin ? '/nookcontrol' : '/'}?${new URLSearchParams(params).toString()}`);
 
 router.get(
   '/callback',
   asyncRoute(async (req, res) => {
     if (!enabled()) return bounce(res, { google_error: 'unconfigured' });
 
+    const state = readState(req.query.state);
+    const admin = Boolean(state?.a);
+
     // The user pressed Cancel, or Google refused.
-    if (req.query.error) return bounce(res, { google_error: String(req.query.error) });
-    if (!validState(req.query.state)) return bounce(res, { google_error: 'bad_state' });
-    if (!req.query.code) return bounce(res, { google_error: 'no_code' });
+    if (req.query.error) return bounce(res, { google_error: String(req.query.error) }, admin);
+    if (!state) return bounce(res, { google_error: 'bad_state' });
+    if (!req.query.code) return bounce(res, { google_error: 'no_code' }, admin);
 
     const tokenRes = await fetch(TOKEN_URL, {
       method: 'POST',
@@ -155,7 +172,7 @@ router.get(
     const tokens = await tokenRes.json().catch(() => ({}));
     if (!tokenRes.ok || !tokens.id_token) {
       console.error(`  google    token exchange failed: ${JSON.stringify(tokens).slice(0, 300)}`);
-      return bounce(res, { google_error: 'exchange_failed' });
+      return bounce(res, { google_error: 'exchange_failed' }, admin);
     }
 
     /**
@@ -167,13 +184,13 @@ router.get(
      */
     const claims = JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64url').toString());
 
-    if (claims.aud !== env.google.clientId) return bounce(res, { google_error: 'wrong_audience' });
+    if (claims.aud !== env.google.clientId) return bounce(res, { google_error: 'wrong_audience' }, admin);
     if (!['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss))
-      return bounce(res, { google_error: 'wrong_issuer' });
-    if (!claims.sub) return bounce(res, { google_error: 'no_subject' });
+      return bounce(res, { google_error: 'wrong_issuer' }, admin);
+    if (!claims.sub) return bounce(res, { google_error: 'no_subject' }, admin);
 
     const user = await findOrCreate(claims);
-    return bounce(res, { g: mintHandoff(user.id) });
+    return bounce(res, { g: mintHandoff(user.id) }, admin);
   })
 );
 
@@ -299,3 +316,4 @@ async function meShape(user) {
 router.get('/available', (req, res) => res.json({ available: enabled() }));
 
 export default router;
+export { claimHandoff };

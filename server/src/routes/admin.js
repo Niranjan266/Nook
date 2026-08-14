@@ -29,6 +29,7 @@ import { signAccess } from '../services/tokens.js';
 import { sendBroadcast, mailProvider } from '../services/mail.js';
 import { createMessage } from '../services/messages.js';
 import * as C from '../db/conversations.js';
+import { claimHandoff } from './google.js';
 
 const router = Router();
 
@@ -100,15 +101,23 @@ router.post(
 );
 
 /**
- * Sign in with the Google identity already used for the app. The handoff code
- * comes from the normal Google flow — this endpoint just checks the resulting
- * account is on the allowlist and issues an admin token instead of a session.
+ * Sign in with the Google identity the app already uses.
+ *
+ * Takes the **handoff code** minted by the Google callback, not an account id.
+ * That distinction is the whole security of this endpoint: a code is single
+ * use, expires in sixty seconds, and can only have come from someone who just
+ * completed Google's consent screen. An account id is public knowledge — it
+ * appears in every message payload — so accepting one here would have let
+ * anybody claim to be the administrator by typing a string.
  */
 router.post(
   '/sign-in/google',
   signInLimit,
   asyncRoute(async (req, res) => {
-    const { userId } = z.object({ userId: z.string().min(1) }).parse(req.body);
+    const { code } = z.object({ code: z.string().min(10) }).parse(req.body);
+
+    const userId = claimHandoff(code);
+    if (!userId) throw httpError(401, 'That sign-in link has expired. Try again.');
 
     const user = await U.findUserById(userId);
     if (!user || !user.email || !isAdminEmail(user.email)) {
