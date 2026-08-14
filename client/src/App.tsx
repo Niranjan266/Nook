@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/stores/auth';
 import { useChat, selectActive } from '@/stores/chat';
@@ -86,7 +86,33 @@ function OfflineBar() {
   );
 }
 
+/**
+ * The admin panel is a separate chunk, fetched only when someone actually
+ * visits /nookcontrol. Ordinary visitors never download a byte of it — which
+ * matters for load time, and means the panel's existence is not advertised in
+ * the main bundle.
+ */
+const AdminApp = lazy(() => import('@/features/admin/AdminApp'));
+
+const isAdminRoute = () => window.location.pathname.replace(/\/+$/, '') === '/nookcontrol';
+
 export default function App() {
+  // Read once: this decides which application you are running, and it should
+  // not change under you mid-session.
+  const [adminRoute] = useState(isAdminRoute);
+
+  if (adminRoute) {
+    return (
+      <Suspense fallback={<div className="center" style={{ height: '100dvh' }} />}>
+        <AdminApp />
+      </Suspense>
+    );
+  }
+
+  return <Nook />;
+}
+
+function Nook() {
   const { me, status, init } = useAuth();
   const conversation = useChat(selectActive);
   const hydrate = useChat((s) => s.hydrate);

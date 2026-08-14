@@ -1,0 +1,272 @@
+/* ── /nookcontrol ──────────────────────────────────────────────────────────
+   Same materials as the app, different density. A chat wants air; a table of
+   accounts wants rows you can scan. So: tighter spacing, mono for anything
+   you might compare or copy, and no decoration that does not carry meaning.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.admin {
+  min-height: 100dvh;
+  padding: var(--s-5) var(--s-5) var(--s-7);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.admin-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-5);
+  flex-wrap: wrap;
+}
+.admin-head h1 {
+  font-size: var(--t-2xl);
+  letter-spacing: -0.02em;
+}
+.admin-actor {
+  font-family: var(--font-mono);
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── the numbers ─────────────────────────────────────────────────────────── */
+
+.admin-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--s-3);
+  margin-bottom: var(--s-5);
+}
+.admin-card {
+  padding: var(--s-4);
+  display: grid;
+  gap: 2px;
+}
+.admin-card strong {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+/* ── search and sort ─────────────────────────────────────────────────────── */
+
+.admin-toolbar {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--s-3);
+}
+.admin-search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1 1 260px;
+  padding: 10px 14px;
+  background: var(--clay-sunk);
+  border-radius: var(--r-clay-sm);
+  box-shadow: var(--clay-in);
+}
+.admin-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+.admin-search svg {
+  opacity: 0.55;
+  flex: none;
+}
+
+.admin-sorts {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--clay-sunk);
+  box-shadow: var(--clay-in);
+  flex-wrap: wrap;
+}
+.admin-sort {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.admin-sort.on {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.admin-count {
+  margin-bottom: var(--s-2);
+}
+
+/* ── the table ───────────────────────────────────────────────────────────── */
+
+.admin-table-wrap {
+  background: var(--clay-surface);
+  border-radius: var(--r-clay);
+  box-shadow: var(--clay-1);
+  overflow-x: auto; /* rather than squashing columns on a narrow screen */
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+.admin-table th {
+  text-align: left;
+  font-size: var(--t-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--clay-edge, rgba(30, 26, 23, 0.1));
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(30, 26, 23, 0.06);
+  vertical-align: middle;
+}
+.admin-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.admin-table tbody tr:hover {
+  background: rgba(30, 26, 23, 0.03);
+}
+.admin-table .num {
+  text-align: right;
+}
+.admin-table .mono {
+  font-family: var(--font-mono);
+}
+.admin-table tr.is-suspended td {
+  opacity: 0.55;
+}
+
+.admin-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.admin-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  background-size: cover;
+  background-position: center;
+  color: var(--on-accent);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-sm);
+}
+.admin-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--moss);
+  flex: none;
+}
+
+.admin-chip-bad {
+  background: var(--rust);
+  color: #fdf6f3;
+}
+.admin-chip-quiet {
+  opacity: 0.6;
+}
+
+.admin-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  padding: var(--s-7);
+  color: var(--ink-faint);
+  font-size: var(--t-sm);
+}
+
+/* ── sign-in ─────────────────────────────────────────────────────────────── */
+
+.admin-gate {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--s-5);
+}
+.admin-gate-card {
+  width: 100%;
+  max-width: 380px;
+  padding: var(--s-6);
+  display: grid;
+  gap: var(--s-3);
+}
+.admin-gate-card h1 {
+  font-size: var(--t-2xl);
+  letter-spacing: -0.02em;
+  margin-top: -4px;
+}
+
+.admin-error,
+.admin-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--rust);
+}
+.admin-note {
+  color: var(--ink-faint);
+}
+.admin-error svg,
+.admin-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ── phones ──────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .admin {
+    padding: var(--s-4) var(--s-3) var(--s-6);
+  }
+  .admin-head h1 {
+    font-size: var(--t-xl);
+  }
+  .admin-actor {
+    display: none; /* the sign-out button matters more than who you are */
+  }
+  .admin-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .admin-card strong {
+    font-size: var(--t-xl);
+  }
+}

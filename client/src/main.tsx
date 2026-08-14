@@ -9,6 +9,7 @@ import './styles/auth.css';
 import './styles/shell.css';
 import './styles/chat.css';
 import './styles/call.css';
+import './styles/admin.css';
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
