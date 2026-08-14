@@ -55,8 +55,38 @@ let [clientId, clientSecret] = process.argv.slice(2);
 clientId ||= process.env.GMAIL_CLIENT_ID || '';
 clientSecret ||= process.env.GMAIL_CLIENT_SECRET || '';
 
+/**
+ * Fall back to server/.env, where these already live. Saves pasting a secret
+ * into a terminal — and a secret pasted into a terminal is a secret in your
+ * shell history.
+ */
+if (!clientId || !clientSecret) {
+  try {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const envPath = path.join(here, '..', 'server', '.env');
+    const text = fs.readFileSync(envPath, 'utf8');
+
+    const read = (key) => {
+      // Last assignment wins, matching how dotenv resolves duplicates.
+      const matches = [...text.matchAll(new RegExp(`^\\s*${key}\\s*=\\s*(.*)$`, 'gm'))];
+      const raw = matches.at(-1)?.[1] ?? '';
+      return raw.trim().replace(/^["']|["']$/g, '');
+    };
+
+    clientId = clientId || read('GMAIL_CLIENT_ID') || read('GOOGLE_CLIENT_ID');
+    clientSecret = clientSecret || read('GMAIL_CLIENT_SECRET') || read('GOOGLE_CLIENT_SECRET');
+
+    if (clientId && clientSecret) line('  Read the client ID and secret from server/.env.');
+  } catch {
+    /* no .env, or unreadable — the prompt below still works */
+  }
+}
+
 if (clientId && clientSecret) {
-  line(`  GMAIL_CLIENT_ID     : ${clientId.slice(0, 24)}… (from ${process.argv[2] ? 'the command line' : 'the environment'})`);
+  line(`  GMAIL_CLIENT_ID     : ${clientId.slice(0, 24)}…`);
   line('  GMAIL_CLIENT_SECRET : ••••••••');
 } else {
   const rl = readline.createInterface({ input, output });
