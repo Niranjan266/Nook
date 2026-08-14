@@ -4,7 +4,9 @@ import { useChat } from '@/stores/chat';
 import { useCall } from '@/stores/call';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
-import { playNudge } from '@/lib/sounds';
+import { playNudge, type SoundId } from '@/lib/sounds';
+import { previewOf } from '@/lib/format';
+import * as notifier from '@/lib/notify';
 
 /** Wires every server event into the stores. One place, so nothing goes missing. */
 export function useSocketBridge(enabled: boolean) {
@@ -23,7 +25,30 @@ export function useSocketBridge(enabled: boolean) {
     socket.on('disconnect', () => chat().setConnected(false));
     socket.on('connect_error', () => chat().setConnected(false));
 
-    socket.on('message:new', (m) => chat().onMessage(m));
+    socket.on('message:new', (m) => {
+      chat().onMessage(m);
+
+      // Push covers people who are disconnected; this covers the case the
+      // server deliberately skips — a live socket in a tab nobody is looking
+      // at. Without it, being "online" meant being told nothing.
+      const me = useAuth.getState().me;
+      if (!me || m.sender?.id === me.id) return;
+
+      const state = chat();
+      const convo = state.conversations[m.conversationId];
+      notifier.messageArrived({
+        conversationId: m.conversationId,
+        conversationName: convo?.name || m.sender?.displayName || 'Nook',
+        senderName: m.sender?.displayName || 'Someone',
+        preview: previewOf(m),
+        isActive: state.activeId === m.conversationId,
+        muted: Boolean(convo?.muted),
+        sound: (convo?.sound as SoundId) || 'default',
+        soundOn: me.settings?.soundOn ?? true,
+        onOpen: (id) => chat().setActive(id),
+        toast: (text) => ui().toast(text),
+      });
+    });
     socket.on('message:edit', (m) => chat().onMessageUpdate(m));
     socket.on('message:preview', (m) => chat().onMessageUpdate(m));
     socket.on('thread:new', (p) => chat().onThreadReply(p));

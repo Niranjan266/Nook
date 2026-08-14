@@ -5,6 +5,7 @@ import Sheet from '@/components/Sheet';
 import Avatar from '@/components/Avatar';
 import { upload, post, put, patch, get } from '@/lib/api';
 import { enablePush, disablePush, pushState } from '@/lib/push';
+import { askToNotify } from '@/lib/notify';
 import { toClock, fromClock, isQuietNow } from '@/lib/rooms';
 import type { QuietHours } from '@/lib/types';
 import {
@@ -210,6 +211,12 @@ export default function SettingsSheet() {
       setPush('off');
       toast('Notifications off');
     } else {
+      // Ask for the browser permission here too. Push covers messages that
+      // arrive while Nook is closed; this same permission is what lets a
+      // notification appear when Nook is open in a tab you are not looking
+      // at — which the server deliberately does not send a push for.
+      await askToNotify();
+
       const result = await enablePush();
       setPush(result);
       toast(

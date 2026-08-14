@@ -33,6 +33,7 @@ import ThreadPanel from '@/features/chat/ThreadPanel';
 import { registerServiceWorker } from '@/lib/push';
 import { setToken } from '@/lib/api';
 import { IMPERSONATE_KEY } from '@/lib/adminApi';
+import { initTitle, watchFocus } from '@/lib/notify';
 import { setCacheScope } from '@/lib/outbox';
 import { usePhone, useNarrow } from '@/lib/useMediaQuery';
 import { spring } from '@/lib/motion';
@@ -135,6 +136,8 @@ function Nook() {
     }
     init();
     registerServiceWorker();
+    initTitle();
+    return watchFocus();
   }, [init]);
 
   useEffect(() => {
