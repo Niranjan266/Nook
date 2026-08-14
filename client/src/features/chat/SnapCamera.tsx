@@ -33,9 +33,16 @@ interface Props {
   onSend: (file: File, seconds: SnapTimer) => void | Promise<void>;
   /** Used when getUserMedia is unavailable or refused. */
   onFallback: () => void;
+  /**
+   * A picture chosen from the library instead of taken here. Skips straight to
+   * the review screen, so a snap from the gallery gets the same timer choice
+   * and the same "Send snap" step as one from the camera — the two paths
+   * should differ only in where the image came from.
+   */
+  initialFile?: File | null;
 }
 
-export default function SnapCamera({ open, onClose, onSend, onFallback }: Props) {
+export default function SnapCamera({ open, onClose, onSend, onFallback, initialFile }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -55,10 +62,19 @@ export default function SnapCamera({ open, onClose, onSend, onFallback }: Props)
     setReady(false);
   }, []);
 
+  /* A picture handed in from the library goes straight to review; the camera
+     is never started, so no permission is asked for and no light comes on. */
+  useEffect(() => {
+    if (!open || !initialFile) return;
+    const url = URL.createObjectURL(initialFile);
+    setShot({ url, file: initialFile });
+    return () => URL.revokeObjectURL(url);
+  }, [open, initialFile]);
+
   /* ── stream lifecycle ─────────────────────────────────────────────────── */
 
   useEffect(() => {
-    if (!open || shot) return;
+    if (!open || shot || initialFile) return;
     let cancelled = false;
 
     (async () => {
@@ -159,6 +175,9 @@ export default function SnapCamera({ open, onClose, onSend, onFallback }: Props)
   }
 
   function retake() {
+    // A library picture has no camera to go back to — close instead, and let
+    // them pick again, rather than starting a camera they never asked for.
+    if (initialFile) return onClose();
     setShot((s) => {
       if (s) URL.revokeObjectURL(s.url);
       return null;
@@ -270,7 +289,7 @@ export default function SnapCamera({ open, onClose, onSend, onFallback }: Props)
               {shot ? (
                 <div className="snap-cam-row">
                   <button className="slab slab-quiet" onClick={retake} disabled={sending}>
-                    Retake
+                    {initialFile ? 'Cancel' : 'Retake'}
                   </button>
                   <button className="slab grow" onClick={send} disabled={sending}>
                     {sending ? 'Sending…' : 'Send snap'}

@@ -53,6 +53,7 @@ export default function Composer({ conversationId }: Props) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [snapMode, setSnapMode] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
+  const [snapFile, setSnapFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<{ name: string; pct: number } | null>(null);
 
   const [recording, setRecording] = useState(false);
@@ -63,6 +64,7 @@ export default function Composer({ conversationId }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
+  const snapPickInput = useRef<HTMLInputElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const recTimer = useRef<number>();
@@ -449,18 +451,36 @@ export default function Composer({ conversationId }: Props) {
                     <span className="list-row-label">Photo or video</span>
                   </span>
                 </button>
+                {/* Snap can come from the camera or the library. Offering both
+                    matters because "take a photo now" is not always possible —
+                    a laptop with no webcam, a refused permission, or a picture
+                    you already have. */}
                 <button
                   className="list-row"
                   onClick={() => {
                     setSnapMode(true);
+                    setSnapFile(null);
                     setCamOpen(true);
                     setAttachOpen(false);
                   }}
                 >
                   <IconFire size={18} />
                   <span className="grow">
-                    <span className="list-row-label">Snap</span>
+                    <span className="list-row-label">Snap — take a photo</span>
                     <span className="list-row-sub">Seen once, then gone</span>
+                  </span>
+                </button>
+                <button
+                  className="list-row"
+                  onClick={() => {
+                    snapPickInput.current?.click();
+                    setAttachOpen(false);
+                  }}
+                >
+                  <IconImage size={18} />
+                  <span className="grow">
+                    <span className="list-row-label">Snap — choose a photo</span>
+                    <span className="list-row-sub">From your library, still seen once</span>
                   </span>
                 </button>
                 <button
@@ -656,11 +676,31 @@ export default function Composer({ conversationId }: Props) {
         }}
       />
 
+      <input
+        ref={snapPickInput}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) {
+            // Straight into the same review screen the camera uses, so the
+            // timer choice and the send step are identical either way.
+            setSnapFile(f);
+            setSnapMode(true);
+            setCamOpen(true);
+          }
+          e.target.value = '';
+        }}
+      />
+
       <SnapCamera
         open={camOpen}
+        initialFile={snapFile}
         onClose={() => {
           setCamOpen(false);
           setSnapMode(false);
+          setSnapFile(null);
         }}
         onSend={(file, seconds) => sendFile(file, true, seconds)}
         // Where a live camera isn't available — permission refused, no device,
