@@ -62,12 +62,27 @@ API being off. Nook's error text calls it out, but it is easier to just do it no
 5. **Test users** → **Add users** → add the Gmail address that will be sending
 6. **Save and continue**
 
-> **Leave it on "Testing" and your refresh token dies after seven days.** That
-> is a Google policy, and it is the reason mail silently stops working a week
-> after you set it up. Once it works, come back to this screen and press
-> **Publish app**. It will warn about verification — ignore that. Verification
-> is only needed for scopes that read user data; `gmail.send` on your own
-> account does not require it.
+> ### Publishing status is not optional here
+>
+> While the consent screen sits on **Testing**, two things are true, and both
+> bite:
+>
+> 1. **Only accounts on the Test users list can consent at all.** Everyone else
+>    gets *"Access blocked: Nook has not completed the Google verification
+>    process — Error 403: access_denied"*. That includes the account you want to
+>    send mail from, and — because the same OAuth client also powers Nook's
+>    sign-in — **every person who tries to sign in with Google**.
+> 2. **Refresh tokens expire after seven days.** Mail works, then silently stops
+>    a week later with `invalid_grant`.
+>
+> So: add the sending account under **Test users** to unblock yourself now, then
+> **Publish app** to fix both properly. Publishing is free and instant.
+>
+> Publishing shows an "unverified app" warning to anyone consenting to a
+> sensitive scope, and caps you at 100 such users. Neither matters here: exactly
+> one person ever consents to `gmail.send` — you, once, to connect the sender.
+> Full Google verification only exists to remove that warning for a public
+> audience you do not have.
 
 ## Step 4 · OAuth client
 

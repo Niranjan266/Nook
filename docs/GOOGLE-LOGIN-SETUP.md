@@ -39,11 +39,21 @@ If you set this up for Gmail sending it is already done. Otherwise:
 **APIs & Services → OAuth consent screen** → External → app name `Nook`, your
 support and developer email → Save.
 
-Scopes are `openid email profile`, all three "non-sensitive", so Google does
-not require app verification. You will see an "unverified app" interstitial
-until you press **Publish app** — and unlike the Gmail token, sign-in keeps
-working while it is in Testing. Publish it anyway so your friends do not meet
-a scary warning screen.
+Scopes are `openid email profile` — all three non-sensitive, so Google does not
+require app verification for sign-in.
+
+> **Press "Publish app" before you let anyone else in.**
+>
+> While the consent screen is on **Testing**, only accounts you have listed
+> under **Test users** can sign in at all. Everyone else is stopped dead with
+> *"Access blocked: Nook has not completed the Google verification process —
+> Error 403: access_denied"*. It is not a warning they can click past.
+>
+> This catches people out because it looks like it works: you are the owner, so
+> it works for you, and you only discover the wall when a friend tries.
+>
+> Publishing is instant and free. With only non-sensitive scopes, sign-in shows
+> no warning afterwards.
 
 ## Step 3 · Set the variables
 
