@@ -417,3 +417,100 @@
     gap: var(--s-2) var(--s-3);
   }
 }
+
+/* ── writing to people ───────────────────────────────────────────────────── */
+
+.admin-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--clay-sunk);
+  box-shadow: var(--clay-in);
+  margin-bottom: var(--s-4);
+}
+.admin-tab {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+.admin-tab.on {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.admin-compose {
+  display: grid;
+  gap: var(--s-3);
+  max-width: 620px;
+}
+.admin-textarea {
+  resize: vertical;
+  min-height: 140px;
+  font: inherit;
+  line-height: 1.6;
+}
+select.groove {
+  appearance: none;
+  cursor: pointer;
+}
+
+/* A rough sketch of the email, not a rendering of it — enough to catch a
+   wrong heading or a wall of unbroken text before it reaches anyone. */
+.admin-preview-card {
+  background: #f4eee6;
+  border-radius: 20px;
+  padding: var(--s-5);
+  margin-top: 6px;
+  color: #1e1a17;
+}
+.admin-preview-brand {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #5c5349;
+}
+.admin-preview-card h3 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  margin: 10px 0 12px;
+}
+.admin-preview-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #5c5349;
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+}
+.admin-preview-btn {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #c0603c;
+  color: #fff6ef;
+  border: 2px solid #1e1a17;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.admin-banner-ok {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-clay-sm);
+  background: var(--moss);
+  color: #f5f7f2;
+  font-size: var(--t-sm);
+  line-height: 1.5;
+}
+.admin-banner-ok svg,
+.admin-banner-bad svg {
+  flex: none;
+}

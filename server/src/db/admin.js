@@ -176,6 +176,16 @@ export const deleteUser = (id) => run('DELETE FROM users WHERE id = ?', [id]);
 export const bumpTokenEpoch = (id) =>
   run('UPDATE users SET token_epoch = ?, updated_at = ? WHERE id = ?', [now(), now(), id]);
 
-/** Everyone with an address, for a broadcast. */
+/** Everyone with an address — the audience for an email broadcast. */
 export const mailableUsers = () =>
   all(`SELECT id, username, display_name, email, nook_id FROM users WHERE email <> '' AND suspended = 0`);
+
+/**
+ * Everyone, address or not — the audience for an in-app message.
+ *
+ * Kept separate from `mailableUsers` on purpose. An in-app message needs no
+ * email address, and reusing the mail audience silently skipped every account
+ * that had not added one: exactly the people who *only* reachable in the app.
+ */
+export const reachableUsers = () =>
+  all(`SELECT id, username, display_name, email, nook_id FROM users WHERE suspended = 0`);

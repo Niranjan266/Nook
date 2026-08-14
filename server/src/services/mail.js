@@ -270,4 +270,63 @@ export function sendWelcome({ to, displayName, username, nookId }) {
   });
 }
 
+/* ── broadcast ────────────────────────────────────────────────────────────
+   An announcement written in the panel, wearing the same clothes as every
+   other Nook email so it does not look like it came from somewhere else.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Escape before interpolating: the body is typed by a human, not by us. */
+const esc = (s) =>
+  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Blank line = paragraph. Single newline = line break. Nothing else. */
+const paragraphs = (body) =>
+  esc(body)
+    .split(/\n{2,}/)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:${MUTED}">${p.replace(/\n/g, '<br>')}</p>`
+    )
+    .join('');
+
+export function sendBroadcast({ to, displayName, subject, heading, body }) {
+  const greeting = heading || `Hello ${displayName}`;
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light only">
+<title>${esc(subject)}</title></head>
+<body style="margin:0;padding:0;background:${BISQUE}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="background:${BISQUE};padding:40px 16px">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="max-width:460px;background:${SURFACE};border-radius:28px;padding:36px;
+                  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+      <tr><td>
+        <div style="font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:${MUTED}">Nook</div>
+        <h1 style="margin:14px 0 14px;font-size:26px;line-height:1.2;color:${INK};letter-spacing:-0.02em">
+          ${esc(greeting)}
+        </h1>
+        ${paragraphs(body)}
+        ${slab(env.appUrl, 'Open Nook')}
+        <p style="margin:26px 0 0;padding-top:20px;border-top:1px solid ${HAIRLINE};
+                  font-size:13px;line-height:1.6;color:${MUTED}">
+          You are getting this because you have a Nook account. It is not marketing and there is
+          nothing to unsubscribe from — we only write when there is something you need to know.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+
+  return send({
+    to,
+    subject,
+    html,
+    text: `${greeting}\n\n${body}\n\nOpen Nook: ${env.appUrl}`,
+  });
+}
+
 export const mailProvider = resolveProvider;

@@ -22,6 +22,7 @@ import {
 import { API_BASE } from '@/lib/config';
 import { IconSearch, IconWarning, IconLogOut, IconCheck, IconUsers } from '@/components/Icon';
 import { UserPanelHost } from './UserPanel';
+import Compose from './Compose';
 
 const SORTS = [
   { id: 'recent', label: 'Last seen' },
@@ -174,6 +175,7 @@ export default function AdminApp() {
   const [error, setError] = useState('');
   const [actor, setActor] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'people' | 'write'>('people');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -252,6 +254,19 @@ export default function AdminApp() {
         ))}
       </div>
 
+      <div className="admin-tabs" role="group" aria-label="Section">
+        <button className={`admin-tab${tab === 'people' ? ' on' : ''}`} onClick={() => setTab('people')}>
+          People
+        </button>
+        <button className={`admin-tab${tab === 'write' ? ' on' : ''}`} onClick={() => setTab('write')}>
+          Write to people
+        </button>
+      </div>
+
+      {tab === 'write' && <Compose people={users} />}
+
+      {tab === 'people' && (
+      <>
       <div className="admin-toolbar">
         <label className="admin-search">
           <IconSearch size={16} />
@@ -367,6 +382,8 @@ export default function AdminApp() {
           </p>
         )}
       </div>
+      </>
+      )}
 
       <UserPanelHost userId={openId} onClose={() => setOpenId(null)} onChanged={load} />
     </div>

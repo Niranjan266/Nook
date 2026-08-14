@@ -26,6 +26,9 @@ import { asyncRoute } from '../middleware/auth.js';
 import { httpError } from '../middleware/error.js';
 import { verify as verifyPassword } from '../services/password.js';
 import { signAccess } from '../services/tokens.js';
+import { sendBroadcast, mailProvider } from '../services/mail.js';
+import { createMessage } from '../services/messages.js';
+import * as C from '../db/conversations.js';
 
 const router = Router();
 
@@ -289,6 +292,154 @@ router.post(
       accessToken: signAccess(user.id),
       user: { id: user.id, username: user.username, displayName: user.displayName },
     });
+  })
+);
+
+/* ── broadcast ────────────────────────────────────────────────────────────
+   Two channels, deliberately separate. Email reaches people who are not in
+   the app; an in-app message reaches people who are, and arrives as a real
+   conversation they can scroll back to. Announcements usually want one or the
+   other, not both, so the panel asks rather than guessing.
+   ────────────────────────────────────────────────────────────────────────── */
+
+const broadcastLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Twenty sends an hour is the limit. Slow down.' },
+});
+
+/**
+ * Everyone, or one person.
+ *
+ * `needsEmail` matters: an in-app message reaches anyone, while an email
+ * obviously cannot reach an account that never added an address. Using one
+ * audience for both silently skipped the accounts that exist only in the app.
+ */
+async function audience(to, { needsEmail } = { needsEmail: false }) {
+  if (to === 'all') return needsEmail ? A.mailableUsers() : A.reachableUsers();
+  const one = await U.findUserById(to);
+  if (!one) throw httpError(404, 'No such account.');
+  return [{ id: one.id, username: one.username, display_name: one.displayName, email: one.email }];
+}
+
+router.post(
+  '/broadcast/email',
+  broadcastLimit,
+  asyncRoute(async (req, res) => {
+    const { to, subject, heading, body } = z
+      .object({
+        to: z.string().min(1),
+        subject: z.string().trim().min(1).max(140),
+        heading: z.string().trim().max(90).optional().default(''),
+        body: z.string().trim().min(1).max(8000),
+      })
+      .parse(req.body);
+
+    const people = (await audience(to, { needsEmail: true })).filter((p) => p.email);
+    if (!people.length) throw httpError(400, 'Nobody in that audience has an email address.');
+
+    await A.audit({
+      actor: req.admin.actor,
+      action: 'broadcast-email',
+      targetId: to === 'all' ? '' : to,
+      detail: `${people.length} recipient(s) · ${subject}`,
+      ip: clientIp(req),
+    });
+
+    /**
+     * Sent one at a time with a small gap rather than in parallel. Gmail's API
+     * will happily rate-limit a burst, and a failed send here is invisible to
+     * the person who never receives it — so this trades a few seconds for
+     * delivery that actually happens, and reports the real counts.
+     */
+    let sent = 0;
+    const failed = [];
+    for (const person of people) {
+      const result = await sendBroadcast({
+        to: person.email,
+        displayName: person.display_name,
+        subject,
+        heading,
+        body,
+      });
+      if (result.delivered) sent += 1;
+      else failed.push({ email: person.email, error: result.error || result.channel });
+      if (people.length > 1) await new Promise((r) => setTimeout(r, 120));
+    }
+
+    res.json({ attempted: people.length, sent, failed: failed.slice(0, 20), channel: mailProvider() });
+  })
+);
+
+/**
+ * The account announcements come from.
+ *
+ * A real user row, because every message in Nook has a sender and the whole
+ * app assumes that is true. Created on first use so a fresh instance does not
+ * carry a mystery account nobody asked for.
+ */
+async function announcer() {
+  const existing = await U.findUserByUsername('nook');
+  if (existing) return existing;
+
+  const { hash } = await import('../services/password.js');
+  return U.createUser({
+    username: 'nook',
+    displayName: 'Nook',
+    // No one signs in as this account, so give it a password nobody knows.
+    passwordHash: await hash(crypto.randomBytes(48).toString('base64')),
+    passwordless: true,
+    about: 'Announcements from the people who run this Nook.',
+  });
+}
+
+router.post(
+  '/broadcast/message',
+  broadcastLimit,
+  asyncRoute(async (req, res) => {
+    const { to, body } = z
+      .object({ to: z.string().min(1), body: z.string().trim().min(1).max(4000) })
+      .parse(req.body);
+
+    const people = await audience(to);
+    const from = await announcer();
+    const recipients = people.filter((p) => p.id !== from.id);
+
+    await A.audit({
+      actor: req.admin.actor,
+      action: 'broadcast-message',
+      targetId: to === 'all' ? '' : to,
+      detail: `${recipients.length} recipient(s) · ${body.slice(0, 80)}`,
+      ip: clientIp(req),
+    });
+
+    let sent = 0;
+    for (const person of recipients) {
+      try {
+        let convo = await C.findDirectBetween(from.id, person.id);
+        if (!convo) {
+          convo = await C.createConversation({
+            type: 'direct',
+            members: [from.id, person.id],
+            createdBy: from.id,
+          });
+        }
+        // Goes through the normal path, so it lands in their chat list, fires
+        // the socket event and raises a push notification like any message.
+        await createMessage({
+          conversationId: convo.id,
+          senderId: from.id,
+          payload: { type: 'text', body },
+        });
+        sent += 1;
+      } catch (err) {
+        console.error(`  broadcast  ${person.username}: ${err.message}`);
+      }
+    }
+
+    res.json({ attempted: recipients.length, sent });
   })
 );
 
