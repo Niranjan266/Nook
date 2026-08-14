@@ -12,6 +12,7 @@ import { notFound, errorHandler } from './middleware/error.js';
 import { UPLOAD_DIR, mediaProvider } from './services/media.js';
 import { mailProvider } from './services/mail.js';
 import { pushProvider } from './services/push.js';
+import { gmailMissing } from './services/gmail.js';
 import { attachSockets } from './sockets/index.js';
 
 import { startScheduler } from './services/scheduler.js';
@@ -69,17 +70,22 @@ app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '30d' }));
  * container disk that gets wiped on the next deploy. So health reports which
  * implementation actually won, not merely that the process is up.
  */
-app.get('/api/health', (req, res) =>
+app.get('/api/health', (req, res) => {
+  const mail = mailProvider();
   res.json({
     ok: true,
     app: 'nook',
     db: usingTurso() ? 'turso' : 'sqlite-file',
     media: mediaProvider(),
-    mail: mailProvider(),
+    mail,
+    // Only when mail is not working, and only variable names — never values.
+    // All four Gmail settings are required, so from outside the container a
+    // missing token and a missing sender look identical. This says which.
+    ...(mail === 'console' ? { mailMissing: gmailMissing(), brevoKeySet: env.brevo.enabled } : {}),
     push: pushProvider(),
     time: new Date().toISOString(),
-  })
-);
+  });
+});
 
 // Mounted before /api/auth so its own paths win; the auth router has no
 // conflicting routes, but the ordering makes that guarantee explicit.

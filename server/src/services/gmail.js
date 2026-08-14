@@ -133,5 +133,21 @@ export async function sendViaGmail({ to, subject, html, text }) {
   return res.json();
 }
 
-export const gmailReady = () =>
-  Boolean(env.gmail.clientId && env.gmail.clientSecret && env.gmail.refreshToken && env.gmail.sender);
+const GMAIL_REQUIRED = [
+  ['GMAIL_CLIENT_ID', () => env.gmail.clientId],
+  ['GMAIL_CLIENT_SECRET', () => env.gmail.clientSecret],
+  ['GMAIL_REFRESH_TOKEN', () => env.gmail.refreshToken],
+  ['GMAIL_SENDER', () => env.gmail.sender],
+];
+
+export const gmailReady = () => GMAIL_REQUIRED.every(([, read]) => Boolean(read()));
+
+/**
+ * Which of the four are still empty — names only, never values.
+ *
+ * All four are required, so "mail: console" can mean any one of them is blank,
+ * and from outside the container they look identical. Reporting the missing
+ * names turns a guessing game into a fact. Safe to expose: a variable *name*
+ * tells an attacker nothing they could not read in this repository.
+ */
+export const gmailMissing = () => GMAIL_REQUIRED.filter(([, read]) => !read()).map(([key]) => key);
