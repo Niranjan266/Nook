@@ -91,7 +91,7 @@ export const adminGet = <T,>(path: string) => call<T>(path);
 export const adminWake = () => call<{ passwordSignIn: boolean; googleSignIn: boolean }>('/config', { retries: 20 });
 export const adminPost = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'POST', body });
 export const adminPatch = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'PATCH', body });
-export const adminDelete = <T,>(path: string) => call<T>(path, { method: 'DELETE' });
+export const adminDelete = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'DELETE', body });
 
 /* ── shapes ───────────────────────────────────────────────────────────────── */
 
@@ -114,6 +114,21 @@ export interface AdminUser {
   conversationCount: number;
   mediaCount: number;
 }
+
+export interface AdminUserDetail extends AdminUser {
+  about: string;
+  activity: { day: number; count: number }[];
+  rooms: { id: string; type: string; name: string; lastActivity: number }[];
+}
+
+/**
+ * Where an opened session is handed to the main app.
+ *
+ * sessionStorage rather than a query parameter: a token in the URL lands in
+ * history, in the referrer of the next request, and in any screenshot of the
+ * address bar. This is read once at boot and deleted immediately.
+ */
+export const IMPERSONATE_KEY = 'nook.openedSession';
 
 export interface AdminStats {
   users: number;

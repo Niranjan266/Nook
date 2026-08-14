@@ -21,6 +21,7 @@ import {
 } from '@/lib/adminApi';
 import { API_BASE } from '@/lib/config';
 import { IconSearch, IconWarning, IconLogOut, IconCheck, IconUsers } from '@/components/Icon';
+import { UserPanelHost } from './UserPanel';
 
 const SORTS = [
   { id: 'recent', label: 'Last seen' },
@@ -172,6 +173,7 @@ export default function AdminApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [actor, setActor] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -301,7 +303,18 @@ export default function AdminApp() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className={u.suspended ? 'is-suspended' : ''}>
+              <tr
+                key={u.id}
+                className={`admin-row${u.suspended ? ' is-suspended' : ''}`}
+                onClick={() => setOpenId(u.id)}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setOpenId(u.id);
+                  }
+                }}
+              >
                 <td>
                   <span className="admin-person">
                     <span
@@ -354,6 +367,8 @@ export default function AdminApp() {
           </p>
         )}
       </div>
+
+      <UserPanelHost userId={openId} onClose={() => setOpenId(null)} onChanged={load} />
     </div>
   );
 }

@@ -31,6 +31,8 @@ import MediaSheet from '@/features/sheets/MediaSheet';
 import ThreadPanel from '@/features/chat/ThreadPanel';
 
 import { registerServiceWorker } from '@/lib/push';
+import { setToken } from '@/lib/api';
+import { IMPERSONATE_KEY } from '@/lib/adminApi';
 import { setCacheScope } from '@/lib/outbox';
 import { usePhone, useNarrow } from '@/lib/useMediaQuery';
 import { spring } from '@/lib/motion';
@@ -121,6 +123,16 @@ function Nook() {
   const isNarrow = useNarrow();
 
   useEffect(() => {
+    /**
+     * A session handed over by the admin panel. Adopted before init() so it
+     * wins over whatever refresh cookie is lying around, and removed the
+     * instant it is read — it is single-use by construction.
+     */
+    const handed = sessionStorage.getItem(IMPERSONATE_KEY);
+    if (handed) {
+      sessionStorage.removeItem(IMPERSONATE_KEY);
+      setToken(handed);
+    }
     init();
     registerServiceWorker();
   }, [init]);

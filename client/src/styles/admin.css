@@ -270,3 +270,150 @@
     font-size: var(--t-xl);
   }
 }
+
+/* ── one account ─────────────────────────────────────────────────────────── */
+
+.admin-row {
+  cursor: pointer;
+}
+.admin-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.admin-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(30, 26, 23, 0.4);
+}
+.admin-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 41;
+  width: min(430px, 100vw);
+  height: 100dvh;
+  overflow-y: auto;
+  padding: var(--s-5);
+  background: var(--clay-bg);
+  box-shadow: -18px 0 46px rgba(30, 26, 23, 0.18);
+  display: grid;
+  gap: var(--s-4);
+  align-content: start;
+}
+.admin-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.admin-drawer-person {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+}
+.admin-drawer-person h2 {
+  font-size: var(--t-xl);
+  letter-spacing: -0.02em;
+}
+.admin-avatar-lg {
+  width: 58px;
+  height: 58px;
+  font-size: var(--t-lg);
+}
+
+.admin-banner-bad {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-clay-sm);
+  background: var(--rust);
+  color: #fdf6f3;
+  font-size: var(--t-sm);
+}
+
+.admin-facts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--s-3) var(--s-4);
+  padding: var(--s-4);
+  background: var(--clay-surface);
+  border-radius: var(--r-clay);
+  box-shadow: var(--clay-1);
+}
+.admin-facts dt {
+  font-size: var(--t-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.admin-facts dd {
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+/* A bar per day. Fourteen bars is enough to see a rhythm and small enough to
+   read at a glance — a real chart library would be more precise and less
+   useful here. */
+.admin-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 54px;
+  padding: var(--s-3);
+  background: var(--clay-sunk);
+  border-radius: var(--r-clay-sm);
+  box-shadow: var(--clay-in);
+}
+.admin-spark span {
+  flex: 1;
+  min-width: 4px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+}
+
+.admin-rooms {
+  list-style: none;
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+.admin-rooms li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px 10px;
+  border-radius: var(--r-clay-sm);
+  background: var(--clay-surface);
+  font-size: var(--t-sm);
+}
+
+.admin-actions {
+  display: grid;
+  gap: var(--s-2);
+}
+.admin-actions .clay-btn,
+.admin-actions .slab {
+  width: 100%;
+  justify-content: center;
+}
+
+.admin-danger {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border: 2px solid var(--rust);
+  border-radius: var(--r-clay-sm);
+}
+
+@media (max-width: 640px) {
+  .admin-drawer {
+    width: 100vw;
+    padding: var(--s-4) var(--s-3);
+  }
+  .admin-facts {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-2) var(--s-3);
+  }
+}
