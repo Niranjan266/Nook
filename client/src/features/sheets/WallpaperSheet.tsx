@@ -7,7 +7,7 @@ import Sheet from '@/components/Sheet';
 import { upload } from '@/lib/api';
 import { WALLPAPER_PRESETS, dominantColor, prepareWallpaper } from '@/lib/color';
 import { spring } from '@/lib/motion';
-import { IconImage, IconCheck, IconUsers } from '@/components/Icon';
+import { IconImage, IconCheck, IconUsers, IconUser, IconRefresh } from '@/components/Icon';
 
 export default function WallpaperSheet() {
   const { sheet, closeSheet, toast } = useUi();
@@ -25,14 +25,27 @@ export default function WallpaperSheet() {
   const [blur, setBlur] = useState(0);
   const [busy, setBusy] = useState(false);
 
+  /**
+   * Whether this look is yours alone or the room's. Defaults to "just me" —
+   * that is the choice nobody else has to agree to, so it is the one that can
+   * be made without consequence.
+   *
+   * Declared here with the other hooks, above the early return below: React
+   * requires the same hooks in the same order on every render.
+   */
+  const [scope, setScope] = useState<'mine' | 'ours'>('mine');
+
   useEffect(() => {
     if (!open || !conversation) return;
-    const wp = conversation.wallpaper;
+    // Start from whatever you are actually looking at, so the sheet opens
+    // showing the current background rather than resetting it.
+    const wp = conversation.myWallpaper || conversation.wallpaper;
     setPreset(wp.preset);
     setUrl(wp.url);
     setTint(wp.tint);
     setDim(wp.dim);
     setBlur(wp.blur);
+    setScope('mine');
   }, [open, conversation?.id]);
 
   if (!conversation) return null;
@@ -61,14 +74,35 @@ export default function WallpaperSheet() {
     }
   }
 
+  const asksPermission = scope === 'ours' && needsConsent;
+
   const apply = async () => {
     setBusy(true);
     try {
-      await setWallpaper(conversation.id, { url, preset, tint, dim, blur }, !needsConsent);
-      toast(needsConsent ? 'Suggested — they can accept it' : 'Wallpaper set');
+      await setWallpaper(conversation.id, { url, preset, tint, dim, blur }, !needsConsent, scope);
+      toast(
+        scope === 'mine'
+          ? 'Set — only you see this'
+          : asksPermission
+            ? 'Suggested — they can accept it'
+            : 'Wallpaper set'
+      );
       closeSheet();
     } catch (e: any) {
       toast(e?.message || 'Could not save that.', true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearMine = async () => {
+    setBusy(true);
+    try {
+      await setWallpaper(conversation.id, { url: '', preset: '', tint: '', dim, blur }, true, 'mine');
+      toast('Back to the room’s wallpaper');
+      closeSheet();
+    } catch (e: any) {
+      toast(e?.message || 'Could not reset that.', true);
     } finally {
       setBusy(false);
     }
@@ -92,8 +126,19 @@ export default function WallpaperSheet() {
           <button className="clay-btn" style={{ flex: 1 }} onClick={closeSheet}>
             Cancel
           </button>
-          <button className="slab" style={{ flex: 2 }} onClick={apply} disabled={busy || !canEdit}>
-            {busy ? 'Working…' : needsConsent ? 'Suggest to both of you' : 'Set wallpaper'}
+          <button
+            className="slab"
+            style={{ flex: 2 }}
+            onClick={apply}
+            disabled={busy || (scope === 'ours' && !canEdit)}
+          >
+            {busy
+              ? 'Working…'
+              : scope === 'mine'
+                ? 'Set for me'
+                : asksPermission
+                  ? 'Suggest to both of you'
+                  : 'Set wallpaper'}
           </button>
         </>
       }
@@ -142,24 +187,58 @@ export default function WallpaperSheet() {
         </motion.div>
       </div>
 
-      {!canEdit && (
-        <p className="small muted row" style={{ gap: 8, alignItems: 'flex-start' }}>
-          <IconUsers size={16} style={{ flex: 'none', marginTop: 2 }} />
-          <span>
-            Only a group admin can change this wallpaper. You can still look at the options — ask an admin
-            if you want one of them.
-          </span>
+      {/*
+        Who this is for. This is the control that answers the complaint that
+        changing a wallpaper always needed the other person's approval: on the
+        left it is yours alone and nobody is asked, on the right it is the
+        room's and they are.
+      */}
+      <div className="sheet-section">
+        <span className="eyebrow">Who sees it</span>
+        <div className="seg" role="group" aria-label="Who this wallpaper is for">
+          <button
+            className={`seg-item${scope === 'mine' ? ' on' : ''}`}
+            onClick={() => setScope('mine')}
+            aria-pressed={scope === 'mine'}
+          >
+            <IconUser size={15} />
+            <span>Just me</span>
+          </button>
+          <button
+            className={`seg-item${scope === 'ours' ? ' on' : ''}`}
+            onClick={() => setScope('ours')}
+            aria-pressed={scope === 'ours'}
+          >
+            <IconUsers size={15} />
+            <span>{isGroup ? 'Everyone' : 'Both of us'}</span>
+          </button>
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>
+          {scope === 'mine'
+            ? 'Only you will see this. No one is asked, and it changes nothing for anyone else.'
+            : isGroup
+              ? canEdit
+                ? 'This becomes the room’s wallpaper for every member.'
+                : 'Only a group admin can set the room’s wallpaper — ask one, or keep it to yourself above.'
+              : asksPermission
+                ? `${conversation.name.split(' ')[0]} gets asked before it changes for both of you.`
+                : 'This becomes the room’s wallpaper.'}
         </p>
-      )}
+      </div>
 
-      {needsConsent && (
-        <p className="small muted row" style={{ gap: 8, alignItems: 'flex-start' }}>
-          <IconUsers size={16} style={{ flex: 'none', marginTop: 2 }} />
-          <span>
-            A wallpaper belongs to the conversation, not your device — so {conversation.name.split(' ')[0]} gets
-            asked before it changes for both of you.
+      {conversation.myWallpaper && (
+        <button className="list-row" onClick={clearMine} disabled={busy}>
+          <span
+            className="clay-round"
+            style={{ width: 40, height: 40, background: 'var(--clay-sunk)', boxShadow: 'none' }}
+          >
+            <IconRefresh size={18} />
           </span>
-        </p>
+          <span className="grow">
+            <span className="list-row-label">Use the room’s wallpaper again</span>
+            <span className="list-row-sub">Drops your personal one and goes back to the shared look</span>
+          </span>
+        </button>
       )}
 
       <div className="sheet-section">

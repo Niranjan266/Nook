@@ -277,6 +277,22 @@ router.put(
       blur: body.blur ?? 0,
     };
 
+    /**
+     * "Just me" needs no one's agreement.
+     *
+     * A wallpaper the other person never sees is a personal preference, like
+     * muting or a notification sound — asking them to approve it was asking
+     * permission for something that does not touch them. It is stored on the
+     * membership, so it overrides the room's look for this viewer only.
+     */
+    if (req.query.scope === 'mine') {
+      await C.updateMemberPrefs(convo.id, req.user.id, {
+        wallpaper: look.url || look.preset ? { ...look, setBy: req.user.id } : null,
+      });
+      const mine = await C.findConversation(convo.id);
+      return res.json({ conversation: serializeConversation(mine, req.user.id) });
+    }
+
     const force = req.query.force === '1' || convo.type === 'group' || convo.members.length === 1;
 
     if (force) {

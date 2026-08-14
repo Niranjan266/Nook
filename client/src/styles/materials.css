@@ -71,6 +71,50 @@
   transform: none;
 }
 
+/*
+ * Segmented control — two or three mutually exclusive choices.
+ *
+ * A sunk clay trough holding raised clay pills, so the selected one reads as
+ * sitting proud of the groove. Cheaper to scan than a pair of radio buttons
+ * and it keeps both options visible, which matters when the choice is "who
+ * does this affect" rather than a preference you can bury.
+ */
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--clay-sunk);
+  border-radius: var(--r-clay-sm);
+  box-shadow: var(--clay-in);
+}
+.seg-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: 9px 12px;
+  border-radius: calc(var(--r-clay-sm) - 3px);
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.92rem;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    box-shadow var(--dur) var(--ease-out),
+    background var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out);
+}
+.seg-item:hover:not(.on) {
+  color: var(--ink);
+}
+.seg-item.on {
+  background: var(--clay-surface);
+  box-shadow: var(--clay-1);
+  color: var(--accent-deep);
+}
+
 /* round clay button — avatars, icon actions */
 .clay-round {
   width: 44px;

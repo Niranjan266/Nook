@@ -163,6 +163,22 @@ export function serializeConversation(c, viewerId) {
     })),
     createdBy: c.createdBy ? String(c.createdBy) : null,
 
+    /**
+     * A personal wallpaper overrides the room's, for this viewer alone. Both
+     * are sent: the sheet needs to show what the room is wearing as well as
+     * what you have chosen over it, or "reset to the shared one" has nothing
+     * to reset to.
+     */
+    myWallpaper: mine?.wallpaper?.url || mine?.wallpaper?.preset
+      ? {
+          url: mine.wallpaper.url || '',
+          preset: mine.wallpaper.preset || '',
+          tint: mine.wallpaper.tint || '',
+          dim: mine.wallpaper.dim ?? 0.35,
+          blur: mine.wallpaper.blur ?? 0,
+        }
+      : null,
+
     wallpaper: {
       url: c.wallpaper?.url || '',
       preset: c.wallpaper?.preset || '',

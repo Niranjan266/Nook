@@ -128,7 +128,16 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
       ? conversation.wallpaper.proposal
       : null;
 
-  const wp = pendingMine ? { ...conversation.wallpaper, ...pendingMine } : conversation.wallpaper;
+  /**
+   * Order of precedence: a wallpaper you chose for yourself beats the room's,
+   * which beats a suggestion you have made but the other person has not
+   * accepted. Your own choice wins because you made it most deliberately.
+   */
+  const wp = conversation.myWallpaper
+    ? { ...conversation.wallpaper, ...conversation.myWallpaper }
+    : pendingMine
+      ? { ...conversation.wallpaper, ...pendingMine }
+      : conversation.wallpaper;
 
   /**
    * The room has a time of day. If a schedule is on, the evening look replaces
@@ -144,7 +153,9 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
 
   const activeLook = (() => {
     const s = conversation.wallpaperSchedule;
-    if (!s?.enabled) return wp;
+    // A look you chose for yourself is not on the room's clock. Letting the
+    // schedule swap it out at 7pm would look like your choice was ignored.
+    if (!s?.enabled || conversation.myWallpaper) return wp;
     const now = new Date().getHours() * 60 + new Date().getMinutes();
     const night =
       s.nightStart <= s.nightEnd

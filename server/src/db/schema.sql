@@ -418,3 +418,8 @@ CREATE INDEX IF NOT EXISTS idx_admin_audit_at ON admin_audit (at DESC);
 -- nothing to revoke. This is the cheapest honest answer: any token issued
 -- before this moment is refused. Zero means never forced out.
 ALTER TABLE users ADD COLUMN token_epoch INTEGER NOT NULL DEFAULT 0;
+
+-- A wallpaper only this member sees. Empty = use the room's shared one.
+-- Lives on the membership rather than the conversation because it is a
+-- personal preference, exactly like `sound` and `muted` beside it.
+ALTER TABLE conversation_members ADD COLUMN wallpaper TEXT NOT NULL DEFAULT '';

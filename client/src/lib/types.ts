@@ -225,6 +225,8 @@ export interface Conversation {
   members: { user: Person | { id: string }; role: 'member' | 'admin'; joinedAt: string }[];
   createdBy: string | null;
   wallpaper: Wallpaper;
+  /** A look you chose for yourself; overrides the room's, for you only. */
+  myWallpaper: { url: string; preset: string; tint: string; dim: number; blur: number } | null;
 
   roomState: {
     mood: string;

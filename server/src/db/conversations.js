@@ -109,6 +109,8 @@ export async function hydrateConversations(rows, { withLastMessage = true } = {}
       unread: m.unread,
       lastReadAt: m.last_read_at ? new Date(m.last_read_at) : null,
       draft: m.draft,
+        // Personal wallpaper: empty means "use the room's".
+        wallpaper: parseJson(m.wallpaper, null),
       sound: m.sound,
     });
   }
@@ -313,6 +315,7 @@ const MEMBER_FIELDS = {
   locked: 'locked',
   draft: 'draft',
   sound: 'sound',
+  wallpaper: 'wallpaper',
   unread: 'unread',
 };
 
@@ -321,8 +324,11 @@ export async function updateMemberPrefs(conversationId, userId, patch) {
   const args = [];
   for (const [key, column] of Object.entries(MEMBER_FIELDS)) {
     if (patch[key] === undefined) continue;
+    const value = patch[key];
     sets.push(`${column} = ?`);
-    args.push(typeof patch[key] === 'boolean' ? bool(patch[key]) : patch[key]);
+    // `wallpaper` is a JSON column; null means "go back to the room's".
+    if (key === 'wallpaper') args.push(value ? toJson(value) : '');
+    else args.push(typeof value === 'boolean' ? bool(value) : value);
   }
   if (patch.lastReadAt !== undefined) {
     sets.push('last_read_at = ?');

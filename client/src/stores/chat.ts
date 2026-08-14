@@ -64,7 +64,12 @@ interface ChatState {
   createGroup: (input: { name: string; memberIds: string[]; description?: string }) => Promise<string>;
   updatePrefs: (conversationId: string, prefs: Record<string, unknown>) => Promise<void>;
   setDisappearing: (conversationId: string, seconds: number) => Promise<void>;
-  setWallpaper: (conversationId: string, wallpaper: Record<string, unknown>, force?: boolean) => Promise<void>;
+  setWallpaper: (
+    conversationId: string,
+    wallpaper: Record<string, unknown>,
+    force?: boolean,
+    scope?: 'mine' | 'ours'
+  ) => Promise<void>;
   respondWallpaper: (conversationId: string, accept: boolean) => Promise<void>;
   addMembers: (conversationId: string, memberIds: string[]) => Promise<void>;
   removeMember: (conversationId: string, userId: string) => Promise<void>;
@@ -462,9 +467,11 @@ export const useChat = create<ChatState>((set, get) => ({
     get().onConversation(conversation);
   },
 
-  async setWallpaper(conversationId, wallpaper, force) {
+  async setWallpaper(conversationId, wallpaper, force, scope) {
+    // scope=mine writes to your own membership: no consent, nobody else sees it.
+    const query = scope === 'mine' ? '?scope=mine' : force ? '?force=1' : '';
     const { conversation } = await put<{ conversation: Conversation }>(
-      `/conversations/${conversationId}/wallpaper${force ? '?force=1' : ''}`,
+      `/conversations/${conversationId}/wallpaper${query}`,
       wallpaper
     );
     get().onConversation(conversation);
