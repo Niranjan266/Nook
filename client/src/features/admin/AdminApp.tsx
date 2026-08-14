@@ -7,8 +7,6 @@
  * instance, and mixing the two invites clicking the wrong thing.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { spring } from '@/lib/motion';
 import {
   adminGet,
   adminPost,
@@ -81,13 +79,10 @@ function SignIn({ onIn }: { onIn: () => void }) {
 
   return (
     <div className="admin-gate">
-      <motion.form
-        className="clay clay-3 admin-gate-card"
-        onSubmit={submit}
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={spring}
-      >
+      {/* CSS entrance, not motion: a backgrounded tab throttles rAF and
+          freezes a JS animation mid-flight, which left this card stuck at
+          half opacity looking broken. */}
+      <form className="clay clay-3 admin-gate-card rise-in" onSubmit={submit}>
         <span className="eyebrow">Nook</span>
         <h1>Control</h1>
         <p className="small muted">This page is not linked from anywhere. Only you should be here.</p>
@@ -157,7 +152,7 @@ function SignIn({ onIn }: { onIn: () => void }) {
             </button>
           </>
         )}
-      </motion.form>
+      </form>
     </div>
   );
 }

@@ -7,8 +7,6 @@
  * other, and a tool that quietly does both is a tool that surprises you.
  */
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { spring } from '@/lib/motion';
 import { adminPost, type AdminUser } from '@/lib/adminApi';
 import { IconWarning, IconCheck, IconSend } from '@/components/Icon';
 
@@ -61,12 +59,7 @@ export default function Compose({ people }: { people: AdminUser[] }) {
   }
 
   return (
-    <motion.section
-      className="admin-compose"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={spring}
-    >
+    <section className="admin-compose rise-in">
       <div className="admin-sorts" role="group" aria-label="Channel">
         <button
           className={`admin-sort${channel === 'email' ? ' on' : ''}`}
@@ -202,6 +195,6 @@ export default function Compose({ people }: { people: AdminUser[] }) {
           </div>
         </div>
       )}
-    </motion.section>
+    </section>
   );
 }
