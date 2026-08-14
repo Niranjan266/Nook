@@ -160,6 +160,7 @@ export function hydrateUser(row) {
     googleSub: row.google_sub || '',
     passwordless: Boolean(row.passwordless),
     suspended: Boolean(row.suspended),
+    tokenEpoch: row.token_epoch || 0,
     displayName: row.display_name,
     passwordHash: row.password_hash,
     email: row.email,

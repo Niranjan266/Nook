@@ -413,3 +413,8 @@ CREATE TABLE IF NOT EXISTS admin_audit (
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_audit_at ON admin_audit (at DESC);
+
+-- Access tokens are stateless JWTs, so "sign this person out everywhere" has
+-- nothing to revoke. This is the cheapest honest answer: any token issued
+-- before this moment is refused. Zero means never forced out.
+ALTER TABLE users ADD COLUMN token_epoch INTEGER NOT NULL DEFAULT 0;

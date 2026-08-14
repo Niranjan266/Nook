@@ -8,9 +8,27 @@ export async function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Not signed in.' });
 
   try {
-    const { sub } = verifyAccess(token);
+    const { sub, iat } = verifyAccess(token);
     const user = await findUserById(sub);
     if (!user) return res.status(401).json({ error: 'Account no longer exists.' });
+
+    /**
+     * Force sign-out. JWTs are stateless so there is nothing to revoke; the
+     * cheapest honest answer is to refuse anything minted before the moment
+     * the admin pressed the button.
+     *
+     * The comparison needs care. `iat` is in **seconds**, floored, while the
+     * epoch is in milliseconds — so a token issued 800 ms after the bump
+     * carries an `iat` that, multiplied up, lands *before* it. Comparing them
+     * naively rejects tokens created after the sign-out, and the user can
+     * never sign back in.
+     *
+     * So reject only when the token's whole second finished before the epoch.
+     * That leaves a sub-second window where a token issued in the same second
+     * survives, which is a fair trade for the account not being bricked.
+     */
+    if (user.tokenEpoch && (iat + 1) * 1000 <= user.tokenEpoch)
+      return res.status(401).json({ error: 'Signed out. Please sign in again.', code: 'TOKEN_EXPIRED' });
 
     // Checked on every request rather than at sign-in, so suspending somebody
     // takes effect on their next action instead of whenever their token

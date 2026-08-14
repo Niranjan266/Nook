@@ -25,6 +25,7 @@ import * as U from '../db/users.js';
 import { asyncRoute } from '../middleware/auth.js';
 import { httpError } from '../middleware/error.js';
 import { verify as verifyPassword } from '../services/password.js';
+import { signAccess } from '../services/tokens.js';
 
 const router = Router();
 
@@ -184,6 +185,111 @@ router.get(
 router.get(
   '/audit',
   asyncRoute(async (req, res) => res.json({ entries: await A.recentAudit(Number(req.query.limit) || 100) }))
+);
+
+/* ── actions ──────────────────────────────────────────────────────────────
+   Each one writes to the audit trail *before* it acts, so a half-completed
+   action still leaves a record of the intent.
+   ────────────────────────────────────────────────────────────────────────── */
+
+const target = async (req) => {
+  const user = await U.findUserById(req.params.id);
+  if (!user) throw httpError(404, 'No such account.');
+  return user;
+};
+
+router.patch(
+  '/users/:id/suspend',
+  asyncRoute(async (req, res) => {
+    const { suspended } = z.object({ suspended: z.boolean() }).parse(req.body);
+    const user = await target(req);
+
+    await A.audit({
+      actor: req.admin.actor,
+      action: suspended ? 'suspend' : 'unsuspend',
+      targetId: user.id,
+      detail: user.username,
+      ip: clientIp(req),
+    });
+
+    await A.setSuspended(user.id, suspended);
+    // Suspending without cutting existing sessions would leave them signed in
+    // until their token expired, which is up to fifteen minutes of nothing
+    // having happened.
+    if (suspended) await A.bumpTokenEpoch(user.id);
+
+    res.json({ ok: true, suspended });
+  })
+);
+
+router.post(
+  '/users/:id/sign-out',
+  asyncRoute(async (req, res) => {
+    const user = await target(req);
+    await A.audit({
+      actor: req.admin.actor,
+      action: 'force-sign-out',
+      targetId: user.id,
+      detail: user.username,
+      ip: clientIp(req),
+    });
+    await A.bumpTokenEpoch(user.id);
+    res.json({ ok: true });
+  })
+);
+
+router.delete(
+  '/users/:id',
+  asyncRoute(async (req, res) => {
+    const user = await target(req);
+    const { confirm } = z.object({ confirm: z.string() }).parse(req.body || {});
+
+    // Typing the username is the only guard between a mis-click and someone's
+    // account and every message they ever sent. Cascades do the rest.
+    if (confirm !== user.username) {
+      throw httpError(400, `Type the username exactly (${user.username}) to confirm.`);
+    }
+
+    await A.audit({
+      actor: req.admin.actor,
+      action: 'delete-account',
+      targetId: user.id,
+      detail: `${user.username} · ${user.email || 'no email'}`,
+      ip: clientIp(req),
+    });
+
+    await A.deleteUser(user.id);
+    res.json({ ok: true });
+  })
+);
+
+/**
+ * Open a user's account.
+ *
+ * Mints a normal, short-lived access token for that account and hands it to
+ * the panel. It is a real session — everything the person can see, you can
+ * see — so it is written to the audit trail with the account name before the
+ * token is issued, and it is deliberately short: fifteen minutes, no refresh
+ * cookie, so it cannot quietly become a permanent second login.
+ */
+router.post(
+  '/users/:id/open',
+  asyncRoute(async (req, res) => {
+    const user = await target(req);
+
+    await A.audit({
+      actor: req.admin.actor,
+      action: 'open-account',
+      targetId: user.id,
+      detail: user.username,
+      ip: clientIp(req),
+    });
+
+    res.json({
+      accessToken: signAccess(user.id),
+      user: { id: user.id, username: user.username, displayName: user.displayName },
+    });
+  })
 );
 
 /* ── whoami, so the panel can show who it thinks you are ──────────────────── */

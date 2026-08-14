@@ -166,6 +166,16 @@ export const setSuspended = (id, suspended) =>
 
 export const deleteUser = (id) => run('DELETE FROM users WHERE id = ?', [id]);
 
+/**
+ * Invalidate every access token issued so far for this account.
+ *
+ * Set to *now*, never the future: the check in requireAuth compares against a
+ * second-granularity `iat`, and pushing the epoch forward would reject tokens
+ * minted immediately afterwards — locking the person out of signing back in.
+ */
+export const bumpTokenEpoch = (id) =>
+  run('UPDATE users SET token_epoch = ?, updated_at = ? WHERE id = ?', [now(), now(), id]);
+
 /** Everyone with an address, for a broadcast. */
 export const mailableUsers = () =>
   all(`SELECT id, username, display_name, email, nook_id FROM users WHERE email <> '' AND suspended = 0`);
