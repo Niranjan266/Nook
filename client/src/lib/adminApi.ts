@@ -28,8 +28,11 @@ export class AdminError extends Error {
   }
 }
 
-async function call<T>(path: string, options: Omit<RequestInit, 'body'> & { body?: unknown } = {}): Promise<T> {
-  const { body, headers, ...rest } = options;
+async function call<T>(
+  path: string,
+  options: Omit<RequestInit, 'body'> & { body?: unknown; retries?: number } = {}
+): Promise<T> {
+  const { body, headers, retries = 0, ...rest } = options;
 
   let res: Response;
   try {
@@ -43,7 +46,25 @@ async function call<T>(path: string, options: Omit<RequestInit, 'body'> & { body
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new AdminError(`Can't reach the server at ${API_BASE || 'this site'}.`, 0);
+    /**
+     * The API runs on a free instance that sleeps after fifteen idle minutes,
+     * and the first request afterwards can take the best part of a minute
+     * while the container starts. The browser gives up long before that, so
+     * opening this page cold used to fail outright.
+     *
+     * Retried only where the caller asked for it — and callers only ask on
+     * reads. Retrying a POST after a transport failure is not safe: the
+     * request may have reached the server and been processed, and we would
+     * have no way to know.
+     */
+    if (retries > 0) {
+      await new Promise((r) => setTimeout(r, 2500));
+      return call<T>(path, { ...options, retries: retries - 1 });
+    }
+    throw new AdminError(
+      `Can't reach the server at ${API_BASE || 'this site'}. It may be starting up — wait a moment and try again.`,
+      0
+    );
   }
 
   const text = await res.text();
@@ -61,6 +82,13 @@ async function call<T>(path: string, options: Omit<RequestInit, 'body'> & { body
 }
 
 export const adminGet = <T,>(path: string) => call<T>(path);
+
+/**
+ * Wake a sleeping instance before the user has finished typing a password, so
+ * signing in does not fail on a cold start. Safe to retry — it is a GET, and
+ * it is the same request the panel needs anyway.
+ */
+export const adminWake = () => call<{ passwordSignIn: boolean; googleSignIn: boolean }>('/config', { retries: 20 });
 export const adminPost = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'POST', body });
 export const adminPatch = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'PATCH', body });
 export const adminDelete = <T,>(path: string) => call<T>(path, { method: 'DELETE' });

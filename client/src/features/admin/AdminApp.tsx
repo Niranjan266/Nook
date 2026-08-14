@@ -12,6 +12,7 @@ import { spring } from '@/lib/motion';
 import {
   adminGet,
   adminPost,
+  adminWake,
   setAdminToken,
   adminToken,
   AdminError,
@@ -46,11 +47,20 @@ function SignIn({ onIn }: { onIn: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [config, setConfig] = useState<{ passwordSignIn: boolean; googleSignIn: boolean } | null>(null);
+  const [waking, setWaking] = useState(true);
 
+  // Start waking the instance the moment the page opens, so it is up by the
+  // time a password has been typed.
   useEffect(() => {
-    adminGet<{ passwordSignIn: boolean; googleSignIn: boolean }>('/config')
-      .then(setConfig)
-      .catch((e) => setError(e.message));
+    adminWake()
+      .then((c) => {
+        setConfig(c);
+        setWaking(false);
+      })
+      .catch((e) => {
+        setError(e.message);
+        setWaking(false);
+      });
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -116,8 +126,15 @@ function SignIn({ onIn }: { onIn: () => void }) {
           </p>
         )}
 
-        <button className="slab slab-block" disabled={busy || !username || !password}>
-          {busy ? 'Checking…' : 'Sign in'}
+        {waking && (
+          <p className="admin-note">
+            Waking the server — the free instance sleeps after fifteen idle minutes and takes about a
+            minute to start.
+          </p>
+        )}
+
+        <button className="slab slab-block" disabled={busy || waking || !username || !password}>
+          {waking ? 'Waking the server…' : busy ? 'Checking…' : 'Sign in'}
         </button>
 
         {config?.googleSignIn && (
