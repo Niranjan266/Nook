@@ -9,6 +9,7 @@ import { warmFriends } from '../lib/friendcache.js';
 import { areFriends } from '../db/friends.js';
 import { createMessage, markRead } from '../services/messages.js';
 import { notify } from '../services/push.js';
+import { TEMPLATES } from '../services/templates.js';
 import { parseJson } from '../db/index.js';
 import {
   bindIo,
@@ -180,13 +181,15 @@ export function attachSockets(io) {
       });
 
       if (!isOnline(target)) {
-        notify(target, {
-          title: socket.user.displayName,
-          body: kind === 'video' ? 'Video call' : 'Voice call',
-          tag: `call-${call.id}`,
-          conversationId: String(convo.id),
-          urgent: true,
-        }).catch(() => {});
+        notify(
+          target,
+          TEMPLATES.call.push({
+            sender: socket.user.displayName,
+            video: kind === 'video',
+            callId: call.id,
+            conversationId: convo.id,
+          })
+        ).catch(() => {});
       }
 
       emitToUser(target, 'call:incoming', {

@@ -28,6 +28,7 @@ import { verify as verifyPassword } from '../services/password.js';
 import { signAccess, attachSession } from '../services/tokens.js';
 import { sendBroadcast, mailProvider } from '../services/mail.js';
 import { notify, pushProvider } from '../services/push.js';
+import { catalogue, render } from '../services/templates.js';
 import { createMessage } from '../services/messages.js';
 import * as C from '../db/conversations.js';
 import { claimHandoff } from './google.js';
@@ -537,6 +538,126 @@ router.post(
       reached,
       devices,
       silent: people.length - reached,
+      provider: pushProvider(),
+    });
+  })
+);
+
+/* ── templated announcements ──────────────────────────────────────────────
+   The composer's half of services/templates.js. Everything it needs to draw
+   itself comes from there, so adding a template adds a form here with no UI
+   change at all.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** What kinds exist, what blanks each needs, which channels each can reach. */
+router.get('/templates', (_req, res) => res.json({ templates: catalogue() }));
+
+/**
+ * Exactly what a send would produce, without sending it.
+ *
+ * This calls the same `render` the send does — not a lookalike — because a
+ * preview that is assembled separately is a preview that will eventually
+ * disagree with reality, and it will do so precisely when someone is relying
+ * on it before pressing a button that reaches everyone.
+ */
+router.post(
+  '/templates/preview',
+  asyncRoute(async (req, res) => {
+    const { id, values } = z
+      .object({ id: z.string().min(1), values: z.record(z.any()).default({}) })
+      .parse(req.body);
+
+    const rendered = render(id, values);
+    if (!rendered) throw httpError(404, 'No template with that id.');
+    res.json(rendered);
+  })
+);
+
+/**
+ * Send a template on whichever channels were asked for.
+ *
+ * Channels are explicit rather than "everywhere it can go". A maintenance
+ * notice usually wants push only; a feature announcement is worth an email.
+ * Making it a choice each time is the difference between people reading Nook's
+ * announcements and filtering them.
+ */
+router.post(
+  '/templates/send',
+  broadcastLimit,
+  asyncRoute(async (req, res) => {
+    const { id, to, values, channels } = z
+      .object({
+        id: z.string().min(1),
+        to: z.string().min(1),
+        values: z.record(z.any()).default({}),
+        channels: z
+          .object({ push: z.boolean().default(true), email: z.boolean().default(false) })
+          .default({ push: true, email: false }),
+      })
+      .parse(req.body);
+
+    const rendered = render(id, values);
+    if (!rendered) throw httpError(404, 'No template with that id.');
+    if (!rendered.push && !rendered.email) throw httpError(400, 'That template renders nothing.');
+
+    /**
+     * `needsEmail` changes which query runs — mailable people rather than
+     * merely reachable ones — so it has to be decided before the audience is
+     * fetched, not filtered afterwards. Asking for email and getting the
+     * push-shaped list back is how you end up reporting "sent to 40" having
+     * sent to nine.
+     */
+    const wantsEmail = channels.email && Boolean(rendered.email);
+    const people = await audience(to, { needsEmail: wantsEmail });
+
+    await A.audit({
+      actor: req.admin.actor,
+      action: 'broadcast-template',
+      targetId: to === 'all' ? '' : to,
+      detail: `${rendered.id} · ${people.length} recipient(s) · ${
+        [channels.push && 'push', channels.email && 'email'].filter(Boolean).join('+') || 'nothing'
+      }`,
+      ip: clientIp(req),
+    });
+
+    let reached = 0;
+    let devices = 0;
+    let emailed = 0;
+    let emailFailed = 0;
+
+    for (const person of people) {
+      if (channels.push && rendered.push) {
+        const n = await notify(person.id, rendered.push).catch(() => 0);
+        if (n > 0) reached += 1;
+        devices += n;
+      }
+
+      if (wantsEmail && person.email) {
+        // Sequential with a gap, matching /broadcast/email: providers
+        // rate-limit a burst, and a throttled send fails silently for the
+        // person who simply never receives it. Announcements are not urgent
+        // enough to be worth that trade.
+        const result = await sendBroadcast({
+          to: person.email,
+          // snake_case: this row comes from the admin queries, not from
+          // findUserById, and the two do not agree on casing.
+          displayName: person.display_name,
+          subject: rendered.email.subject,
+          heading: rendered.email.heading,
+          body: rendered.email.body,
+          format: 'text',
+        }).catch(() => ({ delivered: false }));
+        if (result.delivered) emailed += 1;
+        else emailFailed += 1;
+        if (people.length > 1) await new Promise((r) => setTimeout(r, 120));
+      }
+    }
+
+    res.json({
+      template: rendered.id,
+      attempted: people.length,
+      push: channels.push ? { reached, devices, silent: people.length - reached } : null,
+      email: wantsEmail ? { sent: emailed, failed: emailFailed } : null,
       provider: pushProvider(),
     });
   })

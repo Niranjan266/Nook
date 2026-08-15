@@ -8,6 +8,7 @@ import { httpError } from '../middleware/error.js';
 import { publicQuietHours } from '../services/quietHours.js';
 import { emitToUser } from '../sockets/hub.js';
 import { notify } from '../services/push.js';
+import { TEMPLATES } from '../services/templates.js';
 import { warmNicknames } from '../lib/nicknames.js';
 import { warmFriends } from '../lib/friendcache.js';
 
@@ -312,12 +313,10 @@ router.post(
     emitToUser(target.id, 'nudge', {
       from: { id: req.user.id, displayName: req.user.displayName, username: req.user.username },
     });
-    notify(target.id, {
-      title: req.user.displayName,
-      body: 'nudged you',
-      tag: `nudge-${req.user.id}`,
-      urgent: true,
-    }).catch(() => {});
+    notify(
+      target.id,
+      TEMPLATES.nudge.push({ sender: req.user.displayName, userId: req.user.id })
+    ).catch(() => {});
 
     res.json({ ok: true });
   })
@@ -418,11 +417,14 @@ router.post(
     // person who is not currently looking at Nook, which is most of them —
     // unless they have said they would rather not hear about requests.
     if (person.settings?.notifyRequests !== false)
-      notify(person.id, {
-        title: `${req.user.displayName} wants to chat`,
-        body: note || 'Tap to accept or decline.',
-        data: { kind: 'friend-request', userId: req.user.id },
-      }).catch(() => {});
+      notify(
+        person.id,
+        TEMPLATES.friendRequest.push({
+          sender: req.user.displayName,
+          note,
+          userId: req.user.id,
+        })
+      ).catch(() => {});
 
     res.status(201).json({ friendship: 'sent' });
   })
@@ -450,11 +452,10 @@ router.post(
     emitToUser(person.id, 'friend:accepted', { user: publicUser(req.user) });
     emitToUser(req.user.id, 'friend:accepted', { user: publicUser(person) });
 
-    notify(person.id, {
-      title: `${req.user.displayName} accepted`,
-      body: 'You can talk now.',
-      data: { kind: 'friend-accepted', userId: req.user.id },
-    }).catch(() => {});
+    notify(
+      person.id,
+      TEMPLATES.friendAccepted.push({ sender: req.user.displayName, userId: req.user.id })
+    ).catch(() => {});
 
     res.json({ friendship: 'friends' });
   })

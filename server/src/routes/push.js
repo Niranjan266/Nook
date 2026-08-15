@@ -8,6 +8,7 @@ import {
 } from '../db/misc.js';
 import { asyncRoute, requireAuth } from '../middleware/auth.js';
 import { publicVapidKey, notify } from '../services/push.js';
+import { TEMPLATES } from '../services/templates.js';
 import { fcmReady } from '../services/fcm.js';
 
 const router = Router();
@@ -85,11 +86,7 @@ router.post(
 router.post(
   '/test',
   asyncRoute(async (req, res) => {
-    const sent = await notify(req.user.id, {
-      title: 'Nook',
-      body: 'Notifications are working. This is the only one you asked for.',
-      tag: 'nook-test',
-    });
+    const sent = await notify(req.user.id, TEMPLATES.pushTest.push({}));
     res.json({ sent });
   })
 );

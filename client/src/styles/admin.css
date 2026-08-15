@@ -543,3 +543,83 @@ select.groove {
     animation-duration: 1ms;
   }
 }
+
+/* ── template composer previews ────────────────────────────────────────────
+   A notification is read in a second, at arm's length, stacked among others.
+   Showing the title and body as two form fields tells you nothing about that,
+   so the preview is drawn as the thing itself — including the two-line clamp,
+   which is where most announcements actually go wrong.
+   ────────────────────────────────────────────────────────────────────────── */
+.admin-notif {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 13px 14px;
+  /* Dark, because a lock screen is. Judging contrast against a light panel
+     tells you about the panel, not about the phone. */
+  background: #2a2622;
+  border-radius: 18px;
+}
+.admin-notif-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  background: #f4eee6;
+  border-radius: 10px;
+}
+.admin-notif-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-notif-text b {
+  font-size: 14px;
+  color: #f6f1e9;
+  font-weight: 650;
+  /* One line, ellipsised — exactly what Android does to a long title. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-notif-text span {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #bdb4a8;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.admin-mail {
+  margin-top: 10px;
+  padding: 16px;
+  background: #fbf7f1;
+  border-radius: 16px;
+}
+.admin-mail-subject {
+  font-size: 12px;
+  color: #5c5349;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #ded5c8;
+}
+.admin-mail-heading {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: #1e1a17;
+  margin-bottom: 10px;
+}
+.admin-mail-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #5c5349;
+  /* The body carries deliberate blank lines; collapsing them would hide the
+     one formatting decision the writer actually made. */
+  white-space: pre-wrap;
+}

@@ -5,6 +5,7 @@ import { areFriends } from '../db/friends.js';
 import { serializeMessage } from '../lib/serialize.js';
 import { emitToConversation, emitToUser, isOnline, isWatching } from '../sockets/hub.js';
 import { notify } from './push.js';
+import { TEMPLATES } from './templates.js';
 import { isQuietNow } from './quietHours.js';
 import { fetchPreview, firstUrlIn } from './linkPreview.js';
 import { httpError } from '../middleware/error.js';
@@ -236,17 +237,29 @@ export async function deliver({ message, convo, senderId, threadRoot, system = f
     const showPreview = perChat(member.notifyPreview, prefs.notifyPreview !== false);
     const shouldBuzz = perChat(member.notifyVibrate, prefs.notifyVibrate !== false);
 
-    notify(uid, {
-      title: convo.type === 'group' ? `${sender.displayName} · ${convo.name}` : sender.displayName,
-      body: showPreview ? preview(message) : 'New message',
-      tag: `convo-${convo.id}`,
-      conversationId: String(convo.id),
-      messageId: String(message.id),
-      icon: sender.avatarUrl || '/logo.svg',
-      // A chat's own sound wins; otherwise the one chosen in Settings.
-      sound: member.sound && member.sound !== 'default' ? member.sound : prefs.notifySound || 'default',
-      vibrate: shouldBuzz,
-    }).catch(() => {});
+    /**
+     * The wording lives in services/templates.js, not here.
+     *
+     * What this file decides is what may be *said* — whether the preview is
+     * allowed, which sound applies, whether to buzz — because those are
+     * questions about this recipient and this conversation. How it reads on a
+     * lock screen is a question about Nook, and it is answered once, in one
+     * place, for every notification the app sends.
+     */
+    notify(
+      uid,
+      TEMPLATES.message.push({
+        sender: sender.displayName,
+        preview: showPreview ? preview(message) : 'New message',
+        conversationName: convo.type === 'group' ? convo.name : '',
+        conversationId: convo.id,
+        messageId: message.id,
+        icon: sender.avatarUrl || '/logo.svg',
+        // A chat's own sound wins; otherwise the one chosen in Settings.
+        sound: member.sound && member.sound !== 'default' ? member.sound : prefs.notifySound || 'default',
+        vibrate: shouldBuzz,
+      })
+    ).catch(() => {});
   }
 
   return { message, conversation: convo };

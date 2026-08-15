@@ -22,6 +22,7 @@ import { API_BASE } from '@/lib/config';
 import { IconSearch, IconWarning, IconLogOut, IconCheck, IconUsers } from '@/components/Icon';
 import { UserPanelHost } from './UserPanel';
 import Compose from './Compose';
+import Templates from './Templates';
 
 const SORTS = [
   { id: 'recent', label: 'Last seen' },
@@ -213,7 +214,7 @@ export default function AdminApp() {
   const [error, setError] = useState('');
   const [actor, setActor] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'people' | 'write'>('people');
+  const [tab, setTab] = useState<'people' | 'write' | 'templates'>('people');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -296,12 +297,19 @@ export default function AdminApp() {
         <button className={`admin-tab${tab === 'people' ? ' on' : ''}`} onClick={() => setTab('people')}>
           People
         </button>
+        <button
+          className={`admin-tab${tab === 'templates' ? ' on' : ''}`}
+          onClick={() => setTab('templates')}
+        >
+          Announce
+        </button>
         <button className={`admin-tab${tab === 'write' ? ' on' : ''}`} onClick={() => setTab('write')}>
           Write to people
         </button>
       </div>
 
       {tab === 'write' && <Compose people={users} />}
+      {tab === 'templates' && <Templates people={users} />}
 
       {tab === 'people' && (
       <>
