@@ -33,6 +33,31 @@ const kindFromMime = (mime = '') => {
 };
 
 /**
+ * What Cloudinary calls this, which is not what we call it.
+ *
+ * Cloudinary has exactly four resource types — image, video, raw and auto —
+ * and audio is not among them. Sound files go up as `video`, because to
+ * Cloudinary a voice note is a video that happens to have no picture; it
+ * transcodes and serves it perfectly well under that name.
+ *
+ * This mapping used to be `kind === 'raw' ? 'raw' : kind`, which passed
+ * `audio` straight through. Cloudinary rejected every upload with it, so no
+ * voice message ever left the browser — and the client caught the failure
+ * with a bare `catch` that said "Could not send that voice message", which is
+ * true, unhelpful, and gives no hint that the problem is four hundred miles
+ * away in a provider's parameter validation.
+ *
+ * Kept as its own function so the delete path cannot drift from the upload
+ * path: destroying with the wrong resource type silently fails to delete,
+ * which is the same bug wearing a disguise.
+ */
+const resourceTypeFor = (kind) => {
+  if (kind === 'image') return 'image';
+  if (kind === 'raw') return 'raw';
+  return 'video'; // video and audio both
+};
+
+/**
  * @param {{buffer: Buffer, originalname: string, mimetype: string, size: number}} file
  * @param {{folder?: string}} opts
  */
@@ -42,7 +67,7 @@ export async function uploadBuffer(file, { folder = 'nook' } = {}) {
   if (env.cloudinary.enabled) {
     const result = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { folder, resource_type: kind === 'raw' ? 'raw' : kind },
+        { folder, resource_type: resourceTypeFor(kind) },
         (err, res) => (err ? reject(err) : resolve(res))
       );
       stream.end(file.buffer);
@@ -126,7 +151,7 @@ export async function destroy(publicId, mime = '') {
   if (!publicId) return;
   if (env.cloudinary.enabled) {
     try {
-      await cloudinary.uploader.destroy(publicId, { resource_type: kindFromMime(mime) });
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceTypeFor(kindFromMime(mime)) });
     } catch {
       /* best effort */
     }

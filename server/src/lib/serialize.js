@@ -42,6 +42,17 @@ export function serializeUser(u, viewerId) {
   };
 }
 
+/**
+ * How many times a recipient may open one snap: the first look, plus three
+ * replays.
+ *
+ * Exported so the route that spends an open and the serialiser that decides
+ * whether any are left cannot disagree — two constants with the same value in
+ * two files stay equal exactly until somebody changes one.
+ */
+export const SNAP_REPLAYS = 3;
+export const SNAP_MAX_OPENS = SNAP_REPLAYS + 1;
+
 export function serializeMessage(m, viewerId) {
   if (!m) return null;
   const id = String(m._id || m.id);
@@ -52,7 +63,25 @@ export function serializeMessage(m, viewerId) {
   const seenByViewer = (viewOnce.viewedBy || []).some((u) => String(u) === viewer);
   const senderId = String(m.sender?._id || m.sender?.id || m.sender);
   const isMine = senderId === viewer;
-  const burnt = viewOnce.enabled && !isMine && seenByViewer;
+
+  /**
+   * A snap may be opened more than once, so "seen" is no longer "gone".
+   *
+   * It used to be: `burnt = enabled && !isMine && seenByViewer`. That is what
+   * made snaps impossible to open at all. The client recorded the view and
+   * then opened the viewer — but recording the view made this line true, the
+   * media was stripped from the very next serialise, and the broadcast
+   * replaced the client's copy before the picture could be drawn. The snap
+   * was destroyed on its way to being shown.
+   *
+   * What actually ends a snap is running out of looks, and a saved one never
+   * does. `savedBy` is checked first because saving is a promise: once made,
+   * no counter may take the picture away.
+   */
+  const savedByViewer = (m.savedBy || []).some((u) => String(u) === viewer);
+  const opensUsed = Number(viewOnce.opens?.[viewer] || 0);
+  const spent = opensUsed >= SNAP_MAX_OPENS;
+  const burnt = viewOnce.enabled && !isMine && !savedByViewer && (spent || Boolean(viewOnce.burntAt));
 
   return {
     id,
@@ -117,8 +146,18 @@ export function serializeMessage(m, viewerId) {
     deletedForAll: Boolean(m.deletedForAll),
     deletedForMe,
     editedAt: iso(m.editedAt),
+    // A snap with no time limit is one the sender chose not to rush, and the
+    // only kind that may be kept. Passed through so the client does not have
+    // to infer the rule and get it slightly different.
+    viewSeconds: m.viewSeconds ?? 10,
+    saved: savedByViewer,
+    savedBy: (m.savedBy || []).map(String),
     viewOnce: viewOnce.enabled
       ? {
+          opensUsed,
+          opensLeft: Math.max(0, SNAP_MAX_OPENS - opensUsed),
+          // Saving is only offered when there is no timer running.
+          canSave: !isMine && (m.viewSeconds ?? 10) === 0,
           enabled: true,
           seen: seenByViewer,
           burnt,

@@ -4,7 +4,7 @@ import * as C from '../db/conversations.js';
 import * as M from '../db/messages.js';
 import { asyncRoute, requireAuth } from '../middleware/auth.js';
 import { httpError } from '../middleware/error.js';
-import { serializeMessage } from '../lib/serialize.js';
+import { serializeMessage , SNAP_MAX_OPENS } from '../lib/serialize.js';
 import { emitToConversation, emitToUser } from '../sockets/hub.js';
 import { createMessage, markRead } from '../services/messages.js';
 import { destroy } from '../services/media.js';
@@ -354,20 +354,85 @@ router.post(
     if (!msg.viewOnce?.enabled) throw httpError(400, 'Not a snap.');
     if (String(msg.sender.id) === req.user.id) return res.json({ ok: true });
 
-    if (!msg.viewOnce.viewedBy.some((u) => String(u) === req.user.id)) {
-      await M.recordView(msg.id, req.user.id);
+    /**
+     * Spend one look, and only then decide whether anything is left.
+     *
+     * The old version recorded the view and, in a direct chat, immediately
+     * burnt the message and deleted the media — because "everyone has seen
+     * it" is true the instant the only recipient has. The client then opened
+     * the viewer on a message whose picture had just been destroyed, which is
+     * why no snap could ever be opened. The order was: destroy, then show.
+     *
+     * Saving stops the clock entirely. Somebody who kept the snap has been
+     * given it; counting their looks after that would be taking it back.
+     */
+    if ((msg.savedBy || []).some((u) => String(u) === req.user.id)) {
+      return res.json({ ok: true, opensLeft: SNAP_MAX_OPENS, saved: true });
+    }
 
+    const used = await M.opensBy(msg.id, req.user.id);
+    if (used >= SNAP_MAX_OPENS) throw httpError(410, 'That snap is gone.');
+
+    const nowUsed = await M.recordOpen(msg.id, req.user.id);
+    const opensLeft = Math.max(0, SNAP_MAX_OPENS - nowUsed);
+
+    /**
+     * Burn only when every recipient has used every look.
+     *
+     * The media is destroyed at the provider at the same moment, and only
+     * then — deleting it while somebody still has replays left would leave
+     * them holding a message that says "3 left" over a broken image.
+     */
+    if (opensLeft === 0) {
       const others = await C.memberIdsOf(msg.conversation, msg.sender.id);
-      const fresh = await M.findMessage(msg.id);
-      const allSeen = others.every((id) => fresh.viewOnce.viewedBy.some((u) => String(u) === id));
+      const spentByAll = (
+        await Promise.all(others.map(async (id) => (await M.opensBy(msg.id, id)) >= SNAP_MAX_OPENS))
+      ).every(Boolean);
 
-      if (allSeen) {
+      if (spentByAll && !(msg.savedBy || []).length) {
         if (msg.media?.publicId) await destroy(msg.media.publicId, msg.media.mime);
         await M.burnMessage(msg.id);
       }
-      await broadcast(await M.findMessage(msg.id), 'message:snap-viewed');
     }
-    res.json({ ok: true });
+
+    await broadcast(await M.findMessage(msg.id), 'message:snap-viewed');
+    res.json({ ok: true, opensLeft });
+  })
+);
+
+/**
+ * Keep a message — or a snap — instead of letting it disappear.
+ *
+ * A snap may only be kept when the sender set no time limit. That is not an
+ * arbitrary restriction: a countdown is the sender saying how long you get,
+ * and a Save button that overrode it would make the timer decorative. With no
+ * timer, the sender has already chosen not to rush you, and keeping it is a
+ * smaller step than they have already taken.
+ */
+router.post(
+  '/:id/save',
+  asyncRoute(async (req, res) => {
+    const { saved } = z.object({ saved: z.boolean().default(true) }).parse(req.body ?? {});
+    const msg = await loadMessage(req.params.id, req.user.id);
+
+    if (msg.viewOnce?.enabled) {
+      if (String(msg.sender.id) === req.user.id) throw httpError(400, 'You cannot keep your own snap.');
+      if ((msg.viewSeconds ?? 10) !== 0) {
+        throw httpError(400, 'This snap has a time limit, so it cannot be kept.');
+      }
+      if (msg.viewOnce.burntAt) throw httpError(410, 'That snap is gone.');
+    }
+
+    const current = new Set((msg.savedBy || []).map(String));
+    if (saved) current.add(req.user.id);
+    else current.delete(req.user.id);
+
+    // Commas at both ends so a LIKE search cannot match a prefix of an id.
+    const packed = current.size ? `,${[...current].join(',')},`.replace(/,+/g, ',') : '';
+    await M.setSaved(msg.id, packed);
+
+    await broadcast(await M.findMessage(msg.id), 'message:saved');
+    res.json({ ok: true, saved });
   })
 );
 

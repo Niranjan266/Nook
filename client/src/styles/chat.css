@@ -1771,3 +1771,21 @@
     transform: none;
   }
 }
+
+/* Keeping a snap. Quiet by design: it sits under a snap the sender chose not
+   to put a timer on, and it is an option rather than the point. */
+.snap-keep {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--clay-2);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--t-xs);
+  cursor: pointer;
+}
+.snap-keep:hover { color: var(--ink); }

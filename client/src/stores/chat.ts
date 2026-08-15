@@ -60,6 +60,8 @@ interface ChatState {
   star: (message: Message) => Promise<void>;
   forward: (messageId: string, conversationIds: string[]) => Promise<void>;
   markSnapViewed: (messageId: string) => Promise<void>;
+  /** Keep a message, or a no-timer snap, so it does not disappear. */
+  saveMessage: (messageId: string, saved: boolean) => Promise<void>;
 
   setReplyTo: (m: Message | null) => void;
   setEditing: (m: Message | null) => void;
@@ -476,7 +478,18 @@ export const useChat = create<ChatState>((set, get) => ({
   },
 
   async markSnapViewed(messageId) {
-    await post(`/messages/${messageId}/view`);
+    // Fire and forget: the look has already been had, and a failed count is a
+    // free replay rather than a lost message. Throwing here would surface an
+    // error over a snap the person just finished looking at, which explains
+    // nothing and interrupts the wrong moment.
+    await post(`/messages/${messageId}/view`).catch(() => {});
+  },
+
+  async saveMessage(messageId, saved) {
+    // Not caught: this one is a deliberate action with a button behind it, so
+    // a refusal — a timer on the snap, or a snap already gone — has to be
+    // said out loud rather than swallowed.
+    await post(`/messages/${messageId}/save`, { saved });
   },
 
   setReplyTo: (replyTo) => set({ replyTo, editing: null }),

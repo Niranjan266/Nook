@@ -36,7 +36,13 @@ interface UiState {
   sheet: SheetKind;
   sheetPayload: any;
   toasts: Toast[];
-  lightbox: { messageId: string } | null;
+  /**
+   * `onClose` exists for snaps: the look is only spent once it has been had,
+   * so the count is recorded when the viewer closes rather than when it opens.
+   * Opening-time recording is what let the server destroy the picture while it
+   * was still on screen.
+   */
+  lightbox: { messageId: string; onClose?: () => void } | null;
 
   setTheme: (t: Theme) => void;
   setAccent: (a: Accent) => void;
@@ -46,7 +52,7 @@ interface UiState {
   closeSheet: () => void;
   toast: (text: string, bad?: boolean) => void;
   dropToast: (id: number) => void;
-  setLightbox: (v: { messageId: string } | null) => void;
+  setLightbox: (v: { messageId: string; onClose?: () => void } | null) => void;
 }
 
 const KEY = 'nook.ui';
@@ -107,7 +113,14 @@ export const useUi = create<UiState>((set, get) => ({
   },
   dropToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
-  setLightbox: (lightbox) => set({ lightbox }),
+  setLightbox: (lightbox) => {
+    // Closing runs the callback the opener left behind, exactly once.
+    if (!lightbox) {
+      const previous = get().lightbox;
+      previous?.onClose?.();
+    }
+    set({ lightbox });
+  },
 }));
 
 // keep the document in sync at boot and when the OS theme flips

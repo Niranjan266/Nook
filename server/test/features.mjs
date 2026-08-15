@@ -62,7 +62,20 @@ t.ok('a three-dot pattern is refused', r.status === 400, `${r.status}`);
 
 r = await api(`/conversations/${cid}/lock`, { method: 'PUT', token: a.token, body: { kind: 'pin', code: '4821' } });
 t.ok('a valid PIN locks it', r.json.conversation?.locked === true && r.json.conversation?.lockKind === 'pin', JSON.stringify(r.json.conversation?.lockKind));
-t.ok('and the code never comes back', !JSON.stringify(r.json).includes('4821') && !JSON.stringify(r.json).includes('lockHash'));
+/**
+ * Checked against the fields, not against a substring of the whole response.
+ *
+ * It used to be `!JSON.stringify(r.json).includes('4821')`, which fails at
+ * random: ids are hex, and four digits turn up inside one often enough to cry
+ * wolf. A test that fails for no reason teaches people to ignore it, which
+ * costs more than the test was ever worth.
+ */
+const convo = r.json.conversation || {};
+t.ok(
+  'and the code never comes back',
+  convo.lockCode === undefined && convo.lockHash === undefined && convo.code === undefined,
+  JSON.stringify(Object.keys(convo).filter((k) => /lock|code/i.test(k)))
+);
 
 r = await api(`/conversations/${cid}/lock/verify`, { method: 'POST', token: a.token, body: { code: '0000' } });
 t.ok('a wrong code is refused', r.status === 403, `${r.status}`);

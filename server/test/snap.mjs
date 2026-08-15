@@ -31,7 +31,20 @@ t.ok('the recipient can open it', r.status === 200, `${r.status} ${JSON.stringif
 
 const after = await api(`/messages/${cid}`, { token: b.token });
 const burnt = after.json.messages?.find((m) => m.id === snapId);
-t.ok('and it burns after viewing', burnt?.viewOnce?.burnt === true || burnt?.media === null, JSON.stringify(burnt?.viewOnce));
+/**
+ * Deliberately changed: one look no longer ends a snap.
+ *
+ * This asserted that viewing burns it, which was true and was also the bug —
+ * the server destroyed the picture on the first view, before the client could
+ * show it, so a snap could never actually be opened. A recipient now gets four
+ * looks, and the burn is asserted in test/snapkeep.mjs where the whole
+ * lifecycle is covered.
+ */
+t.ok(
+  'one look does not end it — three replays remain',
+  burnt?.viewOnce?.burnt === false && burnt?.viewOnce?.opensLeft === 3 && Boolean(burnt?.media?.url),
+  JSON.stringify(burnt?.viewOnce)
+);
 
 // A snap with no duration means "until they close it".
 r = await api(`/messages/${cid}`, {

@@ -43,9 +43,19 @@ function baseMessage(row) {
     replyCount: row.reply_count || 0,
     threadUpdatedAt: row.thread_updated_at ? new Date(row.thread_updated_at) : null,
     call: row.call_kind ? { kind: row.call_kind, status: row.call_status, duration: row.call_duration } : null,
-    viewOnce: { enabled: Boolean(row.view_once), viewedBy: [], burntAt: row.burnt_at ? new Date(row.burnt_at) : null },
+    viewOnce: {
+      enabled: Boolean(row.view_once),
+      viewedBy: [],
+      // How many times each viewer has opened it, so replays can be counted
+      // per person rather than per message — in a group, one person using
+      // their looks must not spend anybody else's.
+      opens: {},
+      burntAt: row.burnt_at ? new Date(row.burnt_at) : null,
+    },
     // Seconds the viewer gets on a snap. 0 = they close it themselves.
     viewSeconds: row.view_seconds ?? 10,
+    // Commas at both ends when stored; stripped here so callers see a list.
+    savedBy: String(row.saved_by || '').split(',').filter(Boolean),
     deletedForAll: Boolean(row.deleted_for_all),
     editedAt: row.edited_at ? new Date(row.edited_at) : null,
     scheduledFor: row.scheduled_for ? new Date(row.scheduled_for) : null,
@@ -87,7 +97,12 @@ async function attachChildren(messages) {
     byId.get(d.message_id)?.deliveredTo.push({ user: d.user_id, at: new Date(d.at) });
   for (const s of stars) byId.get(s.message_id)?.starredBy.push(s.user_id);
   for (const d of deletions) byId.get(d.message_id)?.deletedFor.push(d.user_id);
-  for (const v of views) byId.get(v.message_id)?.viewOnce.viewedBy.push(v.user_id);
+  for (const v of views) {
+    const m = byId.get(v.message_id);
+    if (!m) continue;
+    m.viewOnce.viewedBy.push(v.user_id);
+    m.viewOnce.opens[String(v.user_id)] = v.opens || 1;
+  }
   for (const m of mentions) byId.get(m.message_id)?.mentions.push(m.user_id);
 
   // Reply-to is rendered as a quote, so it needs the original's sender name
@@ -413,12 +428,40 @@ export const pendingDeliveriesFor = (userId, limit = 500) =>
     [userId, userId, userId, limit]
   );
 
-export const recordView = (messageId, userId) =>
-  run('INSERT OR IGNORE INTO message_views (message_id, user_id, at) VALUES (?, ?, ?)', [
+/**
+ * Record that someone opened a snap, and return how many times they now have.
+ *
+ * `INSERT … ON CONFLICT DO UPDATE` rather than a read followed by a write:
+ * two taps in quick succession — which a snap invites, because the whole
+ * interaction is tapping — would both read the same count and both write it
+ * back, spending one open and charging for two. Doing it in one statement
+ * makes that impossible without a transaction wrapped around every call.
+ */
+export async function recordOpen(messageId, userId) {
+  await run(
+    `INSERT INTO message_views (message_id, user_id, at, opens) VALUES (?, ?, ?, 1)
+     ON CONFLICT (message_id, user_id) DO UPDATE SET opens = opens + 1, at = excluded.at`,
+    [messageId, userId, now()]
+  );
+  const row = await one('SELECT opens FROM message_views WHERE message_id = ? AND user_id = ?', [
     messageId,
     userId,
-    now(),
   ]);
+  return row?.opens || 1;
+}
+
+/** How many times this person has already opened it. Zero if never. */
+export async function opensBy(messageId, userId) {
+  const row = await one('SELECT opens FROM message_views WHERE message_id = ? AND user_id = ?', [
+    messageId,
+    userId,
+  ]);
+  return row?.opens || 0;
+}
+
+/** Kept deliberately, against a timer or a burn. */
+export const setSaved = (messageId, savedBy) =>
+  run('UPDATE messages SET saved_by = ? WHERE id = ?', [savedBy, messageId]);
 
 export const burnMessage = (id) =>
   run('UPDATE messages SET burnt_at = ?, media = NULL WHERE id = ?', [now(), id]);

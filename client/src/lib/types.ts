@@ -183,11 +183,22 @@ export interface Message {
   viewOnce: {
     enabled: boolean;
     seen: boolean;
+    /** No looks left. Not the same as "has been seen once". */
     burnt: boolean;
     /** Seconds the viewer gets. 0 = they close it themselves. */
     seconds?: number;
+    /** Looks spent and looks remaining, for this viewer only. */
+    opensUsed?: number;
+    opensLeft?: number;
+    /** Only true when the sender set no time limit. */
+    canSave?: boolean;
     viewers: string[];
   } | null;
+  /** Kept against a disappearing timer or a snap's burn. */
+  saved?: boolean;
+  savedBy?: string[];
+  /** Seconds on a snap; 0 means the sender set no limit. */
+  viewSeconds?: number;
   call: { kind: 'audio' | 'video'; status: string; duration: number } | null;
   expiresAt: string | null;
   createdAt: string;

@@ -496,3 +496,20 @@ CREATE INDEX IF NOT EXISTS idx_push_devices_user ON push_devices (user_id);
 -- from freezing at whatever the global was when the row was written.
 ALTER TABLE conversation_members ADD COLUMN notify_vibrate INTEGER NOT NULL DEFAULT -1;
 ALTER TABLE conversation_members ADD COLUMN notify_preview INTEGER NOT NULL DEFAULT -1;
+
+-- How many times each person has opened a snap.
+--
+-- message_views recorded *whether* someone had looked, with INSERT OR IGNORE,
+-- which is all "you get one look" ever needed. Replays need a count, and it
+-- belongs on the view row rather than the message because in a group two
+-- people have independent allowances.
+ALTER TABLE message_views ADD COLUMN opens INTEGER NOT NULL DEFAULT 1;
+
+-- Messages kept deliberately, against a disappearing timer or a snap's burn.
+--
+-- A list of user ids rather than a join table: it is read on every serialise
+-- and written rarely, it is bounded by the size of a conversation, and a join
+-- would mean a second query on the hottest path in the app. Stored with
+-- leading and trailing commas so `LIKE '%,id,%'` cannot match a prefix of a
+-- longer id.
+ALTER TABLE messages ADD COLUMN saved_by TEXT NOT NULL DEFAULT '';

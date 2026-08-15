@@ -62,7 +62,7 @@ function Ticks({ m, meId, convo }: { m: Message; meId: string; convo: Conversati
 }
 
 function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, eager, onJumpTo }: Props) {
-  const { react, star, remove, setReplyTo, setEditing, retry, markSnapViewed, pin, unpin, openThread } =
+  const { react, star, remove, setReplyTo, setEditing, retry, markSnapViewed, saveMessage, pin, unpin, openThread } =
     useChat();
   const { openSheet, setLightbox, toast } = useUi();
   const swipeEnabled = useAuth((s) => s.me?.settings.swipeToReply ?? true);
@@ -238,26 +238,92 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         );
 
       case 'snap': {
-        const burnt = m.viewOnce?.burnt || (!mine && m.viewOnce?.seen);
+        /**
+         * `burnt` is now the server's word for "no looks left", not "has been
+         * seen once". The old code computed it here as `!mine && seen`, which
+         * meant the bubble disabled itself the moment the first open was
+         * recorded — on top of the server destroying the picture at the same
+         * instant. Between them, a snap could be opened exactly never.
+         */
+        const snap = m.viewOnce;
+        const burnt = Boolean(snap?.burnt);
+        const saved = Boolean(m.saved);
+        const left = snap?.opensLeft ?? 0;
+        const opened = (snap?.opensUsed ?? 0) > 0;
+
+        const label = burnt
+          ? 'Snap opened'
+          : mine
+            ? 'Snap sent'
+            : saved
+              ? 'Saved snap'
+              : opened
+                ? 'Tap to replay'
+                : 'Tap to open';
+
+        const sub = burnt
+          ? 'It is gone now'
+          : mine
+            ? snap?.viewers.length
+              ? 'Opened'
+              : 'Not opened yet'
+            : saved
+              ? 'Kept — it will not disappear'
+              : opened
+                ? `${left} ${left === 1 ? 'look' : 'looks'} left`
+                : snap?.seconds
+                  ? `${snap.seconds}s, and ${left - 1} replays`
+                  : 'No time limit';
+
         return (
-          <button
-            className={`snap${burnt ? ' burnt' : ''}`}
-            disabled={burnt || mine}
-            onClick={async () => {
-              await markSnapViewed(m.id);
-              setLightbox({ messageId: m.id });
-            }}
-          >
-            <span className="snap-seal">
-              <IconFire size={20} />
-            </span>
-            <span className="stack" style={{ textAlign: 'left' }}>
-              <span className="snap-label">{burnt ? 'Snap opened' : mine ? 'Snap sent' : 'Tap to open once'}</span>
-              <span className="snap-sub">
-                {burnt ? 'It is gone now' : mine ? (m.viewOnce?.viewers.length ? 'Opened' : 'Not opened yet') : 'You get one look'}
+          <span className="stack" style={{ gap: 6, alignItems: 'stretch' }}>
+            <button
+              className={`snap${burnt ? ' burnt' : ''}`}
+              disabled={burnt || mine}
+              onClick={() => {
+                /**
+                 * Open first, and spend the look when it closes.
+                 *
+                 * Recording it up front is what broke this: the last open
+                 * makes the server destroy the media and broadcast the change,
+                 * which would blank the picture while somebody is still
+                 * looking at it. Counting on close also means a look only
+                 * costs you something once you have actually had it.
+                 */
+                setLightbox({ messageId: m.id, onClose: () => markSnapViewed(m.id) });
+              }}
+            >
+              <span className="snap-seal">
+                <IconFire size={20} />
               </span>
-            </span>
-          </button>
+              <span className="stack" style={{ textAlign: 'left' }}>
+                <span className="snap-label">{label}</span>
+                <span className="snap-sub">{sub}</span>
+              </span>
+            </button>
+
+            {/*
+              Saving is offered only on a snap the sender left without a
+              countdown. A timer is the sender saying how long you get, and a
+              Save button that ignored it would make the timer decorative — so
+              the server refuses too, and this is only the half you can see.
+            */}
+            {snap?.canSave && !burnt && (
+              <button
+                className="snap-keep"
+                onClick={async () => {
+                  try {
+                    await saveMessage(m.id, !saved);
+                  } catch (e: any) {
+                    toast(e?.message || 'Could not keep that.', true);
+                  }
+                }}
+              >
+                <IconStar size={15} />
+                {saved ? 'Kept — tap to let it go' : 'Keep this snap'}
+              </button>
+            )}
+          </span>
         );
       }
 
