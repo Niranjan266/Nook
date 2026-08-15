@@ -230,11 +230,21 @@ router.post(
   })
 );
 
-/* ── send yourself a test email ────────────────────────────────────────────
-   Deliberately only to the address already on your own account. Accepting a
-   recipient from the request body would turn this into an open relay: anyone
-   with an account could make your server send mail to anybody, and your
-   sending domain would wear the consequences.
+/* ── confirm the address already on your account ──────────────────────────
+   This used to send a copy of the welcome email and call it a test. It proved
+   the mail path worked, which is a developer's question; the question a person
+   actually has is "is my address on this account and does it work", and a test
+   email answered that only by implication — nothing was recorded, so an
+   address stayed unverified no matter how many arrived.
+
+   Now the same button sends a real confirmation code. It proves delivery
+   exactly as well, and unlike a test it leaves the account better than it
+   found it: a verified address is what password recovery needs, and what
+   Google sign-in links by.
+
+   Deliberately only to the address already on the account. Taking a recipient
+   from the request body would make this an open relay — anyone with an account
+   could make the server mail anybody, and the sending domain would wear it.
    ────────────────────────────────────────────────────────────────────────── */
 
 const testMailLimit = rateLimit({
@@ -242,24 +252,35 @@ const testMailLimit = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Five test emails an hour is plenty. Try again later.' },
+  message: { error: 'Five codes an hour is plenty. Try again later.' },
 });
 
 router.post(
-  '/test-email',
+  '/email/resend',
   requireAuth,
   testMailLimit,
   asyncRoute(async (req, res) => {
     if (!req.user.email) {
       throw httpError(400, 'Add an email address to your account first, in Settings.');
     }
+    if (req.user.emailVerified) {
+      throw httpError(400, 'That address is already confirmed.');
+    }
 
     const provider = mailProvider();
-    const result = await sendWelcome({
+    const code = sixDigit();
+
+    // Same 15 minutes as every other code Nook issues. Re-sending replaces the
+    // previous one rather than adding a second valid code, so asking twice
+    // cannot leave two working codes in two inboxes.
+    await U.updateUser(req.user.id, {
+      recovery: { code, expiresAt: Date.now() + 15 * 60 * 1000 },
+    });
+
+    const result = await sendEmailVerification({
       to: req.user.email,
+      code,
       displayName: req.user.displayName,
-      username: req.user.username,
-      nookId: req.user.nookId,
     });
 
     // Report what actually happened rather than a bare ok:true. "Sent" when
@@ -273,9 +294,9 @@ router.post(
       error: result.error || '',
       note:
         result.channel === 'console'
-          ? 'No mail provider is configured, so this was printed to the server log instead of sent.'
+          ? 'No mail provider is configured, so the code was printed to the server log instead of sent.'
           : result.delivered
-            ? 'Handed to the provider. If it does not arrive, check their delivery log and your spam folder.'
+            ? 'Sent. Enter the six digits from the email to confirm your address.'
             : 'The provider refused it. The error is above and in the server log.',
     });
   })

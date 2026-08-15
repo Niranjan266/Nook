@@ -29,9 +29,16 @@ t.ok(
 const ids = Object.values(TEMPLATES).map((x) => x.id);
 t.ok('ids are unique', new Set(ids).size === ids.length, ids.join(','));
 
+// Not every template has a push — emailVerify deliberately has none, because
+// a code must only travel to the address it is proving. So the rule is about
+// the ones that do, and a separate check below pins down the one that does not.
+const pushable = Object.values(TEMPLATES).filter((x) => typeof x.push === 'function');
+
+t.ok('some templates send push', pushable.length > 0);
+
 t.ok(
-  'every template renders a push payload',
-  Object.values(TEMPLATES).every((x) => {
+  'every template that sends push renders a payload',
+  pushable.every((x) => {
     const p = x.push({ sender: 'Ada', preview: 'hello', message: 'hello', headline: 'Hi' });
     return p && typeof p.title === 'string' && typeof p.body === 'string';
   })
@@ -40,7 +47,7 @@ t.ok(
 // Handed nothing at all — which is what a half-filled admin form produces.
 t.ok(
   'a push title is never empty, even with nothing filled in',
-  Object.values(TEMPLATES).every((x) => (x.push({}).title || '').length > 0)
+  pushable.every((x) => (x.push({}).title || '').length > 0)
 );
 
 /* ── trimming, which is what stops a lock screen mangling the copy ─────── */
@@ -91,6 +98,28 @@ t.ok(
   TEMPLATES.notice.email({ headline: 'x', message: 'y' }).body.includes('never ask you for your password')
 );
 
+/* ── the verification template, which is the one with a code in it ─────── */
+
+const v = TEMPLATES.emailVerify.email({ code: '123456', displayName: 'Ada' });
+t.ok('the code is in the subject, where it is read from the inbox list', v.subject.startsWith('123456'), v.subject);
+t.ok('and in the body', v.body.includes('123456'));
+t.ok('it says how long it lasts', v.body.includes('15 minutes'));
+t.ok('it says that ignoring it is safe', v.body.toLowerCase().includes("didn't ask"), v.body.slice(-90));
+
+// The whole reason this is a template rather than a string at a call site:
+// a code must never leave by a channel that is not the address being proved.
+t.ok('it never sends a push — that would defeat proving the address', TEMPLATES.emailVerify.push === null);
+t.ok('and never an in-app banner', TEMPLATES.emailVerify.banner === null);
+
+t.ok(
+  'it is not offered in the admin composer — codes are not announcements',
+  !catalogue().some((x) => x.id === 'email-verify')
+);
+
+t.ok('a missing name degrades to a greeting, not to "undefined"',
+  !TEMPLATES.emailVerify.email({ code: '1' }).lede.includes('undefined'),
+  TEMPLATES.emailVerify.email({ code: '1' }).lede.slice(0, 40));
+
 /* ── the helpers ───────────────────────────────────────────────────────── */
 
 t.ok('byId finds by id, not by key', byId('friend-request')?.id === 'friend-request');
@@ -107,6 +136,10 @@ t.ok(
   'the catalogue tells the truth about which channels exist',
   catalogue().every((x) => x.channels.email === Boolean(byId(x.id).email))
 );
+
+// render() must survive a template with no push and no banner.
+const rv = render('email-verify', { code: '111111', displayName: 'Ada' });
+t.ok('render copes with a template that has only an email', Boolean(rv && rv.email && rv.push === null && rv.banner === null));
 
 const rendered = render('update', { headline: 'Hi', message: 'There' });
 t.ok('render returns all three channels at once', Boolean(rendered.push && rendered.email && rendered.banner));

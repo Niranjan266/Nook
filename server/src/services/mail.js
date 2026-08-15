@@ -6,6 +6,7 @@
  */
 import { env } from '../config/env.js';
 import { sendViaGmail, gmailReady } from './gmail.js';
+import { TEMPLATES } from './templates.js';
 
 const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
@@ -117,16 +118,25 @@ export function sendRecoveryCode({ to, code, displayName }) {
   });
 }
 
+/**
+ * Confirming an email address.
+ *
+ * The words come from the template catalogue, the HTML is built here. That
+ * split is the same one every other template uses: what Nook says lives in one
+ * place so it can be read and changed as a whole, and how an email is rendered
+ * stays with the tables and inline styles that make it survive Outlook.
+ *
+ * `emailVerify` is the only template this uses, and this is the only thing
+ * that uses it — a confirmation code is the most phishable thing Nook sends,
+ * so there is exactly one path that can produce one.
+ */
 export function sendEmailVerification({ to, code, displayName }) {
+  const copy = TEMPLATES.emailVerify.email({ code, displayName });
   return send({
     to,
-    subject: `${code} — confirm your email for Nook`,
-    html: shell(
-      'Confirm your email',
-      `Hi ${displayName} — adding an email means you can recover your account if you forget your password. It stays private.`,
-      code
-    ),
-    text: `Your Nook confirmation code is ${code}. It expires in 15 minutes.`,
+    subject: copy.subject,
+    html: shell(copy.heading, copy.lede, copy.code),
+    text: copy.body,
   });
 }
 

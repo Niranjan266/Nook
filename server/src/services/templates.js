@@ -180,6 +180,47 @@ const automatic = {
     banner: ({ sender, video }) => ({ title: who(sender), body: video ? 'Video call' : 'Voice call' }),
   },
 
+  /**
+   * Confirming an email address.
+   *
+   * Deliberately the only template with a `code`, and deliberately used for
+   * nothing else. A six-digit code is the most phishable thing Nook ever
+   * sends: it arrives in an inbox, it looks the same as every other code
+   * anyone gets, and it is worth stealing — a verified address is what Google
+   * sign-in links accounts by, so whoever confirms an address can be linked to
+   * it later. So the copy is fixed here rather than assembled at a call site,
+   * and it always says three things: what the code is for, that it expires,
+   * and that ignoring it changes nothing. The last one is what makes an
+   * unexpected code safe to ignore instead of alarming.
+   *
+   * `email: null` would be wrong and `push` would be worse — a code pushed to
+   * a phone defeats the point of sending it to the address being proved. Push
+   * and banner are absent by design, not by omission.
+   */
+  emailVerify: {
+    id: 'email-verify',
+    label: 'Confirm your email',
+    kind: 'automatic',
+    fields: ['code', 'displayName'],
+    push: null,
+    email: ({ code, displayName }) => ({
+      // The code goes in the subject: most people read it from the inbox list
+      // and never open the message, which is a real saving on a phone.
+      subject: `${code} — confirm your email for Nook`,
+      heading: 'Confirm your email',
+      lede: `Hi ${who(displayName)} — adding an email means you can get back into your nook if you forget your password. It stays private, and it is never shown to anyone.`,
+      code: String(code ?? ''),
+      body: [
+        `Your Nook confirmation code is ${code}.`,
+        '',
+        'It expires in 15 minutes.',
+        '',
+        "If you didn't ask for this, ignore it — nothing on your account has changed, and no code can be used without also being signed in as you.",
+      ].join('\n'),
+    }),
+    banner: null,
+  },
+
   pushTest: {
     id: 'push-test',
     label: 'Test notification',
@@ -351,8 +392,8 @@ export function render(id, values = {}) {
   return {
     id: template.id,
     label: template.label,
-    push: template.push ? template.push(values) : null,
-    email: template.email ? template.email(values) : null,
-    banner: template.banner ? template.banner(values) : null,
+    push: typeof template.push === 'function' ? template.push(values) : null,
+    email: typeof template.email === 'function' ? template.email(values) : null,
+    banner: typeof template.banner === 'function' ? template.banner(values) : null,
   };
 }

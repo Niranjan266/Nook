@@ -179,24 +179,39 @@ export default function SettingsSheet() {
     }
   };
 
-  const sendTest = async () => {
+  /**
+   * Confirm the address already on the account.
+   *
+   * This button used to send a copy of the welcome email and call it a test.
+   * It proved the mail path worked — a developer's question — while leaving
+   * the account exactly as unverified as before, so the answer to "is my email
+   * set up" was still no, no matter how many arrived.
+
+   * Sending a real confirmation code proves delivery just as well and leaves
+   * something behind: a verified address is what password recovery needs, and
+   * what Google sign-in links accounts by.
+   */
+  const verifyExisting = async () => {
     setEmailBusy(true);
     try {
-      const r = await post<{ channel: string; delivered: boolean; error: string; note: string }>(
-        '/auth/test-email'
+      const r = await post<{ channel: string; delivered: boolean; error: string }>(
+        '/auth/email/resend'
       );
-      // Say what actually happened. "Sent" when nothing left the building is
-      // the kind of reassurance that costs an hour of looking in the wrong place.
-      toast(
-        r.channel === 'console'
-          ? 'No mail provider configured — it went to the server log.'
-          : r.delivered
-            ? `Sent via ${r.channel}. Check your inbox and spam folder.`
-            : `${r.channel} refused it: ${r.error}`,
-        !r.delivered
-      );
+      setEmailChannel(r.channel || '');
+      setEmailCode('');
+      setEmailDraft(me.email || '');
+
+      if (r.channel === 'console') {
+        // No provider configured. Say so plainly rather than sending someone
+        // to look in an inbox that will never receive anything.
+        toast('No mail provider configured — the code went to the server log.', true);
+      } else if (!r.delivered) {
+        toast(`${r.channel} refused it: ${r.error}`, true);
+        return;
+      }
+      setEmailStep('code');
     } catch (err: any) {
-      toast(err?.message || 'Could not send the test.', true);
+      toast(err?.message || 'Could not send the code.', true);
     } finally {
       setEmailBusy(false);
     }
@@ -554,9 +569,11 @@ export default function SettingsSheet() {
               </span>
             </button>
 
-            {me.email && (
-              <button className="clay-btn" style={{ marginTop: 6 }} onClick={sendTest} disabled={emailBusy}>
-                {emailBusy ? 'Sending…' : 'Send me a test email'}
+            {/* Only while it is unverified — once confirmed there is nothing
+                left to do, and a button that does nothing is worse than none. */}
+            {me.email && !me.emailVerified && (
+              <button className="clay-btn" style={{ marginTop: 6 }} onClick={verifyExisting} disabled={emailBusy}>
+                {emailBusy ? 'Sending…' : 'Verify this email'}
               </button>
             )}
           </>

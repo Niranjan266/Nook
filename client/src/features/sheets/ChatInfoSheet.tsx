@@ -22,6 +22,7 @@ import {
   IconClock,
   IconLock,
   IconTrash,
+  IconUser,
   IconBlock,
   IconTag,
   IconUsers,
@@ -40,6 +41,7 @@ export default function ChatInfoSheet() {
     useChat();
   const me = useAuth((s) => s.me);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nickDraft, setNickDraft] = useState('');
@@ -499,21 +501,63 @@ export default function ChatInfoSheet() {
           </button>
         ) : (
           partner && (
-            <button
-              className="list-row"
-              style={{ color: 'var(--rust)' }}
-              onClick={async () => {
-                await post(`/users/${partner.id}/block`);
-                toast(`${partner.displayName} is blocked`);
-                closeSheet();
-              }}
-            >
-              <IconBlock size={19} />
-              <span className="grow">
-                <span className="list-row-label">Block {partner.displayName.split(' ')[0]}</span>
-                <span className="list-row-sub">They can no longer message you</span>
-              </span>
-            </button>
+            <>
+              {/*
+                Delete, then block, in that order and with that distance
+                between them. Deleting a contact is the ordinary ending — you
+                do not talk to this person any more — and blocking is the one
+                you reach for when someone will not take the hint. Putting the
+                mild one first means the harsher one is a deliberate choice
+                rather than the only exit offered.
+              */}
+              <button
+                className="list-row"
+                style={{ color: 'var(--rust)' }}
+                onClick={async () => {
+                  if (!confirmDelete) return setConfirmDelete(true);
+                  try {
+                    // One call: the server drops the friendship and removes
+                    // both contact rows, so neither side is left holding half
+                    // a relationship the other has ended.
+                    await post(`/users/${partner.id}/unfriend`);
+                    toast(`${partner.displayName} removed`);
+                    closeSheet();
+                  } catch (e: any) {
+                    toast(e?.message || 'Could not remove them.', true);
+                    setConfirmDelete(false);
+                  }
+                }}
+              >
+                <IconUser size={19} />
+                <span className="grow">
+                  <span className="list-row-label">
+                    {confirmDelete ? 'Tap again to delete' : `Delete ${partner.displayName.split(' ')[0]}`}
+                  </span>
+                  <span className="list-row-sub">
+                    {confirmDelete
+                      ? 'Your messages stay; they would have to ask again to talk'
+                      : 'Removes them from your contacts and ends the friendship'}
+                  </span>
+                </span>
+                {confirmDelete && <IconCheck size={17} />}
+              </button>
+
+              <button
+                className="list-row"
+                style={{ color: 'var(--rust)' }}
+                onClick={async () => {
+                  await post(`/users/${partner.id}/block`);
+                  toast(`${partner.displayName} is blocked`);
+                  closeSheet();
+                }}
+              >
+                <IconBlock size={19} />
+                <span className="grow">
+                  <span className="list-row-label">Block {partner.displayName.split(' ')[0]}</span>
+                  <span className="list-row-sub">They can no longer message you</span>
+                </span>
+              </button>
+            </>
           )
         )}
       </div>
