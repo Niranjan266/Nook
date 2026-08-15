@@ -14,6 +14,7 @@
  * light on if you forget to stop them.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { spring } from '@/lib/motion';
 import { IconClose, IconCamera, IconFire, IconWarning } from '@/components/Icon';
@@ -211,7 +212,22 @@ export default function SnapCamera({ open, onClose, onSend, onFallback, initialF
     },
   };
 
-  return (
+  /**
+   * Rendered into <body>, not where it sits in the tree.
+   *
+   * `.snap-cam` is `position: fixed; inset: 0`, which should cover the window
+   * — but this component lives inside `.composer`, and `.composer` sets
+   * `backdrop-filter`. A backdrop-filter establishes a containing block for
+   * fixed-position descendants, so "cover the window" quietly became "cover
+   * the composer": an ~80px black bar with the header visible and the camera,
+   * timers and Send button squeezed to nothing or clipped by
+   * `.surface { overflow: hidden }`.
+   *
+   * A portal is the fix rather than moving the CSS, because any ancestor
+   * gaining a transform, filter or `will-change` later would bring the bug
+   * straight back, and nothing about the composer's blur is wrong.
+   */
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -324,6 +340,7 @@ export default function SnapCamera({ open, onClose, onSend, onFallback, initialF
           )}
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
