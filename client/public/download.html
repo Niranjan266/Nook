@@ -162,7 +162,7 @@
 
       <div class="card">
         <a class="slab" id="get" href="/nook.apk" download="nook.apk">Download Nook · APK</a>
-        <p class="meta" id="meta">Android 5.1 or newer · about 5 MB</p>
+        <p class="meta" id="meta">Version 1.0.1 · Android 5.1 or newer · about 9 MB</p>
         <p class="meta" style="margin-top: 4px" id="hosted">
           Served from this site — nothing to sign in to.
         </p>
@@ -242,14 +242,23 @@
 
         This only fills in the real size. A HEAD request costs nothing and
         beats a number in the markup that quietly goes stale after every build.
+
+        The version is not fetched, because there is nowhere honest to fetch it
+        from — it lives in build.gradle and only the built APK knows it. It is
+        written into the markup above and has to be changed there when the app
+        is versioned, which is worth the small risk of it going stale: someone
+        reporting a bug needs to be able to say which build they installed.
       */
       fetch('/nook.apk', { method: 'HEAD' })
         .then((res) => {
           if (!res.ok) throw new Error(String(res.status));
           const bytes = Number(res.headers.get('content-length') || 0);
           if (!bytes) return;
-          document.getElementById('meta').textContent =
-            `Android 5.1 or newer · ${(bytes / 1048576).toFixed(1)} MB`;
+          const meta = document.getElementById('meta');
+          // Keep whatever version is printed; only the size is measured.
+          const version = (meta.textContent.match(/^Version [\d.]+/) || ['Version 1.0.1'])[0];
+          meta.textContent =
+            `${version} · Android 5.1 or newer · ${(bytes / 1048576).toFixed(1)} MB`;
         })
         .catch(() => {
           /* Leave the printed estimate. A failed HEAD says nothing about
