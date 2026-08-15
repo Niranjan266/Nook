@@ -130,7 +130,18 @@ await fetch(BASE + `/admin/users/${v2.id}/suspend`, {
   body: JSON.stringify({ suspended: true }),
 });
 r = await api('/auth/me', { token: v2.token });
-ok('a suspended account is refused', r.status === 403, String(r.status));
+/**
+ * Refused — by whichever check gets there first.
+ *
+ * Suspension both marks the account and drops its sessions, so this returns
+ * 403 (the account is suspended) or 401 (that session no longer exists)
+ * depending on which lands first. Asserting only 403 made this fail at random
+ * on the faster path, which is the safer of the two.
+ *
+ * The property worth protecting is that a suspended account cannot use the
+ * API. Pinning the mechanism instead just teaches people to re-run the suite.
+ */
+ok('a suspended account is refused', r.status === 403 || r.status === 401, String(r.status));
 
 // Brute-forcing an email code burns it.
 const g = await reg('audg');

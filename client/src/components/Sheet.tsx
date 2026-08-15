@@ -4,6 +4,13 @@ import { IconClose } from './Icon';
 import { spring, sheetSlide } from '@/lib/motion';
 
 interface Props {
+  /**
+   * Dim the page behind less than usual.
+   *
+   * For sheets whose whole job is changing how the page looks — the wallpaper
+   * picker — where a normal scrim hides the very thing being decided.
+   */
+  seeThrough?: boolean;
   open: boolean;
   onClose: () => void;
   title: string;
@@ -12,7 +19,7 @@ interface Props {
   headExtra?: ReactNode;
 }
 
-export default function Sheet({ open, onClose, title, children, footer, headExtra }: Props) {
+export default function Sheet({ open, onClose, title, children, footer, headExtra , seeThrough }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,7 +56,7 @@ export default function Sheet({ open, onClose, title, children, footer, headExtr
       {open && (
         <>
           <motion.div
-            className="sheet-scrim"
+            className={`sheet-scrim${seeThrough ? " see-through" : ""}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

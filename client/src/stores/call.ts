@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { get as apiGet } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import type { Person } from '@/lib/types';
+import { startCallAudio, stopCallAudio, setCallSpeaker } from '@/lib/callaudio';
 
 type Phase = 'idle' | 'dialing' | 'ringing' | 'connecting' | 'live' | 'ended';
 
@@ -92,6 +93,10 @@ function playRing(): { stop: () => void } {
 }
 
 function teardown() {
+  // Every ending goes through here — hang up, decline, missed, failed — which
+  // is why the routing is released here and not at each of them. Staying in
+  // communication mode after a call leaves music playing out of the earpiece.
+  stopCallAudio();
   ringtone?.stop();
   ringtone = null;
   pendingOffer = null;
@@ -115,7 +120,15 @@ export const useCall = create<CallState>((set, get) => ({
   minimised: false,
   micOn: true,
   camOn: true,
-  speakerOn: true,
+  /**
+   * Off by default: a voice call belongs at your ear.
+   *
+   * It was `true`, which made every call a speakerphone call — and since the
+   * button only flipped this boolean and routed nothing, turning it "off"
+   * changed the icon and not the sound. startCallAudio sets the real routing
+   * and turns this on by itself for video, where a loudspeaker is right.
+   */
+  speakerOn: false,
   startedAt: null,
   error: '',
   localStream: null,
@@ -132,8 +145,12 @@ export const useCall = create<CallState>((set, get) => ({
       error: '',
       micOn: true,
       camOn: kind === 'video',
+      speakerOn: kind === 'video',
       minimised: false,
     });
+
+    // Communication mode, and the output that suits this kind of call.
+    startCallAudio(kind === 'video');
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -214,6 +231,7 @@ export const useCall = create<CallState>((set, get) => ({
       minimised: false,
       micOn: true,
       camOn: payload.kind === 'video',
+      speakerOn: payload.kind === 'video',
       error: '',
     });
   },
@@ -306,7 +324,13 @@ export const useCall = create<CallState>((set, get) => ({
     set({ camOn: !camOn });
   },
 
-  toggleSpeaker: () => set((s) => ({ speakerOn: !s.speakerOn })),
+  toggleSpeaker: () => {
+    const on = !get().speakerOn;
+    // Route first, then reflect it. The button showing "speaker on" while the
+    // sound stays at the earpiece is the bug this replaces.
+    setCallSpeaker(on);
+    set({ speakerOn: on });
+  },
   setMinimised: (minimised) => set({ minimised }),
 
   async onAnswered({ callId, sdp }) {

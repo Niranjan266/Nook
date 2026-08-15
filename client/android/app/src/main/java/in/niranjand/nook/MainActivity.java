@@ -25,6 +25,7 @@ public class MainActivity extends BridgeActivity {
         // Before super.onCreate: the bridge is built there, and a plugin
         // registered afterwards is not in it.
         registerPlugin(PushReadyPlugin.class);
+        registerPlugin(CallAudioPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

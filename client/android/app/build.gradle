@@ -38,8 +38,8 @@ android {
          * versionName is the part people read. It has no effect on install
          * behaviour at all — it exists so a bug report can say which build.
          */
-        versionCode 7
-        versionName "1.0.5"
+        versionCode 8
+        versionName "1.0.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

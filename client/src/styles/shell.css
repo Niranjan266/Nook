@@ -665,3 +665,13 @@ button.list-row:active {
     flex: 1;
   }
 }
+
+/* A scrim for a sheet that is changing how the page looks.
+   The normal one dims to 32% and blurs 2px, which is right for a sheet you
+   read and wrong for the wallpaper picker: it hides the wallpaper. Barely
+   there is enough to say "the sheet has focus" while leaving the chat behind
+   legible, which is the whole point of previewing on it. */
+.sheet-scrim.see-through {
+  background: rgba(30, 26, 23, 0.08);
+  backdrop-filter: none;
+}

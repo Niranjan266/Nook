@@ -168,10 +168,23 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
     return look && (look.preset || look.url) ? { ...wp, ...look } : wp;
   })();
 
+  /**
+   * A wallpaper being chosen right now beats everything, and applies to
+   * nothing but this screen until it is saved.
+   *
+   * The sheet's own thumbnail can show a colour. It cannot answer the question
+   * people are actually asking while they drag the dim slider — is my text
+   * still readable — because that depends on real bubbles at real size over
+   * real content. So the chat itself becomes the preview, and the sheet steps
+   * out of the way (see .sheet-scrim.previewing).
+   */
+  const draft = useUi((s) => s.wallpaperDraft);
+  const shownLook = draft ? { ...activeLook, ...draft } : activeLook;
+
   const wallpaperStyle: React.CSSProperties = {
-    ...(activeLook.url ? { backgroundImage: `url(${activeLook.url})` } : {}),
-    ...(activeLook.blur ? { filter: `blur(${activeLook.blur}px)`, transform: 'scale(1.06)' } : {}),
-    ['--wp-dim' as any]: activeLook.dim,
+    ...(shownLook.url ? { backgroundImage: `url(${shownLook.url})` } : {}),
+    ...(shownLook.blur ? { filter: `blur(${shownLook.blur}px)`, transform: 'scale(1.06)' } : {}),
+    ['--wp-dim' as any]: shownLook.dim,
   };
 
   const status = (() => {
@@ -320,7 +333,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
 
       <div className="chat-canvas">
         <div
-          className={`wallpaper${activeLook.preset ? ` wp-${activeLook.preset}` : activeLook.url ? '' : ' wp-plain'}`}
+          className={`wallpaper${shownLook.preset ? ` wp-${shownLook.preset}` : shownLook.url ? '' : ' wp-plain'}`}
           style={wallpaperStyle}
           aria-hidden="true"
         />

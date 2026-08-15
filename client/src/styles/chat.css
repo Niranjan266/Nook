@@ -1789,3 +1789,14 @@
   cursor: pointer;
 }
 .snap-keep:hover { color: var(--ink); }
+
+/* The wallpaper sheet's own preview, pinned.
+   It used to scroll away exactly when it was needed — you must scroll to
+   reach the presets and the dim slider, and doing so takes the thing you are
+   judging off the screen. On a phone there is no chat visible beside the
+   sheet, so this is the only preview there is; it stays put. */
+.wp-preview {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}

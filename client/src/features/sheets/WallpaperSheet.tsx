@@ -108,6 +108,18 @@ export default function WallpaperSheet() {
     }
   };
 
+  /**
+   * Mirror the choice onto the real conversation behind this sheet.
+   *
+   * Everything the sliders and the swatches change flows out here, and
+   * closeSheet clears it — so cancelling leaves no trace, and only the Set
+   * button ever writes anything down.
+   */
+  const setWallpaperDraft = useUi((s) => s.setWallpaperDraft);
+  useEffect(() => {
+    setWallpaperDraft({ url, preset, tint, dim, blur });
+  }, [url, preset, tint, dim, blur, setWallpaperDraft]);
+
   const previewStyle: React.CSSProperties = {
     backgroundImage: url ? `url(${url})` : undefined,
     backgroundSize: 'cover',
@@ -118,6 +130,7 @@ export default function WallpaperSheet() {
 
   return (
     <Sheet
+      seeThrough
       open={open}
       onClose={closeSheet}
       title="Wallpaper"
@@ -143,9 +156,12 @@ export default function WallpaperSheet() {
         </>
       }
     >
-      {/* live preview with two sample bubbles */}
+      {/* Live preview with two sample bubbles, pinned so it survives the
+          scroll down to the presets and the sliders. On a phone it is the only
+          preview there is; on a desktop the real chat behind the sheet is
+          wearing the same choice. */}
       <div
-        className="clay sunk"
+        className="clay sunk wp-preview"
         style={{
           position: 'relative',
           height: 180,

@@ -44,6 +44,26 @@ interface UiState {
    */
   lightbox: { messageId: string; onClose?: () => void } | null;
 
+  /**
+   * A wallpaper being chosen but not yet applied.
+   *
+   * The sheet has always had a little preview with two sample bubbles, and it
+   * was fine until you scrolled — which you must, to reach the presets and the
+   * sliders — at which point the one thing you are judging leaves the screen.
+   *
+   * This lets the real conversation behind the sheet wear the choice instead.
+   * A thumbnail can tell you a colour; only the actual chat, at actual size,
+   * with actual messages on it, can tell you whether the text is still
+   * readable at 40% dim — which is the only question anyone is really asking.
+   */
+  wallpaperDraft: {
+    url?: string;
+    preset?: string;
+    tint?: string;
+    dim: number;
+    blur: number;
+  } | null;
+
   setTheme: (t: Theme) => void;
   setAccent: (a: Accent) => void;
   toggleShelf: () => void;
@@ -53,6 +73,7 @@ interface UiState {
   toast: (text: string, bad?: boolean) => void;
   dropToast: (id: number) => void;
   setLightbox: (v: { messageId: string; onClose?: () => void } | null) => void;
+  setWallpaperDraft: (v: UiState['wallpaperDraft']) => void;
 }
 
 const KEY = 'nook.ui';
@@ -91,6 +112,7 @@ export const useUi = create<UiState>((set, get) => ({
   sheetPayload: null,
   toasts: [],
   lightbox: null,
+  wallpaperDraft: null,
 
   setTheme(theme) {
     applyTheme(theme, get().accent);
@@ -104,7 +126,9 @@ export const useUi = create<UiState>((set, get) => ({
   setShelf: (shelfOpen) => set({ shelfOpen }),
 
   openSheet: (sheet, sheetPayload = null) => set({ sheet, sheetPayload }),
-  closeSheet: () => set({ sheet: null, sheetPayload: null }),
+  // The draft dies with the sheet. Leaving it behind would show a wallpaper
+  // that was never chosen, on a chat that never agreed to it.
+  closeSheet: () => set({ sheet: null, sheetPayload: null, wallpaperDraft: null }),
 
   toast(text, bad) {
     const id = ++toastId;
@@ -112,6 +136,8 @@ export const useUi = create<UiState>((set, get) => ({
     setTimeout(() => get().dropToast(id), bad ? 5200 : 3200);
   },
   dropToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
+  setWallpaperDraft: (wallpaperDraft) => set({ wallpaperDraft }),
 
   setLightbox: (lightbox) => {
     // Closing runs the callback the opener left behind, exactly once.
