@@ -190,7 +190,12 @@ echo.
 echo   ==========================================
 echo     Published.
 echo.
-for /f "delims=" %%r in ('"!GH!" release view "!TAG!" --json url --jq .url 2^>nul') do echo       %%r
+rem  usebackq again, and for the same reason as the aapt2 call above: this is
+rem  the one gh invocation here with TWO quoted arguments, and cmd strips the
+rem  outermost quote pair from a for /f command, which welds them together into
+rem  nonsense. It failed silently the first time - the release published fine
+rem  and the script simply printed no link.
+for /f "usebackq delims=" %%r in (`""!GH!" release view "!TAG!" --json url --jq .url 2^>nul"`) do echo       %%r
 echo   ==========================================
 echo.
 pause
