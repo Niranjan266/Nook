@@ -488,9 +488,21 @@ export const cancelScheduled = (id, userId) =>
 
 /* ── housekeeping ────────────────────────────────────────────────────────── */
 
-/** Disappearing messages. SQLite has no TTL index, so the scheduler sweeps. */
+/**
+ * Disappearing messages. SQLite has no TTL index, so the scheduler sweeps.
+ *
+ * A message somebody kept is never swept, and that clause is the whole feature
+ * rather than a refinement of it. Without it, Keep wrote a row, showed a
+ * label, and changed nothing — the message vanished on schedule anyway, and
+ * the only sign that anything was wrong would be someone going back for a
+ * message they had explicitly saved and finding it gone. Starred messages have
+ * been exempt from retention for the same reason, and this is the same
+ * principle applied to the timer.
+ */
 export const deleteExpired = () =>
-  run('DELETE FROM messages WHERE expires_at IS NOT NULL AND expires_at <= ?', [Date.now()]);
+  run("DELETE FROM messages WHERE expires_at IS NOT NULL AND expires_at <= ? AND saved_by = ''", [
+    Date.now(),
+  ]);
 
 /** Retention. Starred messages are never swept — someone deliberately kept them. */
 export const applyRetention = (conversationId, cutoff) =>

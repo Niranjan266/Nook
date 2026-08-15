@@ -112,4 +112,35 @@ r = await api(`/messages/${plain.id}/save`, { method: 'POST', token: b.token, bo
 t.ok('an ordinary message can be kept', r.status === 200, `${r.status}`);
 t.ok('and reads as kept', (await seenBy(b.token, plain.id))?.saved === true);
 
+/* ── keeping actually beats the disappearing timer ─────────────────────── */
+
+/**
+ * The part that was missing, and the part the whole feature rests on.
+ *
+ * saved_by was written, the label said "Kept", and deleteExpired swept the
+ * message anyway — it filtered on expires_at alone. Keep wrote a row and
+ * changed nothing. Nobody would have noticed until they went back for a
+ * message they had deliberately saved and found it gone, which is the worst
+ * possible moment to discover it.
+ *
+ * Asserted against the SQL rather than by waiting out a timer: the sweep is
+ * one statement, and what matters is that it cannot select a saved row.
+ */
+import { one, run } from '../src/db/index.js';
+import { deleteExpired } from '../src/db/messages.js';
+
+const kept = (await api(`/messages/${cid}`, { method: 'POST', token: a.token, body: { body: 'save me', type: 'text' } })).json.message;
+const doomed = (await api(`/messages/${cid}`, { method: 'POST', token: a.token, body: { body: 'let me go', type: 'text' } })).json.message;
+
+await api(`/messages/${kept.id}/save`, { method: 'POST', token: b.token, body: { saved: true } });
+
+// Expire both, a second in the past.
+const past = Date.now() - 1000;
+await run('UPDATE messages SET expires_at = ? WHERE id IN (?, ?)', [past, kept.id, doomed.id]);
+
+await deleteExpired();
+
+t.ok('an expired message is swept', !(await one('SELECT id FROM messages WHERE id = ?', [doomed.id])));
+t.ok('a kept one survives the sweep', Boolean(await one('SELECT id FROM messages WHERE id = ?', [kept.id])));
+
 process.exit(t.done() ? 1 : 0);

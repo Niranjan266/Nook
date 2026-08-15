@@ -15,6 +15,7 @@ import {
   IconTick,
   IconTickDouble,
   IconClockSmall,
+  IconClock,
   IconReply,
   IconEmoji,
   IconMore,
@@ -521,6 +522,35 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                     <span className="list-row-label">{m.starred ? 'Unstar' : 'Star'}</span>
                   </span>
                 </button>
+                {/*
+                  Keep, offered only where it changes something: on a chat with
+                  a disappearing timer running. Everywhere else the message was
+                  never going anywhere, and a button promising to save it would
+                  be answering a question nobody asked.
+
+                  Distinct from Star, which is a bookmark — somewhere to find it
+                  again. This is about whether it still exists to be found.
+                */}
+                {conversation.disappearAfter > 0 && m.type !== 'snap' && (
+                  <button
+                    className="list-row"
+                    onClick={() => {
+                      saveMessage(m.id, !m.saved).catch((e) =>
+                        toast(e?.message || 'Could not keep that.', true)
+                      );
+                      setMenu(false);
+                    }}
+                  >
+                    <IconClock size={17} />
+                    <span className="grow">
+                      <span className="list-row-label">{m.saved ? 'Let it disappear' : 'Keep this'}</span>
+                      <span className="list-row-sub">
+                        {m.saved ? 'It is being kept past the timer' : 'Stops the timer deleting it'}
+                      </span>
+                    </span>
+                  </button>
+                )}
+
                 <button
                   className="list-row"
                   onClick={() => {
