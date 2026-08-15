@@ -98,15 +98,51 @@ popd
 echo.
 if exist "client\android\!APK!" (
   copy /Y "client\android\!APK!" "nook.apk" >nul
-  echo   ==========================================
-  echo     Done. The app is here:
+  echo   ------------------------------------------
+  echo     Built: %CD%\nook.apk
+  echo   ------------------------------------------
   echo.
-  echo       %CD%\nook.apk
-  echo.
-  echo     Next: upload it to a GitHub release named
-  echo     nook.apk, and the download page will serve
-  echo     it automatically.
-  echo   ==========================================
+
+  REM ---------------------------------------------------------- publish it
+  REM The download page reads the newest GitHub release, so publishing is the
+  REM step that actually puts the app in front of anyone. Done here rather
+  REM than left as homework, because a build nobody can download is not a
+  REM finished job.
+  where gh >nul 2>&1
+  if errorlevel 1 (
+    echo   [i] The GitHub CLI is not installed, so I cannot publish it for you.
+    echo.
+    echo       Either install it from https://cli.github.com and run this again,
+    echo       or upload nook.apk by hand:
+    echo.
+    echo         1. github.com/Niranjan266/Nook/releases/new
+    echo         2. Tag: v1.0.0
+    echo         3. Attach nook.apk  ^(the name must be exactly nook.apk^)
+    echo         4. Publish
+    echo.
+    echo       The download page picks it up straight away - no redeploy.
+  ) else (
+    echo   Publishing to GitHub Releases...
+    for /f "tokens=*" %%v in ('powershell -NoProfile -Command "(Get-Content client\package.json ^| ConvertFrom-Json).version"') do set "VER=%%v"
+    if "!VER!"=="" set "VER=1.0.0"
+
+    gh release view "v!VER!" >nul 2>&1
+    if errorlevel 1 (
+      gh release create "v!VER!" "nook.apk" --title "Nook v!VER!" --notes "Nook for Android. Install from https://nook.niranjand.in/download"
+    ) else (
+      echo   Release v!VER! already exists - replacing the APK.
+      gh release upload "v!VER!" "nook.apk" --clobber
+    )
+
+    if errorlevel 1 (
+      echo   [i] Publishing failed. Run 'gh auth login' once, then try again.
+    ) else (
+      echo.
+      echo   ==========================================
+      echo     Live at https://nook.niranjand.in/download
+      echo   ==========================================
+    )
+  )
 ) else (
   echo   [X] The build reported success but no APK was produced.
   echo       Look in client\android\app\build\outputs\apk\

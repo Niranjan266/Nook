@@ -356,3 +356,33 @@
 .google-btn svg {
   flex: 0 0 auto;
 }
+
+/* The Android download offer on the front door. Quiet by design — it is an
+   aside for the minority on a phone, not a second call to action competing
+   with signing in. */
+.door-app {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px auto 0;
+  padding: 10px 16px;
+  max-width: 100%;
+  border-radius: var(--r-pill);
+  background: var(--clay-surface);
+  box-shadow: var(--clay-1);
+  color: var(--ink);
+  font-size: 0.86rem;
+  text-align: center;
+  transition:
+    box-shadow var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+.door-app:hover {
+  box-shadow: var(--clay-2);
+  transform: translateY(-1px);
+}
+.door-app:active {
+  box-shadow: var(--clay-in);
+  transform: translateY(0);
+}

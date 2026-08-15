@@ -4,7 +4,7 @@ import { useAuth } from '@/stores/auth';
 import { get, post, setToken, ApiError } from '@/lib/api';
 import { API_BASE } from '@/lib/config';
 import { spring, stepIn } from '@/lib/motion';
-import { IconCheck, IconWarning } from '@/components/Icon';
+import { IconCheck, IconWarning, IconDownload } from '@/components/Icon';
 
 type Step = 'in' | 'up' | 'recover' | 'reset';
 
@@ -50,6 +50,16 @@ function strength(pw: string) {
   if (/\d/.test(pw) && /[a-zA-Z]/.test(pw)) score++;
   return Math.min(score, 4);
 }
+
+/**
+ * Whether to offer the APK. Computed once outside the component: it cannot
+ * change while the page is open, and re-deriving it on every render would be
+ * work for an answer that never moves.
+ */
+const showApp =
+  typeof navigator !== 'undefined' &&
+  /Android/i.test(navigator.userAgent) &&
+  !(window as any).Capacitor?.isNativePlatform?.();
 
 export default function FrontDoor() {
   const { login, signup } = useAuth();
@@ -448,6 +458,19 @@ export default function FrontDoor() {
         Nook has no feed, no reels, no stories and no strangers. Messages are encrypted in transit
         and never used to train anything.
       </p>
+
+      {/*
+        Only on Android, and only in a browser. The APK is useless on a desktop
+        or an iPhone, and offering a download that cannot be installed is worse
+        than not mentioning it — so this asks the one question that decides it
+        rather than showing everyone a link most of them cannot use.
+      */}
+      {showApp && (
+        <a className="door-app" href="/download">
+          <IconDownload size={15} />
+          <span>Get the Android app — notifications on a locked phone</span>
+        </a>
+      )}
 
       {/* the door opening */}
       <AnimatePresence>
