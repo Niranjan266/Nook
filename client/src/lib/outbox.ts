@@ -33,6 +33,14 @@ export interface Outgoing {
   media?: any;
   replyTo?: string | null;
   viewOnce?: boolean;
+  /**
+   * Seconds the recipient gets, 0 meaning "until they close it".
+   *
+   * It has to live on the queued payload too: a snap sent while offline is
+   * replayed from here, and without this the timer the sender chose would be
+   * quietly replaced by the server default on every retry.
+   */
+  viewSeconds?: number;
   queuedAt: number;
 }
 

@@ -199,6 +199,8 @@ export interface Message {
 
   /** client-only */
   status?: 'pending' | 'failed' | 'sent';
+  /** Why it failed, when the server gave a reason worth showing. */
+  failedReason?: string;
   uploadPct?: number;
 }
 

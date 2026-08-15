@@ -12,6 +12,7 @@ import {
   type Outgoing,
 } from '@/lib/outbox';
 import { playSound, type SoundId } from '@/lib/sounds';
+import { useUi } from '@/stores/ui';
 import type { Conversation, Message, Person } from '@/lib/types';
 
 interface Presence {
@@ -43,6 +44,8 @@ interface ChatState {
     body?: string;
     media?: any;
     viewOnce?: boolean;
+    /** Seconds the recipient gets for a snap. 0 = until they close it. */
+    viewSeconds?: number;
     replyTo?: string | null;
     scheduledFor?: string | null;
     transcript?: string;
@@ -230,7 +233,17 @@ export const useChat = create<ChatState>((set, get) => ({
 
   /* ── sending ────────────────────────────────────────────────────────── */
 
-  async send({ conversationId, type = 'text', body = '', media, viewOnce, replyTo, scheduledFor, transcript }) {
+  async send({
+    conversationId,
+    type = 'text',
+    body = '',
+    media,
+    viewOnce,
+    viewSeconds,
+    replyTo,
+    scheduledFor,
+    transcript,
+  }) {
     const clientId = uid();
     const meId = (window as any).__nookMeId as string;
 
@@ -244,6 +257,7 @@ export const useChat = create<ChatState>((set, get) => ({
         media,
         replyTo: replyTo || null,
         viewOnce,
+        viewSeconds,
         transcript,
         scheduledFor,
       });
@@ -270,7 +284,9 @@ export const useChat = create<ChatState>((set, get) => ({
       deletedForAll: false,
       deletedForMe: false,
       editedAt: null,
-      viewOnce: viewOnce ? { enabled: true, seen: false, burnt: false, viewers: [] } : null,
+      viewOnce: viewOnce
+        ? { enabled: true, seen: false, burnt: false, seconds: viewSeconds ?? 10, viewers: [] }
+        : null,
       call: null,
       expiresAt: null,
       createdAt: new Date().toISOString(),
@@ -297,6 +313,7 @@ export const useChat = create<ChatState>((set, get) => ({
       media,
       replyTo: replyTo || null,
       viewOnce,
+      viewSeconds,
       queuedAt: Date.now(),
     };
 
@@ -307,16 +324,35 @@ export const useChat = create<ChatState>((set, get) => ({
       );
       if (!res?.ok || !res.message) throw new Error(res?.error || 'send failed');
       get().onMessage({ ...res.message, status: 'sent' });
-    } catch {
+    } catch (err: any) {
       await enqueue(payload);
       set((s) => ({
         messages: {
           ...s.messages,
           [conversationId]: (s.messages[conversationId] || []).map((m) =>
-            m.clientId === clientId ? { ...m, status: 'failed' } : m
+            m.clientId === clientId ? { ...m, status: 'failed', failedReason: err?.message || '' } : m
           ),
         },
       }));
+
+      /**
+       * Say why.
+       *
+       * This `catch` swallowed everything: a refusal from the server, an
+       * expired session, a dropped socket — all became an unexplained "failed"
+       * bubble. Queuing for later is the right behaviour when the network is
+       * simply gone, but it is the wrong behaviour when the server has said no
+       * and will keep saying no, and the two were indistinguishable to anyone
+       * looking at the screen. That is how "snap is not working" arrives with
+       * nothing to go on.
+       *
+       * A refusal is reported; a transport failure stays quiet, because the
+       * outbox really will send it and a toast for every subway tunnel would
+       * be noise.
+       */
+      const refused = typeof err?.message === 'string' && err.message !== 'send failed' && err.message.length > 0;
+      if (refused) useUi.getState().toast(err.message, true);
+      else console.warn('  send  queued for later:', err);
     }
   },
 
