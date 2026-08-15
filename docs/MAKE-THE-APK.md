@@ -240,20 +240,36 @@ Do this once, before anyone else installs Nook.
 
 ### Create a key
 
-In the project folder, PowerShell:
+**Double-click `Make-Signing-Key.bat`.**
+
+It finds `keytool` inside Android Studio, asks you to choose a password, and
+writes both the key and the config the build needs.
+
+You will be asked for the password **three times**: twice by keytool (to
+confirm it) and once more so the build can use the key without prompting on
+every run. It is never shown on screen and never stored anywhere but
+`keystore.properties`, which is gitignored.
+
+keytool also asks for a name, city and organisation. None of it is shown to
+anyone — press Enter to skip any of them.
+
+**Write the password down before you start.** There is no way to recover it,
+and without it the key is useless.
+
+If a keystore already exists the script refuses to replace it unless you type
+`REPLACE`, because overwriting one you have already published with is the
+mistake that cannot be undone.
+
+<details>
+<summary>Doing it by hand instead</summary>
 
 ```powershell
 & "$env:ProgramFiles\Android\Android Studio\jbr\bin\keytool.exe" `
-  -genkey -v -keystore nook-release.keystore -alias nook `
+  -genkeypair -v -keystore nook-release.keystore -alias nook `
   -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-It asks for a password and some details. Only the password matters; the rest
-can be anything.
-
-### Tell the build about it
-
-Create `client\android\keystore.properties`:
+Then create `client\android\keystore.properties`:
 
 ```properties
 storeFile=../../nook-release.keystore
@@ -262,9 +278,10 @@ keyAlias=nook
 keyPassword=the same password
 ```
 
-`Build-Android.bat` notices the file and produces a signed release build from
-then on. The path is read relative to `client\android\`, which is why
-`../../` lands on the project root where you just made the key.
+The path is read relative to `client\android\`, which is why `../../` lands
+on the project root where the key was just created.
+
+</details>
 
 > Without `keystore.properties` the script builds a **debug** APK on purpose.
 > A release build with no signing config produces an *unsigned* APK: it builds
@@ -329,6 +346,7 @@ which is harmless.
 ## Quick reference
 
 ```
+Make the signing key    Make-Signing-Key.bat   (once, before real users)
 Build it                Build-Android.bat
 Result                  nook.apk  (project root)
 Package name            in.niranjand.nook

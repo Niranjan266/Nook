@@ -13,6 +13,8 @@ On Windows, double-click one of these — they install what's missing, start wha
 | **`Nook-Web.bat`** | Starts the API and the web app, opens your browser |
 | **`Nook-Mobile.bat`** | Starts the API and Expo, and points your phone at this computer |
 | **`Make-Keys.bat`** | Generates your JWT and push keys locally, for deployment |
+| **`Build-Android.bat`** | Builds the Android app and publishes it — see [docs/MAKE-THE-APK.md](docs/MAKE-THE-APK.md) |
+| **`Make-Signing-Key.bat`** | Creates the key that signs the app. Once, before anyone else installs it |
 | **`Gmail-Auth.bat`** | Connects a Gmail account for sending mail (one-time) |
 | **`Stop-Nook.bat`** | Stops everything |
 
