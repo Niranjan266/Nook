@@ -11,6 +11,7 @@ import { enablePush, disablePush, pushState } from '@/lib/push';
 import { askToNotify } from '@/lib/notify';
 import { toClock, fromClock, isQuietNow } from '@/lib/rooms';
 import { SOUNDS, previewSound } from '@/lib/sounds';
+import { isNativeApp } from '@/lib/native';
 import type { QuietHours } from '@/lib/types';
 import {
   IconSun,
@@ -35,6 +36,7 @@ import {
   IconTrash,
   IconChat,
   IconUsers,
+  IconDownload,
 } from '@/components/Icon';
 
 const ACCENTS = [
@@ -637,6 +639,23 @@ export default function SettingsSheet() {
             ))}
           </div>
         </div>
+
+        {/*
+          Only shown on Android in a browser: pointless in the app itself, and
+          the APK does nothing for a desktop or an iPhone. Offering a download
+          that cannot be installed is worse than not mentioning it.
+        */}
+        {!isNativeApp() && /Android/i.test(navigator.userAgent) && (
+          <a className="list-row" href="/download" target="_blank" rel="noreferrer">
+            <IconDownload size={19} />
+            <span className="grow">
+              <span className="list-row-label">Get the Android app</span>
+              <span className="list-row-sub">
+                Notifications on a locked phone, with their own sound
+              </span>
+            </span>
+          </a>
+        )}
 
         <button className="list-row" onClick={togglePush}>
           <IconBell size={19} />

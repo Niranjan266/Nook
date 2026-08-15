@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Get Nook for Android</title>
+    <meta name="description" content="Nook for Android — the same Nook, with notifications that reach a locked phone." />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" href="/logo.svg" />
+
+    <meta property="og:title" content="Nook for Android" />
+    <meta property="og:description" content="The same Nook, with notifications that reach a locked phone." />
+    <meta property="og:type" content="website" />
+
+    <style>
+      /*
+        Deliberately standalone: no framework, no fonts to fetch, no JS. This
+        page is opened on a phone with one hand, often on a poor connection,
+        by someone who has not used Nook yet — every kilobyte before the
+        download button is a kilobyte in the way.
+      */
+      :root {
+        --bisque: #e9e1d6;
+        --surface: #f4eee6;
+        --raised: #fbf7f1;
+        --ink: #1e1a17;
+        --muted: #5c5349;
+        --terracotta: #c0603c;
+        --moss: #57694a;
+        --hairline: #ded5c8;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        padding: 32px 20px calc(48px + env(safe-area-inset-bottom, 0px));
+        background: var(--bisque);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.6;
+        display: flex;
+        justify-content: center;
+      }
+
+      .wrap { width: 100%; max-width: 480px; }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      .brand img { width: 40px; height: 40px; }
+      .brand span {
+        font-size: 12px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 30px;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+      .lede { margin: 0 0 28px; color: var(--muted); }
+
+      .card {
+        background: var(--surface);
+        border-radius: 26px;
+        padding: 24px;
+        box-shadow: 0 12px 30px rgba(30, 26, 23, 0.09);
+        margin-bottom: 20px;
+      }
+
+      /* The Slab: flat fill, hard offset shadow, near-square corners. */
+      .slab {
+        display: block;
+        width: 100%;
+        padding: 16px 20px;
+        border: 2px solid var(--ink);
+        border-radius: 6px;
+        background: var(--terracotta);
+        color: #fdf8f2;
+        font: inherit;
+        font-size: 17px;
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+        box-shadow: 4px 4px 0 var(--ink);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+      }
+      .slab:active {
+        transform: translate(4px, 4px);
+        box-shadow: 0 0 0 var(--ink);
+      }
+      .slab.secondary { background: var(--surface); color: var(--ink); }
+
+      .meta {
+        margin: 12px 0 0;
+        font-size: 13px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      ul { margin: 0; padding: 0; list-style: none; }
+      li {
+        display: flex;
+        gap: 12px;
+        padding: 11px 0;
+        border-bottom: 1px solid var(--hairline);
+      }
+      li:last-child { border-bottom: 0; }
+      li b { display: block; font-weight: 600; }
+      li span { color: var(--muted); font-size: 14px; }
+      .tick { color: var(--moss); flex: none; font-weight: 700; }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      ol { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; }
+      ol li { display: list-item; border: 0; padding: 5px 0; }
+
+      .note {
+        background: var(--raised);
+        border-left: 3px solid var(--terracotta);
+        border-radius: 0 12px 12px 0;
+        padding: 12px 14px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      footer {
+        margin-top: 28px;
+        text-align: center;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      footer a { color: var(--terracotta); }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="brand">
+        <img src="/logo.svg" alt="" />
+        <span>Nook</span>
+      </div>
+
+      <h1>Nook for Android</h1>
+      <p class="lede">
+        The same Nook you use in the browser, as an app on your home screen — and with
+        notifications that reach you when your phone is locked.
+      </p>
+
+      <div class="card">
+        <a class="slab" href="https://github.com/Niranjan266/Nook/releases/latest/download/nook.apk">Download Nook · APK</a>
+        <p class="meta">Android 6.0 or newer · about 5 MB</p>
+        <p class="meta" style="margin-top: 4px">
+          Hosted on GitHub Releases, so you always get the newest build.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>What the app adds</h2>
+        <ul>
+          <li>
+            <span class="tick">✓</span>
+            <span>
+              <b>Notifications on a locked phone</b>
+              <span>With its own sound and vibration, which a browser cannot do.</span>
+            </span>
+          </li>
+          <li>
+            <span class="tick">✓</span>
+            <span>
+              <b>An icon on your home screen</b>
+              <span>Opens straight into Nook, with no address bar.</span>
+            </span>
+          </li>
+          <li>
+            <span class="tick">✓</span>
+            <span>
+              <b>The back button behaves</b>
+              <span>Closes a sheet or a chat, rather than the whole app.</span>
+            </span>
+          </li>
+          <li>
+            <span class="tick">✓</span>
+            <span>
+              <b>Always current</b>
+              <span>Updates arrive with the site — no reinstalling to get new features.</span>
+            </span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Installing it</h2>
+        <ol>
+          <li>Tap Download above.</li>
+          <li>Open the file when it finishes — check your notification shade or Downloads.</li>
+          <li>
+            Android will say it does not usually allow installs from this source. Tap
+            <b>Settings</b>, allow it for your browser, then go back.
+          </li>
+          <li>Tap Install, then Open, and sign in as usual.</li>
+        </ol>
+        <p class="note">
+          That warning is normal for any app not installed from the Play Store — it is
+          Android telling you where the file came from, not that anything is wrong with it.
+          The app is signed by us and only ever talks to nook.niranjand.in.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Would rather not install anything?</h2>
+        <p style="margin: 0 0 14px; color: var(--muted); font-size: 14px">
+          Nook works in the browser, and Chrome can add it to your home screen: open the menu
+          and choose <b>Add to Home screen</b>. You get the icon and the full screen. The only
+          thing you miss is the custom notification sound.
+        </p>
+        <a class="slab secondary" href="/">Open Nook in the browser</a>
+      </div>
+
+      <footer>
+        <a href="/">nook.niranjand.in</a>
+      </footer>
+    </div>
+  </body>
+</html>

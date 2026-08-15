@@ -158,10 +158,22 @@ export function useSocketBridge(enabled: boolean) {
     };
     navigator.serviceWorker?.addEventListener('message', onSwMessage);
 
+    /**
+     * The same intent from the Android app. A tapped FCM notification arrives
+     * through Capacitor rather than the service worker, but it means exactly
+     * the same thing, so it lands on the same handler.
+     */
+    const onNativeOpen = (e: Event) => {
+      const id = (e as CustomEvent).detail?.conversationId;
+      if (id) useChat.getState().setActive(id);
+    };
+    window.addEventListener('nook:open-conversation', onNativeOpen);
+
     return () => {
       window.removeEventListener('online', onOnline);
       document.removeEventListener('visibilitychange', onVisible);
       navigator.serviceWorker?.removeEventListener('message', onSwMessage);
+      window.removeEventListener('nook:open-conversation', onNativeOpen);
       getSocket()?.removeAllListeners();
       disconnectSocket();
     };

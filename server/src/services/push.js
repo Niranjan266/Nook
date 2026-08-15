@@ -3,8 +3,14 @@
  * works out of the box in dev (subscriptions reset when keys change).
  */
 import webpush from 'web-push';
+import { sendToDevice } from './fcm.js';
 import { env } from '../config/env.js';
-import { pushSubscriptionsFor, deletePushSubscription } from '../db/misc.js';
+import {
+  pushSubscriptionsFor,
+  deletePushSubscription,
+  devicesFor,
+  deleteDevice,
+} from '../db/misc.js';
 
 let keys = { publicKey: env.vapid.publicKey, privateKey: env.vapid.privateKey };
 
@@ -28,11 +34,32 @@ export const publicVapidKey = () => keys.publicKey;
 export const pushProvider = () =>
   env.vapid.publicKey && env.vapid.privateKey ? 'configured' : 'ephemeral';
 
+/**
+ * Send to every device this person has, on whichever transport it uses.
+ *
+ * Two transports rather than one, because neither reaches the other's devices:
+ * Web Push does not exist inside an Android WebView, so the app cannot use the
+ * browser's VAPID subscription, and FCM cannot reach a desktop browser. Anyone
+ * with both the site and the app installed is registered on both and gets one
+ * notification per device, which is what they would expect.
+ */
 export async function notify(userId, payload) {
-  const subs = await pushSubscriptionsFor(userId);
-  if (!subs.length) return 0;
+  const [subs, devices] = await Promise.all([pushSubscriptionsFor(userId), devicesFor(userId)]);
+  if (!subs.length && !devices.length) return 0;
 
   let sent = 0;
+
+  // Native first: it is the one that reaches a locked phone.
+  await Promise.all(
+    devices.map(async (device) => {
+      const result = await sendToDevice(device.token, payload).catch(() => 'failed');
+      if (result === 'sent') sent += 1;
+      // A dead registration retried on every message forever is invisible
+      // breakage — the notification simply never arrives and nothing says why.
+      else if (result === 'gone') await deleteDevice(device.token);
+    })
+  );
+
   await Promise.all(
     subs.map(async (sub) => {
       try {

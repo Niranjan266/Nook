@@ -27,3 +27,32 @@ _cli_install.*
 .DS_Store
 .vscode/
 .idea/
+
+# ── Android (Capacitor) ────────────────────────────────────────────────────
+# The project itself IS committed — it holds the manifest, the icon, the
+# notification sounds and the channel config, all of which are real source.
+# What follows is generated or secret.
+client/android/.gradle/
+client/android/build/
+client/android/app/build/
+client/android/local.properties
+client/android/.idea/
+client/android/app/src/main/assets/public/
+client/android/app/src/main/assets/capacitor.config.json
+client/android/app/capacitor.build.gradle
+client/android/capacitor.settings.gradle
+client/android/capacitor-cordova-android-plugins/
+
+# Firebase credentials for push. Contains project identifiers tied to your
+# account; regenerate rather than share.
+client/android/app/google-services.json
+
+# The signing key and its passwords. Losing this means never being able to
+# update an installed app; leaking it means someone else can.
+*.keystore
+*.jks
+client/android/keystore.properties
+
+# The built APK. Copied to client/public/nook.apk for the download page.
+*.apk
+*.aab

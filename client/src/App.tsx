@@ -12,6 +12,7 @@ import CallOverlay from '@/features/calls/CallOverlay';
 import { useSocketBridge } from '@/features/shell/useSocketBridge';
 import { useFriends } from '@/stores/friends';
 import { resumePush } from '@/lib/push';
+import { registerNativePush, bindBackButton, isNativeApp } from '@/lib/native';
 
 import Toasts from '@/components/Toasts';
 import NotifyNudge from '@/components/NotifyNudge';
@@ -141,6 +142,25 @@ function Nook() {
     // first act is a refresh, which cleared the token on failure and replaced
     // it with the previous account's on success.
     init(handed);
+
+    /**
+     * The Android back button. Without this it quits the app from inside a
+     * chat, which is the most jarring difference between a wrapped web app and
+     * a real one. Back closes one layer — a sheet, then the open conversation
+     * — and only leaves from the top.
+     */
+    bindBackButton(() => {
+      const ui = useUi.getState();
+      if (ui.sheet) {
+        ui.closeSheet();
+        return true;
+      }
+      if (useChat.getState().activeId) {
+        useChat.getState().setActive(null);
+        return true;
+      }
+      return false;
+    });
     registerServiceWorker();
     initTitle();
     return watchFocus();
@@ -161,7 +181,11 @@ function Nook() {
       // If permission was granted before, resubscribe silently — including
       // after a VAPID key rotation, which invalidates every old subscription
       // and otherwise leaves people quietly unsubscribed forever.
+      // Two transports, one call site. In a browser the native path returns
+      // immediately and web push does the work; in the APK it is the reverse,
+      // because Web Push does not exist inside an Android WebView.
       resumePush().catch(() => {});
+      registerNativePush().catch(() => {});
     }
   }, [me?.id]);
 
@@ -228,7 +252,10 @@ function Nook() {
           (conversation ? <Conversation key={conversation.id} conversation={conversation} /> : <Empty />)}
       </div>
 
-      <NotifyNudge show={Boolean(conversation)} />
+      {/* The app asks for notification permission natively, through
+          Android's own dialog, so the web nudge would be a second ask for
+          something already granted. */}
+      <NotifyNudge show={Boolean(conversation) && !isNativeApp()} />
 
       <NewChatSheet />
       <NewGroupSheet />

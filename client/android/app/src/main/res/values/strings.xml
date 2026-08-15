@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nook</string>
+    <string name="title_activity_main">Nook</string>
+    <string name="package_name">in.niranjand.nook</string>
+    <string name="custom_url_scheme">in.niranjand.nook</string>
+
+    <!--
+      The channel FCM falls back to when a message does not name one. It must
+      match a channel created in TypeScript (see lib/native.ts), or Android
+      quietly uses its own default and the custom sound never plays.
+    -->
+    <string name="default_notification_channel_id">messages</string>
+</resources>

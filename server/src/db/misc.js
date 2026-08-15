@@ -226,3 +226,21 @@ export const listGuestLinks = (conversationId) =>
 
 export const useGuestLink = (code) => run('UPDATE guest_links SET uses = uses + 1 WHERE code = ?', [code]);
 export const revokeGuestLink = (code) => run('UPDATE guest_links SET revoked = 1 WHERE code = ?', [code]);
+
+/* ── native push devices (the Android app) ──────────────────────────────── */
+
+/**
+ * Keyed on the token, so re-registering the same device moves it to whichever
+ * account signed in last rather than leaving a phone subscribed to both.
+ */
+export const saveDevice = (userId, token, platform = 'android') =>
+  run(
+    `INSERT INTO push_devices (token, user_id, platform, created_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id, platform = excluded.platform`,
+    [token, userId, platform, now()]
+  );
+
+export const devicesFor = (userId) =>
+  all('SELECT token, platform FROM push_devices WHERE user_id = ?', [userId]);
+
+export const deleteDevice = (token) => run('DELETE FROM push_devices WHERE token = ?', [token]);

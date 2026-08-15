@@ -10,6 +10,12 @@
     "preview": "vite preview --port 4173"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/app": "^6.0.3",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/haptics": "^6.0.3",
+    "@capacitor/push-notifications": "^6.0.5",
+    "@capacitor/status-bar": "^6.0.3",
     "blurhash": "^2.0.5",
     "framer-motion": "^11.15.0",
     "idb-keyval": "^6.2.1",
@@ -21,6 +27,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.2.1",
     "@types/node": "^26.2.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

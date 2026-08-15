@@ -468,3 +468,23 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- hashing, verification and rate limiting are identical for both.
 ALTER TABLE conversation_members ADD COLUMN lock_hash TEXT NOT NULL DEFAULT '';
 ALTER TABLE conversation_members ADD COLUMN lock_kind TEXT NOT NULL DEFAULT '';
+
+-- ─── Native push devices ────────────────────────────────────────────────────
+--
+-- Web push and native push are different transports with different tokens, so
+-- they get different tables rather than a `kind` column: the web subscription
+-- is a three-part object bound to a VAPID key, an FCM registration is one
+-- opaque string, and nothing useful is shared between them.
+--
+-- The token is the primary key. Android reissues a registration to whichever
+-- install asked last, so the same token can move between accounts on a shared
+-- phone — keying on it means the newer owner replaces the older one instead of
+-- both receiving the same notification.
+CREATE TABLE IF NOT EXISTS push_devices (
+  token      TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  platform   TEXT NOT NULL DEFAULT 'android',
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_devices_user ON push_devices (user_id);

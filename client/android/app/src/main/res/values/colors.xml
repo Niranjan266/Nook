@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- Terracotta, the app's accent. Used to tint the status bar icon. -->
+    <color name="nook_accent">#C0603C</color>
+</resources>
