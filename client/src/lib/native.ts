@@ -90,6 +90,37 @@ let registered = false;
 export async function registerNativePush(): Promise<'on' | 'denied' | 'unavailable'> {
   if (!isNativeApp() || registered) return isNativeApp() ? 'on' : 'unavailable';
 
+  /**
+   * Refuse to register when the app has no Firebase configuration.
+   *
+   * This is not caution, it is the fix for a crash. Without
+   * google-services.json, PushNotifications.register() throws
+   * "Default FirebaseApp is not initialized" — and it throws on Capacitor's
+   * own CapacitorPlugins thread, so the try/catch below never sees it. An
+   * uncaught exception on any thread ends the process, which is why a
+   * signed-in person opening the app got "Nook keeps stopping": the session
+   * restored, this function ran, and the app died before drawing anything.
+   *
+   * The check has to be native because nothing in JavaScript can see whether
+   * the resource exists. PushReady is thirty lines in MainActivity's package
+   * that look up one string.
+   */
+  try {
+    const { registerPlugin } = await import('@capacitor/core');
+    const PushReady = registerPlugin<{ isConfigured(): Promise<{ configured: boolean }> }>(
+      'PushReady'
+    );
+    const { configured } = await PushReady.isConfigured();
+    if (!configured) {
+      console.warn('  push  no Firebase configuration in this build; staying off');
+      return 'unavailable';
+    }
+  } catch {
+    // An older build without the PushReady plugin. Registering anyway is the
+    // behaviour that crashed, so the safe answer is to do nothing.
+    return 'unavailable';
+  }
+
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
 
