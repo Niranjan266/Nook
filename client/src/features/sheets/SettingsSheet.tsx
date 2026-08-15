@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/stores/auth';
 import { useUi } from '@/stores/ui';
 import Sheet from '@/components/Sheet';
 import Avatar from '@/components/Avatar';
 import { upload, post, put, patch, get } from '@/lib/api';
+import { prepareAvatar } from '@/lib/color';
+import { popIn } from '@/lib/motion';
 import { enablePush, disablePush, pushState } from '@/lib/push';
 import { askToNotify } from '@/lib/notify';
 import { toClock, fromClock, isQuietNow } from '@/lib/rooms';
@@ -27,6 +30,8 @@ import {
   IconRefresh,
   IconFolder,
   IconSchedule,
+  IconImage,
+  IconTrash,
 } from '@/components/Icon';
 
 const ACCENTS = [
@@ -41,6 +46,9 @@ export default function SettingsSheet() {
   const { sheet, closeSheet, openSheet, toast, theme, setTheme, accent, setAccent } = useUi();
   const { me, patchMe, logout, setMe } = useAuth();
   const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const [picMenu, setPicMenu] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [push, setPush] = useState(pushState());
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(me?.displayName || '');
@@ -195,13 +203,39 @@ export default function SettingsSheet() {
     toast('Saved');
   };
 
+  /**
+   * A profile picture is cropped and shrunk before it leaves the device.
+   *
+   * Uploading the raw file meant a phone photo — 8 to 14 MB — travelled in
+   * full to become a 92px circle, which on a slow connection is a long silence
+   * with nothing on screen to say it is working. It also let the browser
+   * centre-crop a tall photo at display time, so the result was not what you
+   * picked. Cropping to a square here makes the upload small and the outcome
+   * predictable.
+   */
   const changeAvatar = async (file: File) => {
+    setAvatarBusy(true);
     try {
-      const { media } = await upload(file, 'avatar');
+      const square = await prepareAvatar(file);
+      const { media } = await upload(square, 'avatar', undefined, 'avatar.jpg');
       await patchMe({ avatarUrl: media.url });
       toast('New picture');
-    } catch {
-      toast('Could not upload that.', true);
+    } catch (e: any) {
+      toast(e?.message || 'Could not upload that.', true);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    setAvatarBusy(true);
+    try {
+      await patchMe({ avatarUrl: '' });
+      toast('Back to your initials');
+    } catch (e: any) {
+      toast(e?.message || 'Could not remove that.', true);
+    } finally {
+      setAvatarBusy(false);
     }
   };
 
@@ -233,15 +267,105 @@ export default function SettingsSheet() {
   return (
     <Sheet open={open} onClose={closeSheet} title="You">
       <div className="stack" style={{ alignItems: 'center', gap: 10 }}>
-        <button style={{ position: 'relative' }} onClick={() => fileInput.current?.click()} aria-label="Change picture">
-          <Avatar name={me.displayName} src={me.avatarUrl} id={me.id} accent={accent} size={92} />
-          <span
-            className="clay-round"
-            style={{ width: 32, height: 32, position: 'absolute', right: -2, bottom: -2 }}
+        {/*
+          Tapping the picture used to jump straight to the OS file browser,
+          which is the wrong door on a phone: the picture you want is usually
+          one you are about to take. Offering the camera, the library and a way
+          back to your initials makes all three reachable in one tap.
+        */}
+        <div style={{ position: 'relative' }}>
+          <button
+            style={{ position: 'relative', display: 'block' }}
+            onClick={() => setPicMenu((v) => !v)}
+            disabled={avatarBusy}
+            aria-label="Change your picture"
+            aria-expanded={picMenu}
           >
-            <IconCamera size={16} />
-          </span>
-        </button>
+            <Avatar name={me.displayName} src={me.avatarUrl} id={me.id} accent={accent} size={92} />
+            <span
+              className="clay-round"
+              style={{ width: 32, height: 32, position: 'absolute', right: -2, bottom: -2 }}
+            >
+              <IconCamera size={16} />
+            </span>
+            {avatarBusy && (
+              <span
+                className="clay-round"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: 92,
+                  height: 92,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: 'rgba(30, 26, 23, 0.45)',
+                  color: '#F7F2EA',
+                  fontSize: 12,
+                }}
+              >
+                Saving…
+              </span>
+            )}
+          </button>
+
+          <AnimatePresence>
+            {picMenu && (
+              <motion.div
+                className="attach-menu"
+                variants={popIn}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                /* Centred under the avatar with a margin rather than a
+                   translate: Framer Motion owns `transform` while it animates,
+                   so a translateX here would be thrown away mid-animation and
+                   the menu would jump to the right. */
+                style={{ left: '50%', marginLeft: -98, bottom: 'auto', top: 'calc(100% + 8px)' }}
+              >
+                <button
+                  className="list-row"
+                  onClick={() => {
+                    cameraInput.current?.click();
+                    setPicMenu(false);
+                  }}
+                >
+                  <IconCamera size={18} />
+                  <span className="grow">
+                    <span className="list-row-label">Take a photo</span>
+                  </span>
+                </button>
+                <button
+                  className="list-row"
+                  onClick={() => {
+                    fileInput.current?.click();
+                    setPicMenu(false);
+                  }}
+                >
+                  <IconImage size={18} />
+                  <span className="grow">
+                    <span className="list-row-label">Choose a photo</span>
+                    <span className="list-row-sub">Cropped to a square automatically</span>
+                  </span>
+                </button>
+                {me.avatarUrl && (
+                  <button
+                    className="list-row"
+                    onClick={() => {
+                      removeAvatar();
+                      setPicMenu(false);
+                    }}
+                  >
+                    <IconTrash size={18} />
+                    <span className="grow">
+                      <span className="list-row-label">Remove picture</span>
+                      <span className="list-row-sub">Go back to your initials</span>
+                    </span>
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {editingName ? (
           <div className="stack" style={{ gap: 8, width: '100%' }}>
@@ -710,6 +834,21 @@ export default function SettingsSheet() {
         ref={fileInput}
         type="file"
         accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) changeAvatar(f);
+          e.target.value = '';
+        }}
+      />
+      {/* Same handler, but `capture` asks the phone for the camera directly
+          rather than the gallery. Desktop browsers ignore it and show the
+          normal picker, which is the right fallback. */}
+      <input
+        ref={cameraInput}
+        type="file"
+        accept="image/*"
+        capture="user"
         hidden
         onChange={(e) => {
           const f = e.target.files?.[0];

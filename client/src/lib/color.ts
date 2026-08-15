@@ -94,6 +94,54 @@ export function prepareWallpaper(file: File, maxW = 1600): Promise<Blob> {
 }
 
 /**
+ * Square-crop and shrink a picked photo into a profile picture.
+ *
+ * Avatars are always drawn in a circle at 32–92px, so uploading a 12 MB
+ * portrait sends thousands of times more data than anyone will ever see —
+ * on a phone that reads as the feature hanging. Worse, a tall photo gets
+ * centre-cropped by CSS at display time, so what you saw when you picked it
+ * is not what other people get.
+ *
+ * Cropping to a centred square here means the upload, the thumbnail and the
+ * circle all agree, and 512px is enough for a retina 92px avatar twice over.
+ */
+export function prepareAvatar(file: File, size = 512): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const edge = Math.min(img.width, img.height);
+      const sx = (img.width - edge) / 2;
+      const sy = (img.height - edge) / 2;
+      const out = Math.min(size, edge);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = out;
+      canvas.height = out;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        return reject(new Error('Canvas unavailable.'));
+      }
+      ctx.drawImage(img, sx, sy, edge, edge, 0, 0, out, out);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(url);
+          blob ? resolve(blob) : reject(new Error('Could not process that image.'));
+        },
+        'image/jpeg',
+        0.88
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Could not read that image.'));
+    };
+    img.src = url;
+  });
+}
+
+/**
  * Shrink a photo before it goes anywhere.
  *
  * A modern phone camera produces 8–14 MB files. Sending that to a chat wastes
