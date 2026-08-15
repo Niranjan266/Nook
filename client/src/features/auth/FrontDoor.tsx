@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { useAuth } from '@/stores/auth';
 import { get, post, setToken, ApiError } from '@/lib/api';
 import { API_BASE } from '@/lib/config';
 import { spring, stepIn } from '@/lib/motion';
 import { IconCheck, IconWarning, IconDownload } from '@/components/Icon';
+import { startGoogleSignIn, bindDeepLinks } from '@/lib/native';
 
 type Step = 'in' | 'up' | 'recover' | 'reset';
 
@@ -94,6 +95,46 @@ export default function FrontDoor() {
    * the history stack or a bookmark — it is single-use, but a spent code
    * sitting in the address bar invites someone to try it anyway.
    */
+  /**
+   * One place that turns a handoff code into a session, because it now arrives
+   * two ways: as `?g=` in the address bar on the web, and as a `nook://auth`
+   * deep link in the Android app. Duplicating it would mean fixing sign-in
+   * twice, and forgetting one of them.
+   */
+  const redeem = useCallback(
+    async (code: string) => {
+      setBusy(true);
+      try {
+        const data = await post<{ user: any; accessToken: string }>('/auth/google/exchange', {
+          code,
+        });
+        // The exchange returns the user with the token, so adopt the session
+        // outright. Calling init() here would throw away this token whenever
+        // the refresh cookie is cross-site and the browser dropped it — and
+        // then play the door animation over a screen nobody had signed into,
+        // which is what left the page blank.
+        useAuth.getState().adopt(data.user, data.accessToken);
+        await openDoor();
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Google sign-in did not complete. Try again.');
+        setBusy(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const explain = useCallback((failed: string) => {
+    setBusy(false);
+    setError(
+      failed === 'access_denied'
+        ? 'Google sign-in was cancelled.'
+        : failed === 'unconfigured'
+          ? 'Google sign-in is not set up on this server yet.'
+          : 'Google sign-in did not complete. Try again.'
+    );
+  }, []);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const handoff = params.get('g');
@@ -102,32 +143,20 @@ export default function FrontDoor() {
     if (!handoff && !failed) return;
     window.history.replaceState({}, '', window.location.pathname);
 
-    if (failed) {
-      setError(
-        failed === 'access_denied'
-          ? 'Google sign-in was cancelled.'
-          : failed === 'unconfigured'
-            ? 'Google sign-in is not set up on this server yet.'
-            : 'Google sign-in did not complete. Try again.'
-      );
-      return;
-    }
+    if (failed) return explain(failed);
+    redeem(handoff!);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    setBusy(true);
-    post<{ user: any; accessToken: string }>('/auth/google/exchange', { code: handoff })
-      .then(async (data) => {
-        // The exchange returns the user with the token, so adopt the session
-        // outright. Calling init() here would throw away this token whenever
-        // the refresh cookie is cross-site and the browser dropped it — and
-        // then play the door animation over a screen nobody had signed into,
-        // which is what left the page blank.
-        useAuth.getState().adopt(data.user, data.accessToken);
-        await openDoor();
-      })
-      .catch((err) => {
-        setError(err instanceof ApiError ? err.message : 'Google sign-in did not complete. Try again.');
-        setBusy(false);
-      });
+  /**
+   * The app's half of the same flow.
+   *
+   * Google refuses embedded web views, so the sign-in runs in a real browser
+   * and the result has to be handed back. Without this the browser kept the
+   * session and the app stayed signed out with nothing to explain it.
+   */
+  useEffect(() => {
+    bindDeepLinks(redeem, explain);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -413,7 +442,12 @@ export default function FrontDoor() {
                   onClick={() => {
                     // A full-page navigation, not a popup: popups are blocked
                     // on some mobile browsers and break the back button.
-                    window.location.href = `${API_BASE}/api/auth/google/start`;
+                    // In the app this opens a Custom Tab and comes back
+                    // through nook://auth; in a browser it is an ordinary
+                    // navigation. `startGoogleSignIn` says which happened.
+                    startGoogleSignIn(API_BASE).then((handled) => {
+                      if (!handled) window.location.href = `${API_BASE}/api/auth/google/start`;
+                    });
                   }}
                 >
                   <GoogleMark />

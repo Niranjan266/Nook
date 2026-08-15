@@ -12,6 +12,7 @@
   "dependencies": {
     "@capacitor/android": "^6.2.1",
     "@capacitor/app": "^6.0.3",
+    "@capacitor/browser": "^6.0.6",
     "@capacitor/core": "^6.2.1",
     "@capacitor/haptics": "^6.0.3",
     "@capacitor/push-notifications": "^6.0.5",

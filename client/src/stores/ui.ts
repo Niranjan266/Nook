@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { styleStatusBar } from '@/lib/native';
 
 type Theme = 'light' | 'dark' | 'system';
 type Accent = 'terracotta' | 'moss' | 'ochre' | 'clay-blue' | 'rust';
@@ -64,6 +65,14 @@ function applyTheme(theme: Theme, accent: Accent) {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   document.documentElement.dataset.accent = accent;
   localStorage.setItem(KEY, JSON.stringify({ theme, accent }));
+
+  /**
+   * The Android status bar is native, so `theme-color` — which the browser
+   * honours — does nothing in the app. Set here rather than at sign-in so it
+   * follows every theme change, including the system flipping to dark while
+   * Nook is open on 'system'.
+   */
+  styleStatusBar(dark);
 }
 
 let toastId = 0;

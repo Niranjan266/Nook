@@ -3,7 +3,12 @@
     <string name="app_name">Nook</string>
     <string name="title_activity_main">Nook</string>
     <string name="package_name">in.niranjand.nook</string>
-    <string name="custom_url_scheme">in.niranjand.nook</string>
+    <!--
+      The scheme Android uses to hand a link back to this app. Short and
+      memorable rather than the package name, because it is what the sign-in
+      redirect points at: nook://auth
+    -->
+    <string name="custom_url_scheme">nook</string>
 
     <!--
       The channel FCM falls back to when a message does not name one. It must

@@ -17,6 +17,7 @@ import {
   type AdminUser,
   type AdminStats,
 } from '@/lib/adminApi';
+import { startGoogleSignIn } from '@/lib/native';
 import { API_BASE } from '@/lib/config';
 import { IconSearch, IconWarning, IconLogOut, IconCheck, IconUsers } from '@/components/Icon';
 import { UserPanelHost } from './UserPanel';
@@ -181,7 +182,13 @@ function SignIn({ onIn }: { onIn: () => void }) {
               onClick={() => {
                 // Reuse the app's Google flow, then trade the resulting
                 // session for an admin token — see AdminApp's handoff effect.
-                window.location.href = `${API_BASE}/api/auth/google/start?admin=1`;
+                // Same round trip as the front door. The admin panel is
+                // rarely opened from the app, but "rarely" is not "never" and
+                // a silent failure here is worse than on the front door —
+                // there is no password fallback visible at that moment.
+                startGoogleSignIn(API_BASE, true).then((handled) => {
+                  if (!handled) window.location.href = `${API_BASE}/api/auth/google/start?admin=1`;
+                });
               }}
             >
               Continue with Google

@@ -78,9 +78,18 @@ setInterval(() => {
 
 const stateSecret = () => env.accessSecret;
 
-function makeState({ admin = false } = {}) {
+function makeState({ admin = false, native = false } = {}) {
   const payload = Buffer.from(
-    JSON.stringify({ n: crypto.randomBytes(8).toString('hex'), t: Date.now(), a: admin ? 1 : 0 })
+    JSON.stringify({
+      n: crypto.randomBytes(8).toString('hex'),
+      t: Date.now(),
+      a: admin ? 1 : 0,
+      // Where to send the result. Sealed in the signature for the same reason
+      // `admin` is: the callback has to be able to trust it, and a plain query
+      // parameter on the way back could be edited into a redirect somewhere
+      // else — which for a URL carrying a sign-in code is the whole ballgame.
+      m: native ? 1 : 0,
+    })
   ).toString('base64url');
   const sig = crypto.createHmac('sha256', stateSecret()).update(payload).digest('base64url');
   return `${payload}.${sig}`;
@@ -125,7 +134,7 @@ router.get('/start', (req, res) => {
     scope: 'openid email profile',
     // `?admin=1` from the panel. Sealed into the signed state so it survives
     // the round trip without being forgeable.
-    state: makeState({ admin: req.query.admin === '1' }),
+    state: makeState({ admin: req.query.admin === '1', native: req.query.native === '1' }),
     // Nook needs the identity once, not ongoing access, so no refresh token is
     // requested. Less to store, less to leak.
     access_type: 'online',
@@ -141,8 +150,24 @@ router.get('/start', (req, res) => {
  * Send the browser back where it came from, with a reason when it did not
  * work. Admin sign-ins return to /nookcontrol; everyone else to the app.
  */
-const bounce = (res, params, admin = false) =>
-  res.redirect(`${env.appUrl}${admin ? '/nookcontrol' : '/'}?${new URLSearchParams(params).toString()}`);
+/**
+ * Where the finished sign-in lands.
+ *
+ * This was always a web URL, which is exactly why signing in with Google broke
+ * the Android app. The app opens Google in a browser — Google refuses embedded
+ * web views, and Capacitor sends any off-origin navigation outside anyway — so
+ * the browser is where the callback arrives. Redirecting to https://nook…
+ * therefore signed you in *in Chrome* and left the app exactly as it was, with
+ * no session and no explanation.
+ *
+ * `nook://auth` is a link only this app can answer, so Android hands the code
+ * back to it. Same round trip, but it finishes where it started.
+ */
+const bounce = (res, params, { admin = false, native = false } = {}) => {
+  const query = new URLSearchParams(params).toString();
+  if (native) return res.redirect(`nook://auth?${query}`);
+  return res.redirect(`${env.appUrl}${admin ? '/nookcontrol' : '/'}?${query}`);
+};
 
 router.get(
   '/callback',
@@ -151,11 +176,13 @@ router.get(
 
     const state = readState(req.query.state);
     const admin = Boolean(state?.a);
+    const native = Boolean(state?.m);
+    const to = { admin, native };
 
     // The user pressed Cancel, or Google refused.
-    if (req.query.error) return bounce(res, { google_error: String(req.query.error) }, admin);
+    if (req.query.error) return bounce(res, { google_error: String(req.query.error) }, to);
     if (!state) return bounce(res, { google_error: 'bad_state' });
-    if (!req.query.code) return bounce(res, { google_error: 'no_code' }, admin);
+    if (!req.query.code) return bounce(res, { google_error: 'no_code' }, to);
 
     const tokenRes = await fetch(TOKEN_URL, {
       method: 'POST',
@@ -172,7 +199,7 @@ router.get(
     const tokens = await tokenRes.json().catch(() => ({}));
     if (!tokenRes.ok || !tokens.id_token) {
       console.error(`  google    token exchange failed: ${JSON.stringify(tokens).slice(0, 300)}`);
-      return bounce(res, { google_error: 'exchange_failed' }, admin);
+      return bounce(res, { google_error: 'exchange_failed' }, to);
     }
 
     /**
@@ -184,13 +211,13 @@ router.get(
      */
     const claims = JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64url').toString());
 
-    if (claims.aud !== env.google.clientId) return bounce(res, { google_error: 'wrong_audience' }, admin);
+    if (claims.aud !== env.google.clientId) return bounce(res, { google_error: 'wrong_audience' }, to);
     if (!['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss))
-      return bounce(res, { google_error: 'wrong_issuer' }, admin);
-    if (!claims.sub) return bounce(res, { google_error: 'no_subject' }, admin);
+      return bounce(res, { google_error: 'wrong_issuer' }, to);
+    if (!claims.sub) return bounce(res, { google_error: 'no_subject' }, to);
 
     const user = await findOrCreate(claims);
-    return bounce(res, { g: mintHandoff(user.id) }, admin);
+    return bounce(res, { g: mintHandoff(user.id) }, to);
   })
 );
 

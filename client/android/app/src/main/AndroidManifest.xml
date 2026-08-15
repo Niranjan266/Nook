@@ -15,11 +15,29 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:exported="true">
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              Signing in with Google leaves the app: Google refuses embedded
+              web views, so the flow runs in a real browser. This is how it
+              gets back. Without it the browser finishes the sign-in, keeps the
+              session, and the app is left exactly as it was — which is why
+              signing in appeared to "kick you out".
+
+              BROWSABLE + DEFAULT are both required for a link tapped in a
+              browser to reach an app; MAIN/LAUNCHER above does not cover it.
+            -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="@string/custom_url_scheme" />
             </intent-filter>
 
         </activity>

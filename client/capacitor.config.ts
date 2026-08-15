@@ -36,15 +36,23 @@ const config: CapacitorConfig = {
     // Only https, so a stray http asset cannot downgrade the connection.
     androidScheme: 'https',
     cleartext: false,
+    /**
+     * Shown when the site cannot be reached. Bundled in the APK, so it is the
+     * one page that loads with no connection at all.
+     *
+     * Without it the WebView shows its own error page — a white screen reading
+     * "net::ERR_NAME_NOT_RESOLVED", which tells somebody holding a phone
+     * nothing and is indistinguishable from the app being broken. This is also
+     * the difference between a bug report of "not working" and one naming the
+     * cause.
+     */
+    errorPath: 'offline.html',
   },
 
   android: {
     // The web app already draws its own background; a white flash between the
     // splash screen and the first paint is more noticeable than the wait.
     backgroundColor: '#E9E1D6',
-    // Nook is a chat app with a fixed composer at the bottom. Without this the
-    // keyboard covers the text box on some devices — the single most common
-    // complaint about wrapped web apps.
     webContentsDebuggingEnabled: false,
   },
 

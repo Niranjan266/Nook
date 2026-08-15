@@ -149,12 +149,107 @@ export async function bindBackButton(goBack: () => boolean) {
   }
 }
 
+/**
+ * Match the status bar to the app rather than leaving it black.
+ *
+ * The WebView has no say over the status bar, so the `theme-color` meta tag
+ * the browser honours does nothing here — an app that is otherwise warm bisque
+ * sits under a black strip until this runs.
+ */
+export async function styleStatusBar(dark: boolean) {
+  if (!isNativeApp()) return;
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar');
+    await StatusBar.setBackgroundColor({ color: dark ? '#201D1A' : '#E9E1D6' });
+    // Dark *content* on a light bar, and the reverse — the naming is the
+    // opposite of what it reads like, which is worth stating once here.
+    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+  } catch {
+    /* not native, or no status bar to style */
+  }
+}
+
 /** A real haptic tap, rather than the blunt vibration the web API gives. */
 export async function tap() {
   if (!isNativeApp()) return;
   try {
     const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
     await Haptics.impact({ style: ImpactStyle.Light });
+  } catch {
+    /* not native */
+  }
+}
+
+/* ── signing in with Google, from inside the app ──────────────────────────── */
+
+/**
+ * Google sign-in cannot happen in the app's own web view.
+ *
+ * Google refuses OAuth from embedded web views, and Capacitor sends any
+ * off-origin navigation to the system browser regardless — so the flow always
+ * runs outside the app. That was fine; what was broken is that it also
+ * *finished* outside the app. The server redirected to https://nook…, so the
+ * browser ended up holding the session and the app was left exactly as it had
+ * been: signed out, with no error to explain it.
+ *
+ * The fix is a round trip that comes home. `?native=1` tells the server to
+ * finish at `nook://auth?g=<code>` instead of a web address, Android hands
+ * that link to this app, and `bindDeepLinks` below turns it into a session.
+ *
+ * A Custom Tab rather than the plain browser: it opens over the app, shares
+ * the system's cookies so an already-signed-in Google account is one tap, and
+ * can be closed programmatically the moment the code comes back.
+ */
+export async function startGoogleSignIn(apiBase: string, admin = false): Promise<boolean> {
+  if (!isNativeApp()) return false;
+
+  try {
+    const { Browser } = await import('@capacitor/browser');
+    const url = `${apiBase}/api/auth/google/start?native=1${admin ? '&admin=1' : ''}`;
+    await Browser.open({ url, presentationStyle: 'popover' });
+    return true;
+  } catch {
+    // No Custom Tab available. Falling back to a normal navigation still
+    // works, because the deep link is what actually carries the result — the
+    // browser choice only affects how it looks.
+    return false;
+  }
+}
+
+/**
+ * Everything Android hands to the app as a link.
+ *
+ * Right now that is the end of a Google sign-in, but the shape is general: a
+ * scheme, a path, and a query. Anything added later (an invite link, a shared
+ * conversation) arrives through the same door.
+ */
+export async function bindDeepLinks(onCode: (code: string) => void, onError: (why: string) => void) {
+  if (!isNativeApp()) return;
+
+  try {
+    const { App } = await import('@capacitor/app');
+
+    await App.addListener('appUrlOpen', async ({ url }) => {
+      if (!url?.startsWith('nook://')) return;
+
+      // `new URL` on a custom scheme is unreliable across engines; the query
+      // is the only part that matters and splitting on '?' cannot misparse.
+      const query = new URLSearchParams(url.split('?')[1] || '');
+      const code = query.get('g');
+      const failed = query.get('google_error');
+
+      // Close the Custom Tab first, so the app is what the person is looking
+      // at when the result lands rather than a browser that lingers on top.
+      try {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.close();
+      } catch {
+        /* nothing open, or already gone */
+      }
+
+      if (code) onCode(code);
+      else if (failed) onError(failed);
+    });
   } catch {
     /* not native */
   }
