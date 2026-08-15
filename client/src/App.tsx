@@ -73,11 +73,57 @@ function Empty() {
   );
 }
 
+/**
+ * "Reconnecting" should mean something is wrong, not that the socket blinked.
+ *
+ * It used to appear the instant a `disconnect` event fired, which is why it
+ * showed up simply from leaving the tab: a backgrounded page has its timers
+ * throttled, the socket's heartbeat misses, and the connection drops — every
+ * single time, by design. Switching apps on a phone does exactly the same.
+ * Reconnecting then takes well under a second, so the banner was reporting a
+ * problem that had already fixed itself before anyone could read it.
+ *
+ * Two rules. Nothing is shown while the page is hidden, because nobody is
+ * looking and the disconnect is expected. And a visible drop has to last a few
+ * seconds before it is worth interrupting anyone over — long enough that a
+ * reconnect wins the race, short enough that a real outage is still reported
+ * while you are staring at it.
+ */
+const OFFLINE_GRACE_MS = 4000;
+
 function OfflineBar() {
   const connected = useChat((s) => s.connected);
+  const [showOffline, setShowOffline] = useState(false);
+
+  useEffect(() => {
+    if (connected) {
+      setShowOffline(false);
+      return;
+    }
+
+    let timer: number | undefined;
+
+    const arm = () => {
+      window.clearTimeout(timer);
+      // Hidden means backgrounded: expected, and unseen either way.
+      if (document.visibilityState !== 'visible') return setShowOffline(false);
+      timer = window.setTimeout(() => setShowOffline(true), OFFLINE_GRACE_MS);
+    };
+
+    arm();
+    // Coming back to the tab restarts the clock rather than showing the banner
+    // immediately — the socket reconnects on focus, and that takes a moment.
+    document.addEventListener('visibilitychange', arm);
+
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', arm);
+    };
+  }, [connected]);
+
   return (
     <AnimatePresence>
-      {!connected && (
+      {showOffline && (
         <motion.div
           className="toast bad"
           style={{ position: 'fixed', top: 12, left: '50%', zIndex: 130 }}

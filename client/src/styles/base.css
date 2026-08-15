@@ -202,3 +202,106 @@ time,
 .bad {
   color: var(--rust);
 }
+
+/* ── touch ────────────────────────────────────────────────────────────────
+   The differences between "a website opened on a phone" and "an app" are
+   mostly these, and none of them are layout. Verified missing rather than
+   assumed: the layout already adapts, the feel did not.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * Android paints a grey rectangle over anything tappable, on every tap, in a
+ * shape that ignores border-radius. It is the loudest tell that something is
+ * a web page — and it is redundant here, because every control already has an
+ * :active state that presses it into the clay.
+ */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * A long press on a phone should open Nook's own menu, not the browser's
+ * "Copy / Select all / Web search" bar. Text people actually want to copy —
+ * message bodies, the Nook ID — opts back in below.
+ */
+button,
+.list-row,
+.rail,
+.shelf,
+.chat-head,
+.sheet-head {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.msg-text,
+.msg-body,
+code,
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
+@media (max-width: 640px) {
+  /*
+   * Chat text at 15px is a desktop size read at desktop distance. A phone is
+   * held closer but glanced at, often one-handed and moving, and every
+   * messaging app people compare this to sits at 16px or more. Raising only
+   * the base leaves the whole scale in proportion, and desktop untouched.
+   */
+  :root {
+    --t-base: 1rem;
+    --t-sm: 0.875rem;
+    --t-xs: 0.8125rem;
+  }
+
+  /*
+   * Anything tappable clears 44px. Below that the miss rate climbs sharply,
+   * and a mis-tap in a chat app is a message sent to the wrong person or a
+   * snap opened before you meant to.
+   */
+  button,
+  .list-row,
+  .clay-round,
+  a.list-row {
+    min-height: 44px;
+  }
+
+  .clay-round {
+    min-width: 44px;
+  }
+
+  /*
+   * Momentum scrolling, and no rubber-band bounce dragging the whole page.
+   * The bounce is what makes a wrapped web app feel like a page inside an app
+   * rather than the app itself.
+   */
+  .stream,
+  .shelf-list,
+  .sheet-body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+}
+
+/*
+ * Feedback on press, since a phone has no hover to tell you a control is live.
+ * Kept to a scale rather than a colour change so it costs nothing to paint.
+ */
+@media (hover: none) {
+  button:active,
+  .list-row:active {
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:active,
+  .list-row:active {
+    transform: none;
+  }
+}
