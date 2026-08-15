@@ -33,12 +33,43 @@ const mustBeUnlocked = async (conversationId, userId) => {
   return convo;
 };
 
+/**
+ * Eight routes resolve a message through here — react, forward, edit, delete,
+ * history, view, star, screenshot-hint — and every one of them inherited
+ * membership-only access from this single line. Reacting to a message in a
+ * locked chat returned its body; forwarding it copied the contents somewhere
+ * readable. Requiring the unlock here fixes all eight at once, which is the
+ * only way a rule like this stays true as routes are added.
+ */
 const loadMessage = async (id, userId) => {
   const msg = await M.findMessage(id);
   if (!msg) throw httpError(404, 'That message is gone.');
-  await mustBeMember(msg.conversation, userId);
+  await mustBeUnlocked(msg.conversation, userId);
   return msg;
 };
+
+/**
+ * Drop messages belonging to a locked chat the viewer has not opened.
+ *
+ * Search, starred and scheduled all query by *membership*, which is the right
+ * scope for everything except this. Rather than teach three SQL builders about
+ * locks, the results are filtered once here — the lists are small, and a rule
+ * applied in one place cannot be half-applied.
+ */
+async function dropLocked(messages, userId) {
+  const byConvo = new Map();
+  const keep = [];
+  for (const m of messages) {
+    const cid = String(m.conversation?._id || m.conversation);
+    if (!byConvo.has(cid)) {
+      const convo = await C.findConversationForUser(cid, userId);
+      const mine = convo?.members?.find((x) => String(x.user?.id || x.user) === String(userId));
+      byConvo.set(cid, Boolean(mine?.locked && mine?.lockHash) && !hasUnlock(userId, cid));
+    }
+    if (!byConvo.get(cid)) keep.push(m);
+  }
+  return keep;
+}
 
 async function broadcast(message, event) {
   const convo = await C.findConversation(message.conversation);
@@ -145,8 +176,8 @@ router.get(
 router.get(
   '/scheduled/all',
   asyncRoute(async (req, res) => {
-    const messages = await M.listScheduled(req.user.id);
-    res.json({ messages: messages.map((m) => serializeMessage(m, req.user.id)) });
+    const pending = await dropLocked(await M.listScheduled(req.user.id), req.user.id);
+    res.json({ messages: pending.map((m) => serializeMessage(m, req.user.id)) });
   })
 );
 
@@ -183,11 +214,15 @@ router.get(
     const q = String(req.query.q || '').trim();
     if (q.length < 2) return res.json({ results: [] });
 
-    const results = await M.searchMessages({
+    const found = await M.searchMessages({
       userId: req.user.id,
       query: q,
       conversationId: req.query.conversationId || null,
     });
+    // Search was the easiest way past the lock: point it at the locked
+    // conversation with `?conversationId=` and page the contents out by
+    // guessing common words.
+    const results = await dropLocked(found, req.user.id);
     res.json({ results: results.map((m) => serializeMessage(m, req.user.id)) });
   })
 );
@@ -195,8 +230,8 @@ router.get(
 router.get(
   '/starred/all',
   asyncRoute(async (req, res) => {
-    const messages = await M.listStarred(req.user.id);
-    res.json({ messages: messages.map((m) => serializeMessage(m, req.user.id)) });
+    const starred = await dropLocked(await M.listStarred(req.user.id), req.user.id);
+    res.json({ messages: starred.map((m) => serializeMessage(m, req.user.id)) });
   })
 );
 

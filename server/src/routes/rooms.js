@@ -7,6 +7,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import * as C from '../db/conversations.js';
+import * as U from '../db/users.js';
+import { areFriends } from '../db/friends.js';
 import { asyncRoute, requireAuth } from '../middleware/auth.js';
 import { httpError } from '../middleware/error.js';
 import { serializeConversation } from '../lib/serialize.js';
@@ -15,9 +17,33 @@ import { emitToConversation } from '../sockets/hub.js';
 const router = Router();
 router.use(requireAuth);
 
+/**
+ * Membership is not consent.
+ *
+ * Anyone could open a direct conversation with anyone, which made every room
+ * surface below a delivery channel that never touched the messages table: 12
+ * wall notes of 200 characters each, a 120-character mood note, arbitrary
+ * image and link URLs — all broadcast to the other person's client. Slow mode
+ * was worse than noise, because a stranger could set it to an hour and
+ * throttle the victim in their own chat.
+ */
 const load = async (id, userId) => {
   const convo = await C.findConversationForUser(id, userId);
   if (!convo) throw httpError(404, 'That conversation is not yours.');
+  return convo;
+};
+
+/** Anything that writes something the other person will see. */
+const loadWritable = async (id, userId) => {
+  const convo = await load(id, userId);
+  if (convo.type === 'direct') {
+    for (const otherId of await C.memberIdsOf(convo.id, userId)) {
+      if (await U.blockExistsBetween(userId, otherId))
+        throw httpError(403, 'You cannot do that here.');
+      if (!(await areFriends(userId, otherId)))
+        throw httpError(403, 'They need to accept your request first.', { code: 'NOT_FRIENDS' });
+    }
+  }
   return convo;
 };
 
@@ -43,7 +69,7 @@ router.put(
       })
       .parse(req.body);
 
-    const convo = await load(req.params.id, req.user.id);
+    const convo = await loadWritable(req.params.id, req.user.id);
     await C.updateConversation(convo.id, {
       roomState: {
         mood,
@@ -76,7 +102,7 @@ router.post(
       })
       .parse(req.body);
 
-    const convo = await load(req.params.id, req.user.id);
+    const convo = await loadWritable(req.params.id, req.user.id);
     if ((await C.countWallObjects(convo.id)) >= 12)
       throw httpError(400, 'A wall holds twelve things. Take one down first.');
 
@@ -98,7 +124,7 @@ router.patch(
       })
       .parse(req.body);
 
-    const convo = await load(req.params.id, req.user.id);
+    const convo = await loadWritable(req.params.id, req.user.id);
     if (!convo.wallObjects.some((o) => o.id === req.params.objectId))
       throw httpError(404, 'That is not on the wall.');
 
@@ -111,7 +137,7 @@ router.patch(
 router.delete(
   '/:id/wall/:objectId',
   asyncRoute(async (req, res) => {
-    const convo = await load(req.params.id, req.user.id);
+    const convo = await loadWritable(req.params.id, req.user.id);
     await C.removeWallObject(convo.id, req.params.objectId);
     const fresh = await broadcast(convo.id);
     res.json({ conversation: serializeConversation(fresh, req.user.id) });
@@ -142,7 +168,7 @@ router.put(
       })
       .parse(req.body);
 
-    const convo = await load(req.params.id, req.user.id);
+    const convo = await loadWritable(req.params.id, req.user.id);
     const current = convo.wallpaperSchedule;
 
     await C.updateConversation(convo.id, {
@@ -165,7 +191,7 @@ router.put(
 router.post(
   '/:id/history/:index/restore',
   asyncRoute(async (req, res) => {
-    const convo = await load(req.params.id, req.user.id);
+    const convo = await loadWritable(req.params.id, req.user.id);
     const entry = await C.wallpaperHistoryEntry(convo.id, Number(req.params.index));
     if (!entry) throw httpError(404, 'No wallpaper at that point in history.');
 
@@ -204,7 +230,7 @@ router.patch(
       })
       .parse(req.body);
 
-    const convo = await load(req.params.id, req.user.id);
+    const convo = await loadWritable(req.params.id, req.user.id);
     if (convo.type === 'group') {
       const mine = convo.members.find((m) => String(m.user?.id || m.user) === req.user.id);
       if (mine?.role !== 'admin') throw httpError(403, 'Only admins can change the pace of a group.');

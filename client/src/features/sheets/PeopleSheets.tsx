@@ -167,19 +167,28 @@ export function NewGroupSheet() {
   const [busy, setBusy] = useState(false);
   const open = sheet === 'new-group';
 
+  /**
+   * Friends only, both in the list and in search.
+   *
+   * A group used to accept anyone, which made it a way around the whole
+   * friend-request rule — you could put a stranger in a two-person "group" and
+   * message them. The server refuses that now, so offering strangers here
+   * would only produce a 403 after the person had picked them and typed a
+   * name. Better not to offer what will be refused.
+   */
   useEffect(() => {
     if (!open) return;
     setName('');
     setPicked([]);
     setQ('');
-    get<{ contacts: Person[] }>('/users').then((r) => setPeople(r.contacts)).catch(() => {});
+    get<{ friends: Person[] }>('/users/friends').then((r) => setPeople(r.friends)).catch(() => {});
   }, [open]);
 
   useEffect(() => {
     if (q.trim().length < 2) return;
     const t = setTimeout(() => {
       get<{ users: Person[] }>(`/users/search?q=${encodeURIComponent(q)}`)
-        .then((r) => setPeople(r.users))
+        .then((r) => setPeople(r.users.filter((u) => u.friendship === 'friends')))
         .catch(() => {});
     }, 280);
     return () => clearTimeout(t);
@@ -229,10 +238,17 @@ export function NewGroupSheet() {
 
       <label className="field">
         <span className="field-label">Add people</span>
-        <input className="groove" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search usernames" autoCapitalize="none" />
+        <input className="groove" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your friends" autoCapitalize="none" />
       </label>
 
       <div className="sheet-section">
+        {people.length === 0 && (
+          <p className="small muted" style={{ padding: '10px 4px' }}>
+            {q.trim().length >= 2
+              ? 'Nobody by that name among your friends. You can only add people who have accepted you.'
+              : 'No friends yet. Add someone from New conversation first.'}
+          </p>
+        )}
         {people.map((p) => {
           const on = picked.some((x) => x.id === p.id);
           return (

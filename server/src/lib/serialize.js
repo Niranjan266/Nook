@@ -247,7 +247,12 @@ export function serializeConversation(c, viewerId) {
       night: c.wallpaperSchedule?.night || null,
     },
 
-    wallObjects: (c.wallObjects || []).map((o) => ({
+    /**
+     * Notes and photos pinned to the chat wall are content of the chat, so a
+     * lock has to cover them too. They were riding out on every
+     * `GET /conversations` while the messages beside them were hidden.
+     */
+    wallObjects: (shut ? [] : c.wallObjects || []).map((o) => ({
       id: o.id,
       type: o.type,
       text: o.text || '',
@@ -259,7 +264,13 @@ export function serializeConversation(c, viewerId) {
       at: iso(o.at),
     })),
 
-    pins: (c.pins || []).map((p) => ({
+    /**
+     * A pinned message is hydrated in full on every conversation load, so this
+     * was the widest leak of the set: the chat list itself shipped the bodies
+     * of pinned messages from locked chats, as did every `conversation:update`
+     * broadcast.
+     */
+    pins: (shut ? [] : c.pins || []).map((p) => ({
       messageId: String(p.message?._id || p.message),
       by: p.by ? String(p.by) : null,
       at: iso(p.at),

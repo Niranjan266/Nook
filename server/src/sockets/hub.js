@@ -7,6 +7,8 @@
  * "deleted for me", view-once state).
  */
 
+import { hasUnlock } from '../lib/lockgrants.js';
+
 let io = null;
 
 /** userId -> Set<socketId> */
@@ -43,6 +45,29 @@ export function emitToUser(userId, event, payload) {
 }
 
 /**
+ * Events that carry, or reveal, the contents of a conversation.
+ *
+ * A member who has locked this chat and not entered their code must not
+ * receive these — the lock hid the history from the screen while every new
+ * message still arrived over the socket in full, which meant leaving the tab
+ * open defeated it entirely. Presence and conversation metadata are not in
+ * this list: those are about the chat existing, not about what is in it.
+ */
+const CONTENT_EVENTS = new Set([
+  'message:new',
+  'message:edit',
+  'message:delete',
+  'message:react',
+  'message:preview',
+  'message:snap-viewed',
+  'thread:new',
+  'pins:changed',
+  'typing:update',
+  'receipt:delivered',
+  'receipt:read',
+]);
+
+/**
  * @param conversation  a Conversation doc (members may be populated or not)
  * @param event         socket event name
  * @param payload       shared payload, or null when using perUser
@@ -51,9 +76,17 @@ export function emitToUser(userId, event, payload) {
  */
 export function emitToConversation(conversation, event, payload, perUser, exceptUserId) {
   if (!io || !conversation?.members) return;
+  const cid = String(conversation._id || conversation.id);
+  const guarded = CONTENT_EVENTS.has(event);
+
   for (const member of conversation.members) {
     const uid = String(member.user?._id || member.user);
     if (exceptUserId && uid === String(exceptUserId)) continue;
+
+    // The one place every real-time fan-out passes through, which is why the
+    // check belongs here rather than at each of the dozen call sites.
+    if (guarded && member.locked && member.lockHash && !hasUnlock(uid, cid)) continue;
+
     emitToUser(uid, event, perUser ? perUser(uid) : payload);
   }
 }

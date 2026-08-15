@@ -105,7 +105,14 @@ export const env = {
    * Make-Admin.bat.
    */
   admin: {
-    emails: process.env.ADMIN_EMAILS || 'supportnookchat@gmail.com',
+    /**
+     * No default. A previous default hardcoded one Gmail address as the
+     * administrator of every deployment of this code — the comment justifying
+     * it had the logic backwards: an empty allowlist is *closed* (isAdminEmail
+     * returns false for everything), so the default prevented nothing and
+     * instead handed the panel to whoever holds that mailbox on any fork.
+     */
+    emails: process.env.ADMIN_EMAILS || '',
     username: (process.env.ADMIN_USERNAME || '').trim(),
     passwordHash: (process.env.ADMIN_PASSWORD_HASH || '').trim(),
   },
@@ -135,6 +142,33 @@ export const env = {
 };
 
 export const isProd = env.nodeEnv === 'production';
+
+/**
+ * Refuse to start in production without real signing secrets.
+ *
+ * The fallback is a fresh random key per boot, which is the right instinct —
+ * never a hardcoded literal — but it fails open in a quieter way: a
+ * misconfigured production deploy boots, looks healthy, and signs everyone out
+ * on every restart with no error anywhere to explain it. The admin panel key
+ * is derived from the refresh secret, so it rotates silently too.
+ *
+ * Failing at boot is louder and cheaper than a week of "why do I keep getting
+ * logged out".
+ */
+if (isProd) {
+  const missing = [
+    !process.env.JWT_ACCESS_SECRET && 'JWT_ACCESS_SECRET',
+    !process.env.JWT_REFRESH_SECRET && 'JWT_REFRESH_SECRET',
+  ].filter(Boolean);
+
+  if (missing.length) {
+    console.error(
+      `\n  config    Refusing to start: ${missing.join(' and ')} must be set in production.` +
+        `\n            Without them every restart invalidates all sessions and the admin panel key.\n`
+    );
+    process.exit(1);
+  }
+}
 
 export function iceServers() {
   const servers = [{ urls: env.ice.stun }];

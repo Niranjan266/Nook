@@ -6,6 +6,7 @@ import * as Calls from '../db/misc.js';
 import { serializeMessage } from '../lib/serialize.js';
 import { warmNicknames } from '../lib/nicknames.js';
 import { warmFriends } from '../lib/friendcache.js';
+import { areFriends } from '../db/friends.js';
 import { createMessage, markRead } from '../services/messages.js';
 import { notify } from '../services/push.js';
 import { parseJson } from '../db/index.js';
@@ -28,9 +29,19 @@ export function attachSockets(io) {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error('No token.'));
     try {
-      const { sub } = verifyAccess(token);
+      const { sub, iat } = verifyAccess(token);
       const user = await U.findUserById(sub);
       if (!user) return next(new Error('Unknown user.'));
+
+      /**
+       * The same two checks `requireAuth` makes. Without them the REST API
+       * said 403 to a suspended account while its socket carried on sending
+       * and receiving in real time, and "sign this person out everywhere" did
+       * not close the connection they already had.
+       */
+      if (user.suspended) return next(new Error('This account has been suspended.'));
+      if (user.tokenEpoch && (iat + 1) * 1000 <= user.tokenEpoch)
+        return next(new Error('Signed out. Please sign in again.'));
       socket.userId = String(user.id);
       socket.user = user;
 
@@ -61,16 +72,29 @@ export function attachSockets(io) {
 
     socket.on('presence:who', async (userIds = [], ack) => {
       const rows = await U.presenceFor(userIds);
+
+      /**
+       * The default setting is 'contacts', and this honoured only 'nobody' —
+       * so anyone could hand it a list of user ids and read online status and
+       * last-seen for almost everybody, bypassing a rule the REST profile
+       * route enforces correctly. Whether the *viewer* is a contact is the
+       * missing half of the question.
+       */
+      const contacts = new Set(await U.contactIds(uid));
+
       const map = {};
       for (const row of rows) {
         const privacy = parseJson(row.privacy);
-        map[row.id] =
-          privacy?.lastSeen === 'nobody'
-            ? { online: false, lastSeen: null }
-            : {
-                online: Boolean(row.online) || isOnline(row.id),
-                lastSeen: row.last_seen ? new Date(row.last_seen).toISOString() : null,
-              };
+        const rule = privacy?.lastSeen || 'contacts';
+        const visible =
+          String(row.id) === uid || rule === 'everyone' || (rule === 'contacts' && contacts.has(row.id));
+
+        map[row.id] = visible
+          ? {
+              online: Boolean(row.online) || isOnline(row.id),
+              lastSeen: row.last_seen ? new Date(row.last_seen).toISOString() : null,
+            }
+          : { online: false, lastSeen: null };
       }
       ack?.(map);
     });
@@ -120,7 +144,21 @@ export function attachSockets(io) {
       if (!convo) return ack?.({ ok: false, error: 'Not your conversation.' });
       if (convo.type !== 'direct') return ack?.({ ok: false, error: 'Group calls are not available yet.' });
 
-      const target = calleeId || (await C.memberIdsOf(convo.id, uid))[0];
+      /**
+       * Ringing someone's phone is louder than messaging them, and this path
+       * checked neither friendship nor blocking — so a stranger could make a
+       * device ring on repeat, and a blocked person could still call through
+       * an old conversation. It also trusted a caller-supplied `calleeId`,
+       * which need not have been in the conversation at all.
+       */
+      const members = await C.memberIdsOf(convo.id, uid);
+      const target = calleeId ? String(calleeId) : members[0];
+      if (!target || !members.includes(target))
+        return ack?.({ ok: false, error: 'That person is not in this conversation.' });
+      if (await U.blockExistsBetween(uid, target))
+        return ack?.({ ok: false, error: 'You cannot call this person.' });
+      if (!(await areFriends(uid, target)))
+        return ack?.({ ok: false, error: 'They need to accept your request first.' });
       const call = await Calls.createCall({
         conversationId: convo.id,
         callerId: uid,
@@ -173,13 +211,29 @@ export function attachSockets(io) {
       emitToUser(call.caller, 'call:answered', { callId, sdp });
     });
 
-    socket.on('call:ice', ({ callId, candidate, to }) => {
-      if (to) emitToUser(to, 'call:ice', { callId, candidate });
+    /**
+     * ICE candidates go to the other end of a call you are actually on.
+     *
+     * This used to forward whatever `to` said, to anyone, with no checks —
+     * an arbitrary "send this socket event to any user on the platform"
+     * primitive. The call row already knows both parties, so `to` is not
+     * needed and is no longer trusted.
+     */
+    socket.on('call:ice', async ({ callId, candidate }) => {
+      const call = await Calls.findCall(callId);
+      if (!call) return;
+      const caller = String(call.caller);
+      const callee = String(call.callee);
+      if (uid !== caller && uid !== callee) return;
+      emitToUser(uid === caller ? callee : caller, 'call:ice', { callId, candidate });
     });
 
     socket.on('call:decline', async ({ callId }) => {
       const call = await Calls.findCall(callId);
       if (!call) return;
+      // Only the person being rung may decline. Anyone who learned a call id
+      // could otherwise hang up other people's calls.
+      if (String(call.callee) !== uid) return;
       const ended = await Calls.updateCall(callId, { status: 'declined', endedAt: Date.now() });
       emitToUser(call.caller, 'call:ended', { callId, reason: 'declined' });
       await logCall(ended);
@@ -188,6 +242,7 @@ export function attachSockets(io) {
     socket.on('call:end', async ({ callId }) => {
       const call = await Calls.findCall(callId);
       if (!call || call.endedAt) return;
+      if (String(call.caller) !== uid && String(call.callee) !== uid) return;
 
       const wasAccepted = call.status === 'accepted';
       const ended = await Calls.updateCall(callId, {

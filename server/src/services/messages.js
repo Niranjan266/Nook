@@ -22,6 +22,30 @@ export const preview = (m) => {
 };
 
 /**
+ * May this person put a message in front of the others in this conversation?
+ *
+ * Checks EVERY other member, not just the first. `memberIdsOf` has no ORDER BY
+ * and the old code tested only index [0], so a direct conversation with a
+ * third member — which guest links can produce — left the real recipient
+ * unchecked entirely.
+ *
+ * Groups are checked too. Exempting them made a two-person group an ungated
+ * DM that bypassed both friendship and blocking; membership is now granted
+ * only to people who accepted you, so this is consistent rather than stricter.
+ */
+export async function assertMayReach(convo, senderId) {
+  const others = await C.memberIdsOf(convo.id, senderId);
+  for (const otherId of others) {
+    if (await blockExistsBetween(senderId, otherId))
+      throw httpError(403, 'You cannot message this person.');
+    if (convo.type === 'direct' && !(await areFriends(senderId, otherId)))
+      throw httpError(403, 'They need to accept your request before you can chat.', {
+        code: 'NOT_FRIENDS',
+      });
+  }
+}
+
+/**
  * Single entry point for creating a message — used by both the socket handler
  * and the REST fallback so behaviour can never drift between them.
  *
@@ -61,17 +85,7 @@ export async function createMessage({ conversationId, senderId, payload, system 
    * something to accept *from*, and so a rejected sender can still see the
    * chat they are waiting on rather than a dead end.
    */
-  if (convo.type === 'direct' && !system) {
-    const otherId = (await C.memberIdsOf(convo.id, senderId))[0];
-    if (otherId) {
-      if (await blockExistsBetween(senderId, otherId))
-        throw httpError(403, 'You cannot message this person.');
-      if (!(await areFriends(senderId, otherId)))
-        throw httpError(403, 'They need to accept your request before you can chat.', {
-          code: 'NOT_FRIENDS',
-        });
-    }
-  }
+  if (!system) await assertMayReach(convo, senderId);
 
   // A thread reply must belong to a real root in this same conversation, and
   // threads are one level deep on purpose — nesting turns a chat into a forum.
@@ -114,7 +128,9 @@ export async function createMessage({ conversationId, senderId, payload, system 
     return { message, conversation: convo, scheduled: true };
   }
 
-  await deliver({ message, convo, senderId, threadRoot });
+  // `system` has to travel with it: deliver re-checks, and an admin
+  // announcement would otherwise be refused at the last step.
+  await deliver({ message, convo, senderId, threadRoot, system });
   return { message, conversation: convo };
 }
 
@@ -122,7 +138,17 @@ export async function createMessage({ conversationId, senderId, payload, system 
  * Everything that happens the moment a message becomes real: counters, fan-out,
  * receipts, push. Split out so the scheduler can reuse it verbatim.
  */
-export async function deliver({ message, convo, senderId, threadRoot }) {
+export async function deliver({ message, convo, senderId, threadRoot, system = false }) {
+  /**
+   * Re-checked here, not only at creation.
+   *
+   * The scheduler calls `deliver` directly, so a message scheduled a month
+   * ahead was delivered no matter what happened in between — unfriending or
+   * blocking the sender did not stop it. The check has to sit where the
+   * message actually reaches someone, which is here.
+   */
+  if (!system) await assertMayReach(convo, senderId);
+
   if (threadRoot) {
     // Thread replies bump the thread, not the main stream.
     await M.bumpThread(threadRoot.id);
@@ -166,6 +192,17 @@ export async function deliver({ message, convo, senderId, threadRoot }) {
   for (const member of convo.members) {
     const uid = String(member.user?.id || member.user);
     if (uid === String(senderId) || member.muted || isOnline(uid)) continue;
+
+    /**
+     * A locked chat gets no push at all.
+     *
+     * This was the worst of the lock's leaks, because it fires precisely when
+     * the person is *not* looking — the message text landing on a lock screen
+     * in front of whoever else is in the room, which is the exact situation
+     * the feature exists to prevent. Sending a contentless "New message" was
+     * tempting, but even that tells a bystander the locked chat is active.
+     */
+    if (member.locked && member.lockHash) continue;
 
     const recipient = await findUserById(uid);
     if (isQuietNow(recipient?.quietHours)) continue; // it'll be there in the morning

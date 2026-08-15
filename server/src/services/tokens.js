@@ -10,11 +10,14 @@ export function signRefresh(userId) {
 }
 
 export function verifyAccess(token) {
-  return jwt.verify(token, env.accessSecret);
+  // Pin the algorithm. With a string secret jsonwebtoken already refuses
+  // `alg: none`, but that guarantee quietly disappears if the secret ever
+  // becomes a KeyObject, and the cost of being explicit is nothing.
+  return jwt.verify(token, env.accessSecret, { algorithms: ['HS256'] });
 }
 
 export function verifyRefresh(token) {
-  return jwt.verify(token, env.refreshSecret);
+  return jwt.verify(token, env.refreshSecret, { algorithms: ['HS256'] });
 }
 
 export const REFRESH_COOKIE = 'nook_rt';

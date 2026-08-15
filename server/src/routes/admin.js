@@ -45,9 +45,9 @@ const clientIp = (req) => (req.headers['x-forwarded-for'] || req.ip || '').toStr
 /* ── who is allowed ───────────────────────────────────────────────────────── */
 
 /**
- * The Google identity that may administer this instance. Configured, not
- * hardcoded, so it can be changed without a deploy — but defaulted, so a fresh
- * clone is not silently wide open with an empty allowlist.
+ * The Google identities that may administer this instance. Configured, with
+ * no default: an empty allowlist is closed, so an unconfigured instance has no
+ * Google administrator at all, which is the safe direction.
  */
 const adminEmails = () =>
   (env.admin.emails || '')
@@ -145,7 +145,7 @@ function requireAdmin(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Not signed in.' });
 
   try {
-    const payload = jwt.verify(token, adminSecret());
+    const payload = jwt.verify(token, adminSecret(), { algorithms: ['HS256'] });
     if (!payload.adm) throw new Error('not an admin token');
     req.admin = { actor: payload.actor };
     next();

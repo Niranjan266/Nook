@@ -9,6 +9,7 @@ import { httpError } from '../middleware/error.js';
 import { serializeConversation } from '../lib/serialize.js';
 import { emitToConversation, emitToUser } from '../sockets/hub.js';
 import { systemMessage } from '../services/messages.js';
+import * as F from '../db/friends.js';
 import { hash as hashSecret, verify as verifySecret } from '../services/password.js';
 import { grantUnlock, hasUnlock, revokeUnlock } from '../lib/lockgrants.js';
 
@@ -23,6 +24,30 @@ const load = async (id, userId) => {
   if (!convo) throw httpError(404, 'That conversation is not yours, or does not exist.');
   return convo;
 };
+
+/**
+ * You may only add people who have accepted you.
+ *
+ * Friend gating covered direct chats and nothing else, which made a two-person
+ * group an ungated DM: `POST /conversations/group` took an arbitrary
+ * `memberIds`, and `createMessage` exempts groups from both the friendship and
+ * the block check. A stranger — or someone you had blocked — could message you
+ * freely by naming the room. The rule has to be about consent to be contacted,
+ * so it belongs wherever someone is added to a room, not only in direct chats.
+ */
+async function assertMayAdd(actor, ids) {
+  for (const id of ids) {
+    if (String(id) === String(actor.id)) continue;
+    const person = await U.findUserById(id);
+    if (!person) throw httpError(404, 'No such person.');
+    if (await U.blockExistsBetween(actor.id, person.id))
+      throw httpError(403, `You cannot add ${person.displayName}.`);
+    if (!(await F.areFriends(actor.id, person.id)))
+      throw httpError(403, `${person.displayName} has to accept your request first.`, {
+        code: 'NOT_FRIENDS',
+      });
+  }
+}
 
 const isAdmin = (convo, userId) =>
   convo.members.find((m) => String(m.user?.id || m.user) === String(userId))?.role === 'admin';
@@ -81,6 +106,7 @@ router.post(
       .parse(req.body);
 
     const unique = [...new Set(memberIds.filter((id) => id !== req.user.id))];
+    await assertMayAdd(req.user, unique);
 
     const convo = await C.createConversation({
       type: 'group',
@@ -130,6 +156,7 @@ router.post(
 
     const existing = new Set(convo.members.map((m) => String(m.user?.id || m.user)));
     const added = memberIds.filter((id) => !existing.has(String(id)));
+    await assertMayAdd(req.user, added);
     for (const id of added) await C.addMember(convo.id, id);
 
     const fresh = await C.findConversation(convo.id);
@@ -212,7 +239,11 @@ router.patch(
         muted: z.boolean().optional(),
         archived: z.boolean().optional(),
         pinned: z.boolean().optional(),
-        locked: z.boolean().optional(),
+        // `locked` is deliberately NOT here. It used to be, which made the
+        // whole feature a formality: PATCH /prefs {"locked":false} cleared the
+        // flag while the hash stayed in the row, and every gate tests
+        // `locked && lockHash`. One request, no code, full history. Locking and
+        // unlocking now live only on /lock, where they have to prove the code.
         draft: z.string().max(4000).optional(),
         sound: z.enum(['default', 'knock', 'pebble', 'chime', 'wood', 'hush', 'none']).optional(),
       })
@@ -295,7 +326,14 @@ router.put(
       return res.json({ conversation: serializeConversation(mine, req.user.id) });
     }
 
-    const force = req.query.force === '1' || convo.type === 'group' || convo.members.length === 1;
+    /**
+     * `?force=1` used to skip the consent flow, which meant the flow was
+     * decorative: anyone could set the shared wallpaper of a chat by adding
+     * five characters to the URL. A direct chat with two people always asks;
+     * "just me" is the escape hatch, and it is an honest one because it
+     * changes nothing for the other person.
+     */
+    const force = convo.type === 'group' || convo.members.length === 1;
 
     if (force) {
       if (convo.type === 'group' && !isAdmin(convo, req.user.id))

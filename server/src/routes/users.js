@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import * as U from '../db/users.js';
 import * as F from '../db/friends.js';
@@ -14,12 +15,47 @@ const router = Router();
 router.use(requireAuth);
 
 /**
+ * Friend requests, nudges and search were the only user-facing surfaces with
+ * no limiter at all. Each request fires a push notification at a stranger of
+ * the sender's choosing, and declining is silent by design — so the sender got
+ * no feedback and no ceiling. That combination is a harassment tool.
+ */
+const reachLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'That is a lot of requests. Try again later.' },
+});
+
+const searchLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Slow down a moment.' },
+});
+
+/**
  * `nicks` is the viewer's private rename map. Passing it here keeps these
  * responses consistent with everything `serialize.js` produces — a person you
  * have renamed reads the same in search results as in the chat header.
  */
-const publicUser = (u, extra = {}, nicks = {}) => {
+const publicUser = (u, extra = {}, nicks = {}, viewer = null) => {
   const nickname = nicks[u.id] || '';
+
+  /**
+   * `GET /users/:id` honoured `privacy.lastSeen` and `privacy.avatar`; this
+   * shape — used by search, contacts, friends and the request list — ignored
+   * both. Search was therefore a stronger leak than the profile it linked to:
+   * it published online status and last-seen for people who had set them to
+   * "contacts" or even "nobody". `viewer` is what makes the rule applicable;
+   * without it, assume no relationship rather than full disclosure.
+   */
+  const isContact = extra.isContact ?? (viewer ? viewer.contacts?.includes(u.id) : false);
+  const allow = (rule) => rule === 'everyone' || (rule === 'contacts' && isContact);
+  const seeLastSeen = allow(u.privacy?.lastSeen || 'contacts');
+
   return {
     id: u.id,
     username: u.username,
@@ -27,11 +63,11 @@ const publicUser = (u, extra = {}, nicks = {}) => {
     displayName: nickname || u.displayName,
     realName: u.displayName,
     nickname,
-    avatarUrl: u.avatarUrl,
+    avatarUrl: allow(u.privacy?.avatar || 'everyone') ? u.avatarUrl : '',
     about: u.about,
     accent: u.accent,
-    online: u.online,
-    lastSeen: u.lastSeen,
+    online: seeLastSeen ? u.online : false,
+    lastSeen: seeLastSeen ? u.lastSeen : null,
     ...extra,
   };
 };
@@ -61,6 +97,7 @@ async function friendship(meId, otherId) {
 
 router.get(
   '/search',
+  searchLimit,
   asyncRoute(async (req, res) => {
     const q = String(req.query.q || '').trim();
     if (q.length < 2) return res.json({ users: [] });
@@ -338,6 +375,7 @@ router.get(
 
 router.post(
   '/:id/friend',
+  reachLimit,
   asyncRoute(async (req, res) => {
     const { note } = z.object({ note: z.string().trim().max(200).optional() }).parse(req.body || {});
     if (req.params.id === req.user.id) throw httpError(400, 'You are already your own friend.');

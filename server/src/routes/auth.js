@@ -13,6 +13,7 @@ import {
   attachSession,
   readRefreshToken,
 } from '../services/tokens.js';
+import { revokeAllFor } from '../lib/lockgrants.js';
 import { sendRecoveryCode, sendEmailVerification, sendWelcome, mailProvider } from '../services/mail.js';
 
 const router = Router();
@@ -164,6 +165,24 @@ router.post(
     const user = await U.findUserById(payload.sub);
     if (!user) throw httpError(401, 'Account no longer exists.');
 
+    /**
+     * The same two checks `requireAuth` makes, because this is the other door.
+     *
+     * `bumpTokenEpoch` refuses access tokens issued before the moment someone
+     * was signed out — but the refresh token is a stateless 30-day JWT that
+     * nothing invalidated, so the sign-out lasted exactly until the next
+     * refresh, which the app performs automatically at boot. "Sign out
+     * everywhere" and "suspend" were both effectively decorative.
+     */
+    if (user.suspended) {
+      clearRefreshCookie(res);
+      throw httpError(403, 'This account has been suspended.', { code: 'SUSPENDED' });
+    }
+    if (user.tokenEpoch && (payload.iat + 1) * 1000 <= user.tokenEpoch) {
+      clearRefreshCookie(res);
+      throw httpError(401, 'Signed out. Please sign in again.', { code: 'TOKEN_EXPIRED' });
+    }
+
     const session = attachSession(req, res, user.id);
     res.json({ user: await me(user), accessToken: signAccess(user.id), ...session });
   })
@@ -171,6 +190,19 @@ router.post(
 
 router.post('/logout', (req, res) => {
   clearRefreshCookie(res);
+  // Signing out must close any chat left unlocked, or signing back in within
+  // the fifteen-minute window walks straight into it. `revokeAllFor` existed
+  // and its doc comment promised this; nothing was calling it.
+  const token = req.headers.authorization?.startsWith('Bearer ')
+    ? req.headers.authorization.slice(7)
+    : null;
+  if (token) {
+    try {
+      revokeAllFor(verifyAccess(token).sub);
+    } catch {
+      /* an expired token has no grants worth keeping anyway */
+    }
+  }
   res.json({ ok: true });
 });
 
@@ -274,17 +306,56 @@ router.post(
   })
 );
 
+/**
+ * Guessing a six-digit code is 10^6 tries; unlimited guesses make that an
+ * afternoon. It mattered more than it looks: a verified email is what Google
+ * sign-in links accounts by, so brute-forcing a verification code for someone
+ * else's address, then waiting for them to "Continue with Google", handed
+ * their identity to the guesser's account. Both a limiter and a burn-after-
+ * five, because a limiter alone just slows the same attack down.
+ */
+const verifyLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Wait fifteen minutes.' },
+});
+
+/**
+ * Wrong guesses per account. After five the code is destroyed, so the attacker
+ * has to make the real owner request a new one — which is noise the owner can
+ * see, and the point at which an attack stops being silent.
+ */
+const codeMisses = new Map();
+const MISS_LIMIT = 5;
+
+async function wrongCode(userId) {
+  const n = (codeMisses.get(userId) || 0) + 1;
+  codeMisses.set(userId, n);
+  if (n >= MISS_LIMIT) {
+    codeMisses.delete(userId);
+    await U.updateUser(userId, { recovery: { code: '', expiresAt: null } });
+    throw httpError(429, 'Too many wrong codes. Ask for a new one.');
+  }
+  throw httpError(400, 'That code is not right.');
+}
+
+const rightCode = (userId) => codeMisses.delete(userId);
+
 router.post(
   '/email/verify',
+  verifyLimit,
   requireAuth,
   asyncRoute(async (req, res) => {
     const { code } = z.object({ code: z.string().trim().length(6, 'Six digits, please.') }).parse(req.body);
     const user = await U.findUserById(req.user.id);
 
-    if (!user.recovery?.code || user.recovery.code !== code) throw httpError(400, 'That code is not right.');
+    if (!user.recovery?.code || user.recovery.code !== code) await wrongCode(user.id);
     if (!user.recovery.expiresAt || user.recovery.expiresAt < Date.now())
       throw httpError(400, 'That code has expired.');
 
+    rightCode(user.id);
     const updated = await U.updateUser(user.id, {
       emailVerified: true,
       recovery: { code: '', expiresAt: null },
@@ -324,10 +395,14 @@ router.post(
       .parse(req.body);
 
     const user = await U.findUserByUsername(username);
-    if (!user?.recovery?.code || user.recovery.code !== code) throw httpError(400, 'That code is not right.');
+    // Same burn-after-five as email verification. This one resets a password,
+    // so unlimited guessing here is a straightforward account takeover.
+    if (!user) throw httpError(400, 'That code is not right.');
+    if (!user.recovery?.code || user.recovery.code !== code) await wrongCode(user.id);
     if (!user.recovery.expiresAt || user.recovery.expiresAt < Date.now())
       throw httpError(400, 'That code has expired.');
 
+    rightCode(user.id);
     const updated = await U.updateUser(user.id, {
       passwordHash: await hashPassword(password),
       recovery: { code: '', expiresAt: null },
