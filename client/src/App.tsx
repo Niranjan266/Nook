@@ -33,7 +33,6 @@ import MediaSheet from '@/features/sheets/MediaSheet';
 import ThreadPanel from '@/features/chat/ThreadPanel';
 
 import { registerServiceWorker } from '@/lib/push';
-import { setToken } from '@/lib/api';
 import { IMPERSONATE_KEY } from '@/lib/adminApi';
 import { initTitle, watchFocus, onBanner } from '@/lib/notify';
 import MessageBanner, { type BannerMessage } from '@/components/MessageBanner';
@@ -133,11 +132,13 @@ function Nook() {
      * instant it is read — it is single-use by construction.
      */
     const handed = sessionStorage.getItem(IMPERSONATE_KEY);
-    if (handed) {
-      sessionStorage.removeItem(IMPERSONATE_KEY);
-      setToken(handed);
-    }
-    init();
+    if (handed) sessionStorage.removeItem(IMPERSONATE_KEY);
+
+    // Passed *into* init rather than set beside it. Setting the token first
+    // and calling init() separately looked equivalent and was not: init's
+    // first act is a refresh, which cleared the token on failure and replaced
+    // it with the previous account's on success.
+    init(handed);
     registerServiceWorker();
     initTitle();
     return watchFocus();

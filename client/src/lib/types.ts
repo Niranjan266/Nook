@@ -52,6 +52,11 @@ export interface Me extends Omit<Person, 'quietHours'> {
     badgeCount: boolean;
     voiceSpeed: number;
     skipSilence: boolean;
+    /** What a notification may say, and which ones are worth sending at all. */
+    notifyPreview?: boolean;
+    notifyRequests?: boolean;
+    notifyReactions?: boolean;
+    notifyGroups?: boolean;
   };
   contacts: string[];
   blocked: string[];
@@ -274,6 +279,10 @@ export interface Conversation {
   archived: boolean;
   pinned: boolean;
   locked: boolean;
+  /** Which keypad to show. Empty when the chat is not locked. */
+  lockKind: '' | 'pin' | 'pattern';
+  /** True once the code has been entered, until the server's grant lapses. */
+  lockOpen: boolean;
   draft: string;
   lastReadAt: string | null;
   myRole: 'member' | 'admin';

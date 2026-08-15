@@ -64,6 +64,12 @@ interface ChatState {
   createGroup: (input: { name: string; memberIds: string[]; description?: string }) => Promise<string>;
   updatePrefs: (conversationId: string, prefs: Record<string, unknown>) => Promise<void>;
   setDisappearing: (conversationId: string, seconds: number) => Promise<void>;
+  /** Chat lock. `code` is a PIN's digits or a pattern's dot sequence. */
+  setLock: (conversationId: string, kind: 'pin' | 'pattern', code: string, currentCode?: string) => Promise<void>;
+  removeLock: (conversationId: string, code: string) => Promise<void>;
+  unlockChat: (conversationId: string, code: string) => Promise<void>;
+  closeLock: (conversationId: string) => Promise<void>;
+
   setWallpaper: (
     conversationId: string,
     wallpaper: Record<string, unknown>,
@@ -465,6 +471,40 @@ export const useChat = create<ChatState>((set, get) => ({
       { seconds }
     );
     get().onConversation(conversation);
+  },
+
+  async setLock(conversationId, kind, code, currentCode) {
+    const { conversation } = await put<{ conversation: Conversation }>(
+      `/conversations/${conversationId}/lock`,
+      { kind, code, ...(currentCode ? { currentCode } : {}) }
+    );
+    get().onConversation(conversation);
+  },
+
+  async removeLock(conversationId, code) {
+    const { conversation } = await del<{ conversation: Conversation }>(
+      `/conversations/${conversationId}/lock`,
+      { code }
+    );
+    get().onConversation(conversation);
+  },
+
+  async unlockChat(conversationId, code) {
+    const { conversation } = await post<{ conversation: Conversation }>(
+      `/conversations/${conversationId}/lock/verify`,
+      { code }
+    );
+    get().onConversation(conversation);
+    // The history was refused while it was shut, so there is nothing cached
+    // to show — fetch it now that the server will hand it over.
+    await get().loadMessages(conversationId);
+  },
+
+  async closeLock(conversationId) {
+    await post(`/conversations/${conversationId}/lock/close`);
+    // Re-fetch so the preview disappears from the list at the same moment the
+    // chat closes, rather than lingering until something else refreshes it.
+    await get().loadConversations();
   },
 
   async setWallpaper(conversationId, wallpaper, force, scope) {

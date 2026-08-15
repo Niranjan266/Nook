@@ -168,6 +168,10 @@ router.patch(
             badgeCount: z.boolean().optional(),
             voiceSpeed: z.number().min(0.5).max(3).optional(),
             skipSilence: z.boolean().optional(),
+            notifyPreview: z.boolean().optional(),
+            notifyRequests: z.boolean().optional(),
+            notifyReactions: z.boolean().optional(),
+            notifyGroups: z.boolean().optional(),
           })
           .optional(),
       })
@@ -369,12 +373,14 @@ router.post(
     });
 
     // A request nobody sees is a request that never happened. Push reaches the
-    // person who is not currently looking at Nook, which is most of them.
-    notify(person.id, {
-      title: `${req.user.displayName} wants to chat`,
-      body: note || 'Tap to accept or decline.',
-      data: { kind: 'friend-request', userId: req.user.id },
-    }).catch(() => {});
+    // person who is not currently looking at Nook, which is most of them —
+    // unless they have said they would rather not hear about requests.
+    if (person.settings?.notifyRequests !== false)
+      notify(person.id, {
+        title: `${req.user.displayName} wants to chat`,
+        body: note || 'Tap to accept or decline.',
+        data: { kind: 'friend-request', userId: req.user.id },
+      }).catch(() => {});
 
     res.status(201).json({ friendship: 'sent' });
   })

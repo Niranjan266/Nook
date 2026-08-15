@@ -8,6 +8,7 @@ import { serializeMessage } from '../lib/serialize.js';
 import { emitToConversation, emitToUser } from '../sockets/hub.js';
 import { createMessage, markRead } from '../services/messages.js';
 import { destroy } from '../services/media.js';
+import { hasUnlock } from '../lib/lockgrants.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -15,6 +16,20 @@ router.use(requireAuth);
 const mustBeMember = async (conversationId, userId) => {
   const convo = await C.findConversationForUser(conversationId, userId);
   if (!convo) throw httpError(404, 'That conversation is not yours.');
+  return convo;
+};
+
+/**
+ * A locked chat must refuse to hand over its history until the code has been
+ * entered. Hiding it only in the UI would make the lock decoration — the
+ * messages would still be one request away, which is not a lock, it is a
+ * curtain.
+ */
+const mustBeUnlocked = async (conversationId, userId) => {
+  const convo = await mustBeMember(conversationId, userId);
+  const mine = convo.members.find((m) => String(m.user?.id || m.user) === String(userId));
+  if (mine?.locked && mine?.lockHash && !hasUnlock(userId, String(convo.id)))
+    throw httpError(403, 'This chat is locked.', { code: 'CHAT_LOCKED' });
   return convo;
 };
 
@@ -35,7 +50,7 @@ async function broadcast(message, event) {
 router.get(
   '/:conversationId',
   asyncRoute(async (req, res) => {
-    await mustBeMember(req.params.conversationId, req.user.id);
+    await mustBeUnlocked(req.params.conversationId, req.user.id);
     const limit = Math.min(Number(req.query.limit) || 40, 100);
 
     const messages = await M.listMessages({
@@ -188,7 +203,7 @@ router.get(
 router.get(
   '/media/:conversationId',
   asyncRoute(async (req, res) => {
-    await mustBeMember(req.params.conversationId, req.user.id);
+    await mustBeUnlocked(req.params.conversationId, req.user.id);
     const messages = await M.listMediaFor(req.params.conversationId);
     res.json({ messages: messages.map((m) => serializeMessage(m, req.user.id)) });
   })

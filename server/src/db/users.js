@@ -139,6 +139,19 @@ const DEFAULT_SETTINGS = {
   badgeCount: false,
   voiceSpeed: 1,
   skipSilence: false,
+
+  /**
+   * Notification preferences.
+   *
+   * Defaults are what a new person would expect rather than what is quietest:
+   * previews on, because a notification with no content is a notification you
+   * have to open to learn anything from; reactions off, because a thumbs-up is
+   * not worth a buzz.
+   */
+  notifyPreview: true,
+  notifyRequests: true,
+  notifyReactions: false,
+  notifyGroups: true,
 };
 const DEFAULT_QUIET = {
   enabled: false,

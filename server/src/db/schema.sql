@@ -455,3 +455,16 @@ CREATE TABLE IF NOT EXISTS app_meta (
   value TEXT NOT NULL DEFAULT '',
   at    INTEGER NOT NULL
 );
+
+-- ─── Chat lock ──────────────────────────────────────────────────────────────
+--
+-- A code per person per chat, so "locked" means locked for you: the other
+-- person's copy of the same conversation is unaffected, and neither of you
+-- learns the other has locked it. Lives on the membership beside `muted` and
+-- `wallpaper` for exactly that reason.
+--
+-- `lock_kind` is 'pin' or 'pattern'. A pattern is stored as the dot sequence
+-- it traces ("0,1,2,5,8"), so both kinds are just a short string and the
+-- hashing, verification and rate limiting are identical for both.
+ALTER TABLE conversation_members ADD COLUMN lock_hash TEXT NOT NULL DEFAULT '';
+ALTER TABLE conversation_members ADD COLUMN lock_kind TEXT NOT NULL DEFAULT '';

@@ -1465,3 +1465,89 @@
     flex: 1;
   }
 }
+
+/* ── chat lock: PIN pad and pattern grid ─────────────────────────────────── */
+
+.code-entry {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.pin-dots {
+  display: flex;
+  gap: 10px;
+}
+.pin-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: var(--r-pill);
+  background: var(--clay-sunk);
+  box-shadow: var(--clay-in);
+  transition:
+    background var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+.pin-dot.on {
+  background: var(--accent);
+  box-shadow: none;
+  transform: scale(1.12);
+}
+
+.pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+.pin-key {
+  height: 56px;
+  font-size: 1.22rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pattern-pad {
+  position: relative;
+  border-radius: var(--r-clay-lg);
+  background: var(--clay-sunk);
+  box-shadow: var(--clay-in);
+  /* Without this a drag on the grid scrolls the sheet instead of drawing. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pattern-dot {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: var(--r-pill);
+  background: var(--clay-surface);
+  box-shadow: var(--clay-1);
+  transition:
+    background var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+  pointer-events: none;
+}
+.pattern-dot.on {
+  background: var(--accent);
+  transform: scale(1.35);
+}
+
+/* The gate that replaces a locked conversation entirely. */
+.lock-gate {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: var(--s-5);
+}
+
+/* The lock setup detour, shown over the info sheet rather than as a second
+   sheet — a sheet on a sheet is one gesture from closing both. */
+.lock-flow {
+  margin-top: var(--s-3);
+  padding: var(--s-4);
+  border-radius: var(--r-clay);
+  background: var(--clay-raised);
+  box-shadow: var(--clay-2);
+}

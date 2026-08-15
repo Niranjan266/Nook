@@ -24,8 +24,14 @@ export const preview = (m) => {
 /**
  * Single entry point for creating a message — used by both the socket handler
  * and the REST fallback so behaviour can never drift between them.
+ *
+ * `system` is for messages the server itself sends: an admin announcement from
+ * the Nook account. Those have no friendship to check, and requiring one would
+ * mean nobody could be told anything until they had befriended a robot. It is
+ * a named parameter rather than a special-cased sender id so the exemption is
+ * visible at every call site that uses it.
  */
-export async function createMessage({ conversationId, senderId, payload }) {
+export async function createMessage({ conversationId, senderId, payload, system = false }) {
   const convo = await C.findConversationForUser(conversationId, senderId);
   if (!convo) throw httpError(404, 'That conversation is not yours.');
 
@@ -55,7 +61,7 @@ export async function createMessage({ conversationId, senderId, payload }) {
    * something to accept *from*, and so a rejected sender can still see the
    * chat they are waiting on rather than a dead end.
    */
-  if (convo.type === 'direct') {
+  if (convo.type === 'direct' && !system) {
     const otherId = (await C.memberIdsOf(convo.id, senderId))[0];
     if (otherId) {
       if (await blockExistsBetween(senderId, otherId))
@@ -164,9 +170,22 @@ export async function deliver({ message, convo, senderId, threadRoot }) {
     const recipient = await findUserById(uid);
     if (isQuietNow(recipient?.quietHours)) continue; // it'll be there in the morning
 
+    const prefs = recipient?.settings || {};
+    if (convo.type === 'group' && prefs.notifyGroups === false) continue;
+
+    /**
+     * Previews off means the notification says who, not what.
+     *
+     * The alternative — dropping the notification entirely — would be a worse
+     * reading of the setting: people turn previews off because a message can
+     * appear on a lock screen in front of other people, not because they stop
+     * wanting to know someone wrote to them.
+     */
+    const showPreview = prefs.notifyPreview !== false;
+
     notify(uid, {
       title: convo.type === 'group' ? `${sender.displayName} · ${convo.name}` : sender.displayName,
-      body: preview(message),
+      body: showPreview ? preview(message) : 'New message',
       tag: `convo-${convo.id}`,
       conversationId: String(convo.id),
       messageId: String(message.id),

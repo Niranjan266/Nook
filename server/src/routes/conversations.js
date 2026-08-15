@@ -9,6 +9,8 @@ import { httpError } from '../middleware/error.js';
 import { serializeConversation } from '../lib/serialize.js';
 import { emitToConversation, emitToUser } from '../sockets/hub.js';
 import { systemMessage } from '../services/messages.js';
+import { hash as hashSecret, verify as verifySecret } from '../services/password.js';
+import { grantUnlock, hasUnlock, revokeUnlock } from '../lib/lockgrants.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -421,5 +423,178 @@ router.delete(
     res.json({ ok: true });
   })
 );
+
+
+/* ── chat lock ────────────────────────────────────────────────────────────── */
+
+/**
+ * A PIN is 4-6 digits. A pattern is the sequence of dots it traces, as indices
+ * 0-8 with no repeats and at least four of them — the same rule Android uses,
+ * and for the same reason: a three-dot pattern has 400-odd possibilities.
+ *
+ * Both arrive as a short string, so everything downstream — hashing, checking,
+ * counting failures — treats them identically and cannot drift apart.
+ */
+const PIN_RE = /^[0-9]{4,6}$/;
+
+function normaliseCode(kind, raw) {
+  const code = String(raw ?? '').trim();
+  if (kind === 'pin') {
+    if (!PIN_RE.test(code)) throw httpError(400, 'A PIN is 4 to 6 digits.');
+    return code;
+  }
+  if (kind === 'pattern') {
+    const dots = code.split(',').map((d) => d.trim()).filter(Boolean);
+    if (dots.length < 4) throw httpError(400, 'Join at least four dots.');
+    if (dots.some((d) => !/^[0-8]$/.test(d))) throw httpError(400, 'That pattern is not valid.');
+    if (new Set(dots).size !== dots.length) throw httpError(400, 'That pattern reuses a dot.');
+    return dots.join(',');
+  }
+  throw httpError(400, 'Choose a PIN or a pattern.');
+}
+
+const myMembership = (convo, userId) =>
+  convo.members.find((m) => String(m.user?.id || m.user) === String(userId));
+
+/**
+ * Wrong codes are counted per person per chat, in memory.
+ *
+ * bcrypt on a four-digit PIN is ten thousand guesses for anyone who ever gets
+ * the hash, so the honest defence is refusing to be asked quickly. This is not
+ * a claim that the lock resists an attacker with the database; it is a claim
+ * that it resists someone holding the unlocked phone, which is who the feature
+ * is actually for.
+ */
+const failures = new Map();
+const FAIL_LIMIT = 5;
+const FAIL_WINDOW = 5 * 60 * 1000;
+
+function noteFailure(userId, convoId) {
+  const k = `${userId}:${convoId}`;
+  const now = Date.now();
+  const rec = failures.get(k);
+  if (!rec || now > rec.until) failures.set(k, { n: 1, until: now + FAIL_WINDOW });
+  else rec.n += 1;
+}
+
+function tooManyFailures(userId, convoId) {
+  const rec = failures.get(`${userId}:${convoId}`);
+  if (!rec) return 0;
+  if (Date.now() > rec.until) {
+    failures.delete(`${userId}:${convoId}`);
+    return 0;
+  }
+  return rec.n >= FAIL_LIMIT ? Math.ceil((rec.until - Date.now()) / 1000) : 0;
+}
+
+const clearFailures = (userId, convoId) => failures.delete(`${userId}:${convoId}`);
+
+/** Turn the lock on, or change the code. Changing it requires the old one. */
+router.put(
+  '/:id/lock',
+  asyncRoute(async (req, res) => {
+    const { kind, code, currentCode } = z
+      .object({
+        kind: z.enum(['pin', 'pattern']),
+        code: z.string().min(1),
+        currentCode: z.string().optional(),
+      })
+      .parse(req.body);
+
+    const convo = await load(req.params.id, req.user.id);
+    const mine = myMembership(convo, req.user.id);
+
+    // Already locked? Prove you can open it before you can change it.
+    if (mine?.lockHash) {
+      const wait = tooManyFailures(req.user.id, convo.id);
+      if (wait) throw httpError(429, `Too many tries. Wait ${wait}s.`);
+      const okOld = await verifySecret(mine.lockHash, String(currentCode || '')).catch(() => false);
+      if (!okOld) {
+        noteFailure(req.user.id, convo.id);
+        throw httpError(403, 'That is not the current code.');
+      }
+    }
+
+    const normalised = normaliseCode(kind, code);
+    await C.updateMemberPrefs(convo.id, req.user.id, {
+      locked: true,
+      lockKind: kind,
+      lockHash: await hashSecret(normalised),
+    });
+
+    clearFailures(req.user.id, convo.id);
+    // Setting a code closes the chat now, rather than leaving it open until
+    // the old grant runs out — which would look like the lock did nothing.
+    revokeUnlock(req.user.id, convo.id);
+
+    const fresh = await C.findConversation(convo.id);
+    res.json({ conversation: serializeConversation(fresh, req.user.id) });
+  })
+);
+
+/** Take the lock off. Needs the code — otherwise it is not a lock. */
+router.delete(
+  '/:id/lock',
+  asyncRoute(async (req, res) => {
+    const { code } = z.object({ code: z.string().min(1) }).parse(req.body || {});
+    const convo = await load(req.params.id, req.user.id);
+    const mine = myMembership(convo, req.user.id);
+    if (!mine?.lockHash) return res.json({ conversation: serializeConversation(convo, req.user.id) });
+
+    const wait = tooManyFailures(req.user.id, convo.id);
+    if (wait) throw httpError(429, `Too many tries. Wait ${wait}s.`);
+
+    const ok = await verifySecret(mine.lockHash, String(code)).catch(() => false);
+    if (!ok) {
+      noteFailure(req.user.id, convo.id);
+      throw httpError(403, 'That code is not right.');
+    }
+
+    await C.updateMemberPrefs(convo.id, req.user.id, { locked: false, lockKind: '', lockHash: '' });
+    clearFailures(req.user.id, convo.id);
+    revokeUnlock(req.user.id, convo.id);
+
+    const fresh = await C.findConversation(convo.id);
+    res.json({ conversation: serializeConversation(fresh, req.user.id) });
+  })
+);
+
+/** Enter the code to read the chat. Grants a short-lived unlock. */
+router.post(
+  '/:id/lock/verify',
+  asyncRoute(async (req, res) => {
+    const { code } = z.object({ code: z.string().min(1) }).parse(req.body || {});
+    const convo = await load(req.params.id, req.user.id);
+    const mine = myMembership(convo, req.user.id);
+    if (!mine?.lockHash) {
+      grantUnlock(req.user.id, convo.id);
+      return res.json({ ok: true, conversation: serializeConversation(convo, req.user.id) });
+    }
+
+    const wait = tooManyFailures(req.user.id, convo.id);
+    if (wait) throw httpError(429, `Too many tries. Wait ${wait}s.`);
+
+    const ok = await verifySecret(mine.lockHash, String(code)).catch(() => false);
+    if (!ok) {
+      noteFailure(req.user.id, convo.id);
+      throw httpError(403, 'That code is not right.');
+    }
+
+    clearFailures(req.user.id, convo.id);
+    grantUnlock(req.user.id, convo.id);
+    const fresh = await C.findConversation(convo.id);
+    res.json({ ok: true, conversation: serializeConversation(fresh, req.user.id) });
+  })
+);
+
+/** Close it again by hand, without waiting for the grant to lapse. */
+router.post(
+  '/:id/lock/close',
+  asyncRoute(async (req, res) => {
+    revokeUnlock(req.user.id, req.params.id);
+    res.json({ ok: true });
+  })
+);
+
 
 export default router;

@@ -196,3 +196,9 @@ time,
     scroll-behavior: auto !important;
   }
 }
+
+/* Text that reports a problem. Colour alone never carries the meaning — the
+   wording always says what went wrong too. */
+.bad {
+  color: var(--rust);
+}

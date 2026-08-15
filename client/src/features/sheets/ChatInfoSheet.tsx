@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useChat, selectActive } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
@@ -8,7 +8,8 @@ import { post, put, del } from '@/lib/api';
 import { disappearLabel, lastSeenLabel } from '@/lib/format';
 import { SOUNDS, previewSound } from '@/lib/sounds';
 import { exportConversation } from '@/lib/export';
-import type { Person } from '@/lib/types';
+import CodeEntry from '@/components/CodeEntry';
+import type { Person, Conversation as Convo } from '@/lib/types';
 import {
   IconWall,
   IconDownload,
@@ -27,6 +28,7 @@ import {
   IconStar,
   IconPlus,
   IconCheck,
+  IconRefresh,
 } from '@/components/Icon';
 
 const TIMERS = [0, 3600, 86400, 604800, 2592000];
@@ -42,6 +44,7 @@ export default function ChatInfoSheet() {
   const [renaming, setRenaming] = useState(false);
   const [nickDraft, setNickDraft] = useState('');
   const [savingNick, setSavingNick] = useState(false);
+  const [lockStep, setLockStep] = useState<LockStep>(null);
 
   const open = sheet === 'chat-info';
   if (!conversation || !me) return null;
@@ -219,15 +222,40 @@ export default function ChatInfoSheet() {
           </span>
         </button>
 
-        <button className="list-row" onClick={() => toggle('locked')} aria-pressed={conversation.locked}>
+        {/*
+          Not a toggle any more. A lock has a code, so turning it on is a small
+          conversation — choose PIN or pattern, enter it twice — and turning it
+          off has to ask for the code, or it is not a lock.
+        */}
+        <button className="list-row" onClick={() => setLockStep(conversation.locked ? 'remove' : 'choose')}>
           <IconLock size={19} />
           <span className="grow">
-            <span className="list-row-label">Lock this chat</span>
-            <span className="list-row-sub">Hides the contents until you unlock it</span>
+            <span className="list-row-label">{conversation.locked ? 'Chat lock is on' : 'Lock this chat'}</span>
+            <span className="list-row-sub">
+              {conversation.locked
+                ? `Opens with your ${conversation.lockKind === 'pattern' ? 'pattern' : 'PIN'} — tap to change or remove`
+                : 'A PIN or pattern, just for this chat'}
+            </span>
           </span>
-          <span className="toggle" aria-checked={conversation.locked} role="switch" />
+          {conversation.locked && <span className="chip">On</span>}
         </button>
+
+        {conversation.locked && (
+          <button className="list-row" onClick={() => setLockStep('change')}>
+            <IconRefresh size={19} />
+            <span className="grow">
+              <span className="list-row-label">Change the code</span>
+              <span className="list-row-sub">You will need the current one first</span>
+            </span>
+          </button>
+        )}
       </div>
+
+      <LockFlow
+        conversation={conversation}
+        step={lockStep}
+        onDone={() => setLockStep(null)}
+      />
 
       {/* ── per-person notification sound ────────────────────────────── */}
       <div className="sheet-section">
@@ -462,5 +490,186 @@ export default function ChatInfoSheet() {
         )}
       </div>
     </Sheet>
+  );
+}
+
+/* ── chat lock setup ──────────────────────────────────────────────────────── */
+
+type LockStep = null | 'choose' | 'set-pin' | 'set-pattern' | 'change' | 'change-new' | 'remove';
+
+/**
+ * Turning a lock on, changing it, or taking it off.
+ *
+ * Shown over the info sheet rather than as another sheet, because it is a
+ * short detour that returns you to where you were — and because a sheet on top
+ * of a sheet is one gesture away from closing both.
+ *
+ * The new code is always asked for twice. A chat lock is the one setting where
+ * a typo is not recoverable: nobody can reset it for you, and the messages
+ * behind it are the ones you cared enough about to lock.
+ */
+function LockFlow({
+  conversation,
+  step,
+  onDone,
+}: {
+  conversation: Convo;
+  step: LockStep;
+  onDone: () => void;
+}) {
+  const { setLock, removeLock } = useChat();
+  const { toast } = useUi();
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [current, setCurrent] = useState('');
+  const [stage, setStage] = useState<LockStep>(step);
+  const [switched, setSwitched] = useState(false);
+
+  useEffect(() => {
+    setStage(step);
+    setError('');
+    setCurrent('');
+    setSwitched(false);
+  }, [step]);
+
+  if (!stage) return null;
+
+  const close = () => {
+    setStage(null);
+    onDone();
+  };
+
+  const existing = conversation.lockKind === 'pattern' ? 'pattern' : 'pin';
+
+  const run = async (fn: () => Promise<unknown>, done: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await fn();
+      toast(done);
+      close();
+    } catch (e: any) {
+      setError(e?.message || 'That did not work.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="lock-flow clay">
+      {stage === 'choose' && (
+        <div className="stack" style={{ gap: 12 }}>
+          <div className="stack" style={{ gap: 2 }}>
+            <h3 style={{ margin: 0 }}>Lock this chat</h3>
+            <p className="small muted" style={{ margin: 0 }}>
+              Only you. The other person is not told, and their copy stays open.
+            </p>
+          </div>
+          <div className="seg" role="group" aria-label="Lock type">
+            <button className="seg-item" onClick={() => setStage('set-pin')}>
+              PIN
+            </button>
+            <button className="seg-item" onClick={() => setStage('set-pattern')}>
+              Pattern
+            </button>
+          </div>
+          <p className="tiny faint" style={{ margin: 0 }}>
+            Nobody can reset this for you — not even from the admin page. Choose something you will
+            remember.
+          </p>
+          <button className="clay-btn" onClick={close}>
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {(stage === 'set-pin' || stage === 'set-pattern') && (
+        <CodeEntry
+          kind={stage === 'set-pin' ? 'pin' : 'pattern'}
+          confirm
+          error={error}
+          busy={busy}
+          hint={stage === 'set-pin' ? '4 to 6 digits.' : 'Join at least four dots.'}
+          onCancel={close}
+          onSubmit={(code) =>
+            run(
+              () => setLock(conversation.id, stage === 'set-pin' ? 'pin' : 'pattern', code),
+              'Chat locked'
+            )
+          }
+        />
+      )}
+
+      {stage === 'change' && (
+        <CodeEntry
+          kind={existing}
+          title="Current code"
+          hint="Enter the code you use now."
+          error={error}
+          busy={busy}
+          onCancel={close}
+          onSubmit={(code) => {
+            setCurrent(code);
+            setError('');
+            setStage('change-new');
+          }}
+        />
+      )}
+
+      {stage === 'change-new' && (
+        <div className="stack" style={{ gap: 12 }}>
+          <div className="seg" role="group" aria-label="New lock type">
+            <button
+              className={`seg-item${existing === 'pin' ? ' on' : ''}`}
+              onClick={() => setStage('change-new')}
+            >
+              Keep {existing === 'pin' ? 'PIN' : 'pattern'}
+            </button>
+            <button
+              className="seg-item"
+              onClick={() => {
+                // Switching kind mid-change is allowed: the old code has
+                // already been proved, which is the only thing that mattered.
+                setSwitched((v) => !v);
+              }}
+            >
+              Use a {existing === 'pin' ? 'pattern' : 'PIN'}
+            </button>
+          </div>
+          <CodeEntry
+            kind={switched ? (existing === 'pin' ? 'pattern' : 'pin') : existing}
+            confirm
+            title="New code"
+            error={error}
+            busy={busy}
+            onCancel={close}
+            onSubmit={(code) =>
+              run(
+                () =>
+                  setLock(
+                    conversation.id,
+                    switched ? (existing === 'pin' ? 'pattern' : 'pin') : existing,
+                    code,
+                    current
+                  ),
+                'Code changed'
+              )
+            }
+          />
+        </div>
+      )}
+
+      {stage === 'remove' && (
+        <CodeEntry
+          kind={existing}
+          title="Remove the lock"
+          hint="Enter your code to take it off."
+          error={error}
+          busy={busy}
+          onCancel={close}
+          onSubmit={(code) => run(() => removeLock(conversation.id, code), 'Lock removed')}
+        />
+      )}
+    </div>
   );
 }

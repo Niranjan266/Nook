@@ -289,7 +289,32 @@ const paragraphs = (body) =>
     )
     .join('');
 
-export function sendBroadcast({ to, displayName, subject, heading, body }) {
+/**
+ * `format` decides who owns the markup.
+ *
+ * 'text' wraps the message in the Nook template, which is the right default:
+ * it renders in Outlook, it carries the branding, and nobody has to think
+ * about email HTML.
+ *
+ * 'html' hands the whole body over untouched, for a design built elsewhere.
+ * The template is not merged into it — half a template around someone else's
+ * layout is how emails end up with two headers and two footers. Placeholders
+ * are still substituted, because a bulk email that cannot say the recipient's
+ * name is barely worth sending.
+ */
+export function sendBroadcast({ to, displayName, subject, heading, body, format = 'text' }) {
+  if (format === 'html') {
+    const filled = fillPlaceholders(body, { displayName, appUrl: env.appUrl, email: to });
+    return send({
+      to,
+      subject,
+      html: filled,
+      // A plain-text alternative is what stops a rich email scoring as spam,
+      // and it is what people on a watch or a screen reader actually get.
+      text: htmlToText(filled),
+    });
+  }
+
   const greeting = heading || `Hello ${displayName}`;
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -327,6 +352,37 @@ export function sendBroadcast({ to, displayName, subject, heading, body }) {
     html,
     text: `${greeting}\n\n${body}\n\nOpen Nook: ${env.appUrl}`,
   });
+}
+
+/**
+ * The few substitutions a hand-written email needs. Deliberately a fixed short
+ * list rather than a template language: this input comes from the admin page
+ * and goes straight into an email body, so the less of it that is interpreted,
+ * the fewer ways it can misbehave.
+ */
+export function fillPlaceholders(html, { displayName, appUrl, email }) {
+  return String(html)
+    .replaceAll('{{name}}', esc(displayName || 'there'))
+    .replaceAll('{{email}}', esc(email || ''))
+    .replaceAll('{{app_url}}', appUrl || '')
+    .replaceAll('{{year}}', String(new Date().getFullYear()));
+}
+
+/** Crude but honest: strip the tags, keep the words, collapse the whitespace. */
+export function htmlToText(html) {
+  return String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|tr|h[1-6])>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }
 
 export const mailProvider = resolveProvider;

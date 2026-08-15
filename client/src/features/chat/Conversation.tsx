@@ -8,6 +8,7 @@ import Avatar from '@/components/Avatar';
 import MessageBubble from './MessageBubble';
 import Composer from './Composer';
 import PinBar from './PinBar';
+import CodeEntry from '@/components/CodeEntry';
 import { MOOD_EMOJI, MOOD_LABEL, daysUntil } from '@/lib/rooms';
 import { dayLabel, sameDay, lastSeenLabel } from '@/lib/format';
 import { spring } from '@/lib/motion';
@@ -30,13 +31,15 @@ const GAP_MINUTES = 6;
 export default function Conversation({ conversation }: { conversation: Convo }) {
   const { messages, typing, presence, loadMessages, hasMore, markRead, respondWallpaper, removeWallObject } =
     useChat();
+  const unlockChat = useChat((s) => s.unlockChat);
   const { openSheet, setShelf, toast } = useUi();
   const me = useAuth((s) => s.me);
   const startCall = useCall((s) => s.start);
 
   const stream = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
-  const [unlocked, setUnlocked] = useState(false);
+  const [lockError, setLockError] = useState('');
+  const [unlocking, setUnlocking] = useState(false);
 
   const list = messages[conversation.id] || [];
 
@@ -60,7 +63,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
   const partnerPresence = conversation.partner ? presence[conversation.partner.id] : undefined;
 
   useEffect(() => {
-    setUnlocked(false);
+    setLockError('');
   }, [conversation.id]);
 
   useLayoutEffect(() => {
@@ -188,19 +191,48 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
     return conversation.partner ? `@${conversation.partner.username}` : '';
   })();
 
-  /* ── PIN-locked chat gate ─────────────────────────────────────────────── */
-  if (conversation.locked && !unlocked) {
+  /* ── locked chat gate ─────────────────────────────────────────────────── */
+
+  /**
+   * `lockOpen` comes from the server, not from a local flag.
+   *
+   * The old gate was a button that set `unlocked = true`. It hid the messages
+   * from the screen while the API went on handing them to anyone who asked —
+   * so it locked nothing, it just drew a curtain. Now the server refuses the
+   * history until the code has been entered, and this screen only reflects
+   * what the server has already decided.
+   */
+  if (conversation.locked && !conversation.lockOpen) {
     return (
       <section className="surface">
-        <div className="empty">
-          <span className="clay-round" style={{ width: 74, height: 74 }}>
-            <IconLock size={30} />
-          </span>
-          <h3>This chat is locked</h3>
-          <p>You locked this conversation. Unlock it to read what’s inside.</p>
-          <button className="slab" onClick={() => setUnlocked(true)}>
-            Unlock
-          </button>
+        <div className="lock-gate">
+          <div className="stack" style={{ alignItems: 'center', gap: 18, width: '100%' }}>
+            <span className="clay-round" style={{ width: 66, height: 66 }}>
+              <IconLock size={27} />
+            </span>
+            <CodeEntry
+              kind={conversation.lockKind === 'pattern' ? 'pattern' : 'pin'}
+              title={conversation.name}
+              hint={
+                conversation.lockKind === 'pattern'
+                  ? 'Draw your pattern to open this chat.'
+                  : 'Enter your PIN to open this chat.'
+              }
+              error={lockError}
+              busy={unlocking}
+              onSubmit={async (code) => {
+                setUnlocking(true);
+                setLockError('');
+                try {
+                  await unlockChat(conversation.id, code);
+                } catch (e: any) {
+                  setLockError(e?.message || 'That code is not right.');
+                } finally {
+                  setUnlocking(false);
+                }
+              }}
+            />
+          </div>
         </div>
       </section>
     );

@@ -140,7 +140,13 @@ export const get = <T = any,>(p: string) => api<T>(p);
 export const post = <T = any,>(p: string, body?: unknown) => api<T>(p, { method: 'POST', body });
 export const patch = <T = any,>(p: string, body?: unknown) => api<T>(p, { method: 'PATCH', body });
 export const put = <T = any,>(p: string, body?: unknown) => api<T>(p, { method: 'PUT', body });
-export const del = <T = any,>(p: string) => api<T>(p, { method: 'DELETE' });
+/**
+ * DELETE with an optional body. Unusual, but removing a chat lock has to carry
+ * the code — a delete that needs no proof is not a lock — and inventing a
+ * POST /unlock purely to dodge the convention would be worse.
+ */
+export const del = <T = any,>(p: string, body?: unknown) =>
+  api<T>(p, { method: 'DELETE', ...(body === undefined ? {} : { body }) });
 
 /** Upload with progress — XHR, because fetch still has no upload progress. */
 export function upload(

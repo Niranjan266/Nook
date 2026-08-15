@@ -25,8 +25,9 @@ import * as U from '../db/users.js';
 import { asyncRoute } from '../middleware/auth.js';
 import { httpError } from '../middleware/error.js';
 import { verify as verifyPassword } from '../services/password.js';
-import { signAccess } from '../services/tokens.js';
+import { signAccess, attachSession } from '../services/tokens.js';
 import { sendBroadcast, mailProvider } from '../services/mail.js';
+import { notify, pushProvider } from '../services/push.js';
 import { createMessage } from '../services/messages.js';
 import * as C from '../db/conversations.js';
 import { claimHandoff } from './google.js';
@@ -297,8 +298,26 @@ router.post(
       ip: clientIp(req),
     });
 
+    /**
+     * A real session, not just an access token.
+     *
+     * Handing over a bare token looked right and then failed twice. The app
+     * refreshes on boot, and a refresh with no cookie for this account clears
+     * the token it was just given — so "open this account" signed you straight
+     * back out. Even past that, an access token expires in minutes and the
+     * refresh behind it would have belonged to whoever was signed in before,
+     * which is worse than failing: you would silently end up in the wrong
+     * account.
+     *
+     * `attachSession` sets the refresh cookie for this user, replacing any
+     * previous one, so the opened account behaves exactly like signing in as
+     * them — which is what opening an account means.
+     */
+    const session = attachSession(req, res, user.id);
+
     res.json({
       accessToken: signAccess(user.id),
+      ...session,
       user: { id: user.id, username: user.username, displayName: user.displayName },
     });
   })
@@ -337,12 +356,14 @@ router.post(
   '/broadcast/email',
   broadcastLimit,
   asyncRoute(async (req, res) => {
-    const { to, subject, heading, body } = z
+    const { to, subject, heading, body, format } = z
       .object({
         to: z.string().min(1),
         subject: z.string().trim().min(1).max(140),
         heading: z.string().trim().max(90).optional().default(''),
-        body: z.string().trim().min(1).max(8000),
+        // Raw HTML runs longer than prose does, so it gets more room.
+        body: z.string().trim().min(1).max(200000),
+        format: z.enum(['text', 'html']).optional().default('text'),
       })
       .parse(req.body);
 
@@ -353,7 +374,7 @@ router.post(
       actor: req.admin.actor,
       action: 'broadcast-email',
       targetId: to === 'all' ? '' : to,
-      detail: `${people.length} recipient(s) · ${subject}`,
+      detail: `${people.length} recipient(s) · ${format} · ${subject}`,
       ip: clientIp(req),
     });
 
@@ -372,6 +393,7 @@ router.post(
         subject,
         heading,
         body,
+        format,
       });
       if (result.delivered) sent += 1;
       else failed.push({ email: person.email, error: result.error || result.channel });
@@ -441,6 +463,8 @@ router.post(
           conversationId: convo.id,
           senderId: from.id,
           payload: { type: 'text', body },
+          // The announcer is nobody's friend, and should not have to be.
+          system: true,
         });
         sent += 1;
       } catch (err) {
@@ -455,6 +479,68 @@ router.post(
 /* ── whoami, so the panel can show who it thinks you are ──────────────────── */
 
 router.get('/me', (req, res) => res.json({ actor: req.admin.actor }));
+
+
+/**
+ * A push notification, sent as itself.
+ *
+ * Distinct from the in-app broadcast above, which sends a *message* that
+ * happens to raise a notification. This one leaves nothing behind in anyone's
+ * chat list — right for "the server is going down in ten minutes", wrong for
+ * anything worth reading later, which is exactly why both exist.
+ */
+router.post(
+  '/broadcast/push',
+  broadcastLimit,
+  asyncRoute(async (req, res) => {
+    const { to, title, body, url } = z
+      .object({
+        to: z.string().min(1),
+        title: z.string().trim().min(1).max(80),
+        body: z.string().trim().min(1).max(240),
+        url: z.string().trim().max(400).optional().default(''),
+      })
+      .parse(req.body);
+
+    const people = await audience(to);
+
+    await A.audit({
+      actor: req.admin.actor,
+      action: 'broadcast-push',
+      targetId: to === 'all' ? '' : to,
+      detail: `${people.length} recipient(s) · ${title}`,
+      ip: clientIp(req),
+    });
+
+    /**
+     * `notify` returns how many of a person's devices took it, which is the
+     * only number worth reporting: "sent to 40 people" is a lie when 30 of
+     * them never enabled notifications. Counting devices and people separately
+     * makes a disappointing result legible instead of mysterious.
+     */
+    let reached = 0;
+    let devices = 0;
+    for (const person of people) {
+      const n = await notify(person.id, {
+        title,
+        body,
+        tag: 'nook-announcement',
+        url: url || undefined,
+        icon: '/logo.svg',
+      }).catch(() => 0);
+      if (n > 0) reached += 1;
+      devices += n;
+    }
+
+    res.json({
+      attempted: people.length,
+      reached,
+      devices,
+      silent: people.length - reached,
+      provider: pushProvider(),
+    });
+  })
+);
 
 export default router;
 export { requireAdmin, signAdmin, clientIp };

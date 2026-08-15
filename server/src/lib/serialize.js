@@ -9,6 +9,7 @@
 
 import { nicknamesFor } from './nicknames.js';
 import { canWriteTo } from './friendcache.js';
+import { hasUnlock } from './lockgrants.js';
 
 const iso = (value) => (value instanceof Date ? value.toISOString() : value || null);
 
@@ -139,6 +140,13 @@ export function serializeConversation(c, viewerId) {
   const mine = (c.members || []).find((m) => String(m.user?._id || m.user?.id || m.user) === viewer);
   const others = (c.members || []).filter((m) => String(m.user?._id || m.user?.id || m.user) !== viewer);
   const partner = c.type === 'direct' ? others[0]?.user : null;
+
+  /**
+   * "Locked and not currently open." Everything that would leak the contents
+   * of a locked chat keys off this one value, so there is a single place to
+   * look when asking what a lock actually hides.
+   */
+  const shut = Boolean(mine?.locked && mine?.lockHash) && !hasUnlock(viewer, String(c._id || c.id));
 
   return {
     id: String(c._id || c.id),
@@ -271,13 +279,27 @@ export function serializeConversation(c, viewerId) {
     muted: Boolean(mine?.muted),
     archived: Boolean(mine?.archived),
     pinned: Boolean(mine?.pinned),
-    locked: Boolean(mine?.locked),
-    draft: mine?.draft || '',
+    locked: Boolean(mine?.locked && mine?.lockHash),
+    /**
+     * Which keypad to show. Never the hash, and never anything derived from
+     * it — the client's only job is to collect a code and hand it back.
+     */
+    lockKind: mine?.lockHash ? mine.lockKind || 'pin' : '',
+    /** True once the code has been entered, until the grant lapses. */
+    lockOpen: !shut,
+    draft: shut ? '' : mine?.draft || '',
     lastReadAt: iso(mine?.lastReadAt),
     myRole: mine?.role || 'member',
-    lastMessage: c.lastMessage && typeof c.lastMessage === 'object' && c.lastMessage.type
-      ? serializeMessage(c.lastMessage, viewer)
-      : null,
+    /**
+     * A locked chat shows no preview in the list. A lock that still spells the
+     * last message out on the screen anyone can see is worse than none: it
+     * looks like privacy while leaking exactly the part people read.
+     */
+    lastMessage: shut
+      ? null
+      : c.lastMessage && typeof c.lastMessage === 'object' && c.lastMessage.type
+        ? serializeMessage(c.lastMessage, viewer)
+        : null,
     lastActivity: iso(c.lastActivity || c.updatedAt),
     createdAt: iso(c.createdAt),
   };

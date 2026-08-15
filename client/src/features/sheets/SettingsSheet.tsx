@@ -32,6 +32,8 @@ import {
   IconSchedule,
   IconImage,
   IconTrash,
+  IconChat,
+  IconUsers,
 } from '@/components/Icon';
 
 const ACCENTS = [
@@ -645,6 +647,75 @@ export default function SettingsSheet() {
           </span>
           <span className="toggle" role="switch" aria-checked={push === 'on'} />
         </button>
+
+        {/*
+          What a notification is allowed to say, and what is worth one at all.
+          Shown only once notifications are actually on — settings for a thing
+          you have switched off are just noise.
+        */}
+        {push === 'on' && (
+          <>
+            <button
+              className="list-row"
+              onClick={() =>
+                patchMe({
+                  settings: { ...me.settings, notifyPreview: me.settings.notifyPreview === false },
+                })
+              }
+            >
+              <IconChat size={19} />
+              <span className="grow">
+                <span className="list-row-label">Show the message</span>
+                <span className="list-row-sub">
+                  {me.settings.notifyPreview === false
+                    ? 'Says who wrote, not what they said'
+                    : 'The notification shows the text itself'}
+                </span>
+              </span>
+              <span
+                className="toggle"
+                role="switch"
+                aria-checked={me.settings.notifyPreview !== false}
+              />
+            </button>
+
+            <button
+              className="list-row"
+              onClick={() =>
+                patchMe({
+                  settings: { ...me.settings, notifyGroups: me.settings.notifyGroups === false },
+                })
+              }
+            >
+              <IconUsers size={19} />
+              <span className="grow">
+                <span className="list-row-label">Group messages</span>
+                <span className="list-row-sub">A busy group can be a lot of buzzing</span>
+              </span>
+              <span className="toggle" role="switch" aria-checked={me.settings.notifyGroups !== false} />
+            </button>
+
+            <button
+              className="list-row"
+              onClick={() =>
+                patchMe({
+                  settings: { ...me.settings, notifyRequests: me.settings.notifyRequests === false },
+                })
+              }
+            >
+              <IconUser size={19} />
+              <span className="grow">
+                <span className="list-row-label">Friend requests</span>
+                <span className="list-row-sub">When someone asks to chat with you</span>
+              </span>
+              <span
+                className="toggle"
+                role="switch"
+                aria-checked={me.settings.notifyRequests !== false}
+              />
+            </button>
+          </>
+        )}
       </div>
 
       {/* ── quiet hours: a contract, not a personal mute ──────────────── */}
