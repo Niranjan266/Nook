@@ -8,6 +8,7 @@ import { get as apiGet } from '@/lib/api';
 import Avatar from '@/components/Avatar';
 import Blur from '@/components/Blur';
 import VoiceNote from './VoiceNote';
+import ReactionBar from './ReactionBar';
 import { clock, bytes, linkify, duration, accentFor } from '@/lib/format';
 import { bubbleIn, spring, popIn } from '@/lib/motion';
 import {
@@ -34,7 +35,6 @@ import {
   IconDown,
 } from '@/components/Icon';
 
-const QUICK = ['❤️', '😂', '👍', '😮', '😢', '🙏'];
 
 interface Props {
   message: Message;
@@ -67,6 +67,19 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
   const { openSheet, setLightbox, toast } = useUi();
   const swipeEnabled = useAuth((s) => s.me?.settings.swipeToReply ?? true);
   const [picker, setPicker] = useState(false);
+  /**
+   * The message's box on screen, captured at the moment the picker opens.
+   * Measured rather than guessed: the old picker used a fixed percentage of
+   * the viewport, which is why the emoji appeared beside the wrong message
+   * and ran off the edge of a phone.
+   */
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  const openPicker = () => {
+    setAnchorRect(bubbleRef.current?.getBoundingClientRect() || null);
+    setPicker(true);
+  };
   const [menu, setMenu] = useState(false);
   const [history, setHistory] = useState<{ body: string; at: string; current?: boolean }[] | null>(null);
 
@@ -143,7 +156,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
 
   const openRadial = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
-    setPicker(true);
+    openPicker();
   };
 
   /* Reserve the right shape before the file arrives, so nothing jumps. */
@@ -328,7 +341,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           <span style={{ width: 30, flex: 'none' }} />
         ) : null}
 
-        <div className={`bubble${isMediaBubble ? ' media' : ''}`}>
+        <div ref={bubbleRef} className={`bubble${isMediaBubble ? ' media' : ''}`}>
           {/* Each person keeps their own colour, so a busy group stays readable. */}
           {runStart && !mine && conversation.type === 'group' && (
             <span
@@ -411,7 +424,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
             >
               <IconThread size={16} />
             </button>
-            <button onClick={() => setPicker(true)} aria-label="React" title="React">
+            <button onClick={openPicker} aria-label="React" title="React">
               <IconEmoji size={16} />
             </button>
             <button onClick={() => setMenu((v) => !v)} aria-label="More" title="More">
@@ -595,50 +608,17 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         </div>
       )}
 
-      {/* radial reaction picker — emoji arc out of the bubble */}
-      <AnimatePresence>
-        {picker && (
-          <>
-            <div
-              style={{ position: 'fixed', inset: 0, zIndex: 79 }}
-              onClick={() => setPicker(false)}
-              aria-hidden="true"
-            />
-            <motion.div
-              className="radial"
-              style={{
-                left: mine ? 'auto' : '18%',
-                right: mine ? '18%' : 'auto',
-                top: '50%',
-              }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              {QUICK.map((emoji, i) => {
-                const angle = (-90 + (i - (QUICK.length - 1) / 2) * 26) * (Math.PI / 180);
-                return (
-                  <motion.button
-                    key={emoji}
-                    className="radial-item"
-                    initial={{ x: 0, y: 0, scale: 0.4, opacity: 0 }}
-                    animate={{ x: Math.cos(angle) * 96, y: Math.sin(angle) * 96, scale: 1, opacity: 1 }}
-                    exit={{ x: 0, y: 0, scale: 0.4, opacity: 0 }}
-                    transition={{ ...spring, delay: i * 0.022 }}
-                    onClick={() => {
-                      react(m, emoji);
-                      setPicker(false);
-                    }}
-                    aria-label={`React ${emoji}`}
-                  >
-                    {emoji}
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {/*
+        The reaction picker. Anchored to this message and rendered into
+        <body> — see ReactionBar for why both matter.
+      */}
+      <ReactionBar
+        open={picker}
+        anchor={anchorRect}
+        mine={mine}
+        onPick={(emoji) => react(m, emoji)}
+        onClose={() => setPicker(false)}
+      />
     </>
   );
 }

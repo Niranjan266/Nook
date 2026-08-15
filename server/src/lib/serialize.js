@@ -284,6 +284,14 @@ export function serializeConversation(c, viewerId) {
     retentionDays: c.retentionDays || 0,
     spaceId: c.space ? String(c.space._id || c.space) : null,
     sound: mine?.sound || 'default',
+    /**
+     * Per-chat notification overrides. -1 means "follow my default", which the
+     * client shows as an explicit third choice rather than guessing — a person
+     * who set nothing here should not be pinned to whatever the global was at
+     * the time.
+     */
+    notifyVibrate: mine?.notifyVibrate ?? -1,
+    notifyPreview: mine?.notifyPreview ?? -1,
 
     disappearAfter: c.disappearAfter || 0,
     unread: mine?.unread || 0,

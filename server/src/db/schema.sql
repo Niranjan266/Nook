@@ -488,3 +488,11 @@ CREATE TABLE IF NOT EXISTS push_devices (
 );
 
 CREATE INDEX IF NOT EXISTS idx_push_devices_user ON push_devices (user_id);
+
+-- Per-chat notification overrides. `sound` already existed; these are the rest
+-- of what "custom notification for this person" means, and they live on the
+-- membership beside it so one person's choices never touch the other's.
+-- Empty / -1 means "use my default", which is what keeps a per-chat setting
+-- from freezing at whatever the global was when the row was written.
+ALTER TABLE conversation_members ADD COLUMN notify_vibrate INTEGER NOT NULL DEFAULT -1;
+ALTER TABLE conversation_members ADD COLUMN notify_preview INTEGER NOT NULL DEFAULT -1;

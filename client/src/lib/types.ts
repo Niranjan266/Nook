@@ -277,6 +277,9 @@ export interface Conversation {
   retentionDays: number;
   spaceId: string | null;
   sound: string;
+  /** Per-chat notification overrides. -1 follow my default, 0 off, 1 on. */
+  notifyVibrate?: number;
+  notifyPreview?: number;
 
   disappearAfter: number;
   unread: number;

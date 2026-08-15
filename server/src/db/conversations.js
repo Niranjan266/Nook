@@ -108,6 +108,11 @@ export async function hydrateConversations(rows, { withLastMessage = true } = {}
       locked: Boolean(m.locked),
       lockHash: m.lock_hash || '',
       lockKind: m.lock_kind || '',
+      // -1 means "follow my default". Kept as a third state rather than a
+      // boolean so a per-chat choice does not silently freeze at whatever the
+      // global setting happened to be the day it was written.
+      notifyVibrate: m.notify_vibrate ?? -1,
+      notifyPreview: m.notify_preview ?? -1,
       unread: m.unread,
       lastReadAt: m.last_read_at ? new Date(m.last_read_at) : null,
       draft: m.draft,
@@ -319,6 +324,8 @@ const MEMBER_FIELDS = {
   lockKind: 'lock_kind',
   draft: 'draft',
   sound: 'sound',
+  notifyVibrate: 'notify_vibrate',
+  notifyPreview: 'notify_preview',
   wallpaper: 'wallpaper',
   unread: 'unread',
 };

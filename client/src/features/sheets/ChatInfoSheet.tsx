@@ -257,7 +257,35 @@ export default function ChatInfoSheet() {
         onDone={() => setLockStep(null)}
       />
 
-      {/* ── per-person notification sound ────────────────────────────── */}
+      {/* ── custom notification, for this person only ─────────────────── */}
+      <div className="sheet-section">
+        <span className="eyebrow">Custom notification</span>
+        <p className="tiny faint" style={{ paddingLeft: 4, marginBottom: 8 }}>
+          Just for {isGroup ? 'this group' : conversation.name.split(' ')[0]}. Anything left on
+          “Default” follows your setting in Settings → Notifications, so changing that later still
+          reaches this chat.
+        </p>
+
+        {/*
+          Three states rather than a switch. A per-chat toggle would have to
+          start somewhere, and whichever way it started would silently pin this
+          chat to whatever the global setting happened to be that day — so
+          "Default" is a real, visible choice.
+        */}
+        <TriChoice
+          label="Vibrate"
+          hint="A buzz when a message arrives"
+          value={conversation.notifyVibrate ?? -1}
+          onChange={(v) => updatePrefs(conversation.id, { notifyVibrate: v })}
+        />
+        <TriChoice
+          label="Show the message"
+          hint="Off means the alert says who wrote, not what"
+          value={conversation.notifyPreview ?? -1}
+          onChange={(v) => updatePrefs(conversation.id, { notifyPreview: v })}
+        />
+      </div>
+
       <div className="sheet-section">
         <span className="eyebrow">How this person sounds</span>
         <p className="tiny faint" style={{ paddingLeft: 4 }}>
@@ -670,6 +698,53 @@ function LockFlow({
           onSubmit={(code) => run(() => removeLock(conversation.id, code), 'Lock removed')}
         />
       )}
+    </div>
+  );
+}
+
+
+/**
+ * Default / On / Off.
+ *
+ * The middle state is the point: "Default" has to be selectable, not merely
+ * the absence of a choice, or a per-chat setting quietly freezes at whatever
+ * the global was when it was written and stops following it afterwards.
+ */
+function TriChoice({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const options: { v: number; text: string }[] = [
+    { v: -1, text: 'Default' },
+    { v: 1, text: 'On' },
+    { v: 0, text: 'Off' },
+  ];
+
+  return (
+    <div className="stack" style={{ gap: 6, marginBottom: 12 }}>
+      <span className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+        <span className="list-row-label">{label}</span>
+      </span>
+      <div className="seg" role="group" aria-label={label}>
+        {options.map((o) => (
+          <button
+            key={o.v}
+            className={`seg-item${value === o.v ? ' on' : ''}`}
+            onClick={() => onChange(o.v)}
+            aria-pressed={value === o.v}
+          >
+            {o.text}
+          </button>
+        ))}
+      </div>
+      <span className="tiny faint">{hint}</span>
     </div>
   );
 }

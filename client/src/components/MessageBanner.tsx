@@ -10,6 +10,7 @@
  * of the page instead of as an interruption.
  */
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { spring } from '@/lib/motion';
 import Avatar from '@/components/Avatar';
@@ -45,7 +46,14 @@ export default function MessageBanner({
     // inheriting whatever was left of the first one's.
   }, [message?.id, dragging, onDismiss]);
 
-  return (
+  /**
+   * Into <body>, like the snap camera and the reaction row. It is
+   * `position: fixed` at the top of the screen, and any ancestor that gains a
+   * transform, filter or backdrop-filter would silently make itself the
+   * containing block and pin the banner inside it instead. That has already
+   * happened twice in this codebase.
+   */
+  return createPortal(
     <AnimatePresence>
       {message && (
         <motion.div
@@ -108,6 +116,7 @@ export default function MessageBanner({
           )}
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

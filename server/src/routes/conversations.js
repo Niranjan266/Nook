@@ -246,6 +246,9 @@ router.patch(
         // unlocking now live only on /lock, where they have to prove the code.
         draft: z.string().max(4000).optional(),
         sound: z.enum(['default', 'knock', 'pebble', 'chime', 'wood', 'hush', 'none']).optional(),
+        // -1 follow my default, 0 off, 1 on.
+        notifyVibrate: z.number().int().min(-1).max(1).optional(),
+        notifyPreview: z.number().int().min(-1).max(1).optional(),
       })
       .parse(req.body);
 

@@ -219,6 +219,13 @@ export async function deliver({ message, convo, senderId, threadRoot, system = f
     if (convo.type === 'group' && prefs.notifyGroups === false) continue;
 
     /**
+     * A per-chat choice beats the global one, and -1 means there is no per-chat
+     * choice. Resolved here rather than at the call site so "custom
+     * notification for this person" means the same thing on every path.
+     */
+    const perChat = (value, fallback) => (value === -1 || value === undefined ? fallback : value === 1);
+
+    /**
      * Previews off means the notification says who, not what.
      *
      * The alternative — dropping the notification entirely — would be a worse
@@ -226,7 +233,8 @@ export async function deliver({ message, convo, senderId, threadRoot, system = f
      * appear on a lock screen in front of other people, not because they stop
      * wanting to know someone wrote to them.
      */
-    const showPreview = prefs.notifyPreview !== false;
+    const showPreview = perChat(member.notifyPreview, prefs.notifyPreview !== false);
+    const shouldBuzz = perChat(member.notifyVibrate, prefs.notifyVibrate !== false);
 
     notify(uid, {
       title: convo.type === 'group' ? `${sender.displayName} · ${convo.name}` : sender.displayName,
@@ -235,7 +243,9 @@ export async function deliver({ message, convo, senderId, threadRoot, system = f
       conversationId: String(convo.id),
       messageId: String(message.id),
       icon: sender.avatarUrl || '/logo.svg',
-      sound: member.sound || 'default',
+      // A chat's own sound wins; otherwise the one chosen in Settings.
+      sound: member.sound && member.sound !== 'default' ? member.sound : prefs.notifySound || 'default',
+      vibrate: shouldBuzz,
     }).catch(() => {});
   }
 

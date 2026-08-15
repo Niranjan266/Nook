@@ -1695,3 +1695,60 @@
     transform: none;
   }
 }
+
+/* ── the reaction row ─────────────────────────────────────────────────────
+   Replaces an arc that fanned emoji out from a point fixed at 18% of the
+   viewport — nowhere near the message, and off the edge of a phone. A row
+   measured against the message it belongs to fits any screen, and six targets
+   in a line are easier to hit than six on a curve.                        */
+
+.react-row {
+  position: fixed;
+  z-index: 97;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border-radius: var(--r-pill);
+  background: var(--clay-raised);
+  box-shadow: var(--clay-3);
+}
+
+.react-pick {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  font-size: 24px;
+  line-height: 1;
+  background: transparent;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.react-pick:hover {
+  background: var(--clay-sunk);
+}
+.react-pick:active {
+  transform: scale(0.86);
+}
+
+.react-more {
+  color: var(--muted);
+  background: var(--clay-sunk);
+  box-shadow: var(--clay-in);
+}
+.react-more:hover {
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-pick {
+    transition: none;
+  }
+  .react-pick:active {
+    transform: none;
+  }
+}
