@@ -48,7 +48,7 @@ if [ $# -gt 0 ]; then
   SUITES=()
   for name in "$@"; do SUITES+=("test/$name.mjs"); done
 else
-  SUITES=(test/features.mjs test/security.mjs)
+  SUITES=(test/features.mjs test/security.mjs test/snap.mjs test/notify.mjs)
 fi
 
 FAILED=0

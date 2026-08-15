@@ -152,6 +152,11 @@ const DEFAULT_SETTINGS = {
   notifyRequests: true,
   notifyReactions: false,
   notifyGroups: true,
+
+  /** Buzz the device alongside the sound. On by default: a phone on silent. */
+  notifyVibrate: true,
+  /** The sound used when a chat has not chosen its own. */
+  notifySound: 'default',
 };
 const DEFAULT_QUIET = {
   enabled: false,

@@ -209,6 +209,10 @@ router.patch(
             notifyRequests: z.boolean().optional(),
             notifyReactions: z.boolean().optional(),
             notifyGroups: z.boolean().optional(),
+            notifyVibrate: z.boolean().optional(),
+            notifySound: z
+              .enum(['default', 'knock', 'pebble', 'chime', 'wood', 'hush', 'none'])
+              .optional(),
           })
           .optional(),
       })

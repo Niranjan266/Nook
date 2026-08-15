@@ -628,3 +628,40 @@ button.list-row:active {
     display: none;
   }
 }
+
+/* The one-time ask for notification permission. Sits above the composer so it
+   cannot be confused for part of the conversation, and never covers it. */
+.notify-nudge {
+  position: fixed;
+  z-index: 90;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 12px 14px;
+  border-radius: var(--r-clay);
+  background: var(--clay-raised);
+  box-shadow: var(--clay-3);
+}
+.notify-nudge-x {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 4px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+@media (max-width: 560px) {
+  .notify-nudge {
+    flex-wrap: wrap;
+  }
+  .notify-nudge .row {
+    width: 100%;
+  }
+  .notify-nudge .row > button {
+    flex: 1;
+  }
+}

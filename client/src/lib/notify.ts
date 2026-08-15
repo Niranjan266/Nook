@@ -15,6 +15,25 @@
  */
 import { playSound, type SoundId } from './sounds';
 
+/**
+ * A short buzz, for the case a sound cannot cover: a phone on silent, or in a
+ * pocket. Two taps rather than one long one — a single long buzz reads as a
+ * call, which is a bigger claim on attention than a message deserves.
+ *
+ * Guarded because Safari and every iOS browser have no Vibration API at all,
+ * and calling it there throws. It is also ignored by browsers until the page
+ * has been interacted with, which is correct and needs no handling: a page
+ * nobody has touched has no business buzzing.
+ */
+function buzz(wanted?: boolean) {
+  if (wanted === false) return;
+  try {
+    navigator.vibrate?.([60, 45, 60]);
+  } catch {
+    /* not supported here; the sound and the banner still happen */
+  }
+}
+
 let unread = 0;
 let baseTitle = '';
 
@@ -61,6 +80,8 @@ interface Incoming {
   muted: boolean;
   sound: SoundId;
   soundOn: boolean;
+  /** Whether this person wants the device to buzz. */
+  vibrate?: boolean;
   avatarUrl?: string;
   accent?: string;
   onOpen: (conversationId: string) => void;
@@ -75,6 +96,7 @@ export function messageArrived({
   muted,
   sound,
   soundOn,
+  vibrate,
   avatarUrl,
   accent,
   onOpen,
@@ -92,6 +114,7 @@ export function messageArrived({
   paintTitle();
 
   if (soundOn) playSound(sound);
+  buzz(vibrate);
 
   if (hidden && canNotify()) {
     void systemNotification({ conversationId, conversationName, senderName, preview, avatarUrl, soundOn, onOpen });

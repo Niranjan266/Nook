@@ -57,6 +57,9 @@ export interface Me extends Omit<Person, 'quietHours'> {
     notifyRequests?: boolean;
     notifyReactions?: boolean;
     notifyGroups?: boolean;
+    notifyVibrate?: boolean;
+    /** Fallback sound for chats that have not picked one of their own. */
+    notifySound?: string;
   };
   contacts: string[];
   blocked: string[];

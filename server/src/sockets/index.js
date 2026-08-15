@@ -17,6 +17,8 @@ import {
   emitToUser,
   emitToConversation,
   isOnline,
+  setFocus,
+  clearFocus,
 } from './hub.js';
 
 /** conversationId -> Map<userId, timeoutId> */
@@ -67,6 +69,17 @@ export function attachSockets(io) {
     }
 
     socket.emit('ready', { userId: uid });
+
+    /* ── what this person is looking at ─────────────────────────────────── */
+
+    /**
+     * The client says which conversation is on screen, and repeats it while it
+     * stays there. Push uses this instead of "has a socket", which was the
+     * reason messages arrived silently on a backgrounded phone.
+     */
+    socket.on('focus:conversation', ({ conversationId } = {}) => {
+      setFocus(uid, conversationId || null);
+    });
 
     /* ── presence lookup ────────────────────────────────────────────────── */
 
@@ -261,6 +274,11 @@ export function attachSockets(io) {
     /* ── disconnect ─────────────────────────────────────────────────────── */
 
     socket.on('disconnect', async () => {
+      // Their last window is gone, so nothing is on screen. Clearing this
+      // matters: a stale claim would silence that chat's notifications until
+      // the TTL expired.
+      clearFocus(uid);
+
       if (trackDisconnect(uid, socket.id) === 0) {
         const lastSeen = Date.now();
         await U.setPresence(uid, false, lastSeen);

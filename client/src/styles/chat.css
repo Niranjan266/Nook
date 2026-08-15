@@ -1551,3 +1551,147 @@
   background: var(--clay-raised);
   box-shadow: var(--clay-2);
 }
+
+/* ── emoji picker ─────────────────────────────────────────────────────────
+   Touch targets are 44px with 6px gutters, which is the minimum a thumb can
+   hit reliably; the old grid used ~30px cells with a 2px gap, so picking the
+   wrong face was normal rather than a slip. Rendered into <body>, because
+   `.composer` sets backdrop-filter (a containing block for fixed children)
+   and `.surface` clips whatever escapes it.                                */
+
+.emoji-pop {
+  position: fixed;
+  z-index: 95;
+  width: min(376px, calc(100vw - 24px));
+  max-height: min(432px, 62vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-clay);
+  background: var(--clay-raised);
+  box-shadow: var(--clay-3);
+  overflow: hidden;
+}
+
+.emoji-pop-search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: none;
+  padding: 10px 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--clay-sunk);
+}
+.emoji-pop-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  outline: none;
+}
+.emoji-pop-input::placeholder {
+  color: var(--muted);
+  opacity: 0.75;
+}
+.emoji-pop-search button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+}
+.emoji-pop-search button:hover {
+  background: var(--clay-sunk);
+  color: var(--ink);
+}
+
+.emoji-pop-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 10px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.emoji-pop-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.emoji-pop-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 6px;
+}
+.emoji-pop-empty {
+  padding: 22px 8px;
+  text-align: center;
+}
+
+.emoji-cell {
+  height: 44px;
+  border-radius: var(--r-clay-sm);
+  font-size: 25px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.emoji-cell:hover,
+.emoji-cell:focus-visible {
+  background: var(--clay-sunk);
+}
+.emoji-cell:active {
+  transform: scale(0.88);
+}
+
+.emoji-pop-tabs {
+  flex: none;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 6px;
+  border-top: 1px solid var(--clay-sunk);
+  background: var(--clay-surface);
+}
+.emoji-tab {
+  height: 40px;
+  border-radius: var(--r-clay-sm);
+  font-size: 19px;
+  line-height: 1;
+  filter: saturate(0.25) opacity(0.6);
+  transition:
+    filter var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+.emoji-tab:hover {
+  filter: none;
+}
+.emoji-tab.on {
+  background: var(--clay-sunk);
+  filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emoji-cell,
+  .emoji-tab {
+    transition: none;
+  }
+  .emoji-cell:active {
+    transform: none;
+  }
+}

@@ -11,8 +11,10 @@ import Conversation from '@/features/chat/Conversation';
 import CallOverlay from '@/features/calls/CallOverlay';
 import { useSocketBridge } from '@/features/shell/useSocketBridge';
 import { useFriends } from '@/stores/friends';
+import { resumePush } from '@/lib/push';
 
 import Toasts from '@/components/Toasts';
+import NotifyNudge from '@/components/NotifyNudge';
 import Lightbox from '@/components/Lightbox';
 import {
   NewChatSheet,
@@ -156,6 +158,10 @@ function Nook() {
       // load. Without this the badge would be zero until the first socket
       // event, which for anyone who was asked while signed out is never.
       useFriends.getState().load().catch(() => {});
+      // If permission was granted before, resubscribe silently — including
+      // after a VAPID key rotation, which invalidates every old subscription
+      // and otherwise leaves people quietly unsubscribed forever.
+      resumePush().catch(() => {});
     }
   }, [me?.id]);
 
@@ -221,6 +227,8 @@ function Nook() {
         {showSurface &&
           (conversation ? <Conversation key={conversation.id} conversation={conversation} /> : <Empty />)}
       </div>
+
+      <NotifyNudge show={Boolean(conversation)} />
 
       <NewChatSheet />
       <NewGroupSheet />

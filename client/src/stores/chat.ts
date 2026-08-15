@@ -13,6 +13,7 @@ import {
 } from '@/lib/outbox';
 import { playSound, type SoundId } from '@/lib/sounds';
 import { useUi } from '@/stores/ui';
+import { watchConversation } from '@/lib/focus';
 import type { Conversation, Message, Person } from '@/lib/types';
 
 interface Presence {
@@ -188,6 +189,10 @@ export const useChat = create<ChatState>((set, get) => ({
 
   setActive(id) {
     set({ activeId: id, replyTo: null, editing: null });
+    // The server decides whether to push based on this. Reported here rather
+    // than in the view so it cannot be missed by a route that opens a chat
+    // some other way.
+    watchConversation(id);
     if (id) {
       if (!get().messages[id]) get().loadMessages(id);
       get().markRead(id);

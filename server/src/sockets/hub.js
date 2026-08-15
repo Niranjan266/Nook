@@ -39,6 +39,47 @@ export function trackDisconnect(userId, socketId) {
 export const isOnline = (userId) => online.has(String(userId));
 export const onlineUserIds = () => [...online.keys()];
 
+/* ── who is actually looking at what ──────────────────────────────────────── */
+
+/**
+ * "Has a socket" is not "is reading this".
+ *
+ * Push was skipped for anyone with a live socket, which sounds reasonable and
+ * is why notifications felt broken: a phone with the tab merely backgrounded,
+ * or a laptop asleep with the connection still half-open, counts as online. So
+ * the person got no notification at all, and the message sat unseen until they
+ * next opened the app. WhatsApp notifies unless you are looking at that exact
+ * conversation, and that is the behaviour worth copying.
+ *
+ * The client says which conversation is on screen while the window is visible,
+ * and repeats it on a timer. The timer matters: without it a crashed or frozen
+ * tab would leave a stale claim behind and silence that chat's notifications
+ * indefinitely — the failure has to expire on its own.
+ */
+const focus = new Map();
+const FOCUS_TTL_MS = 70_000;
+
+export function setFocus(userId, conversationId) {
+  const key = String(userId);
+  if (!conversationId) focus.delete(key);
+  else focus.set(key, { conversationId: String(conversationId), at: Date.now() });
+}
+
+export function clearFocus(userId) {
+  focus.delete(String(userId));
+}
+
+/** True only when this person is watching this conversation, right now. */
+export function isWatching(userId, conversationId) {
+  const seen = focus.get(String(userId));
+  if (!seen) return false;
+  if (Date.now() - seen.at > FOCUS_TTL_MS) {
+    focus.delete(String(userId));
+    return false;
+  }
+  return seen.conversationId === String(conversationId);
+}
+
 export function emitToUser(userId, event, payload) {
   if (!io) return;
   io.to(`user:${String(userId)}`).emit(event, payload);

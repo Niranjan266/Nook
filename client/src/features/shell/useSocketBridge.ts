@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket';
 import { useChat } from '@/stores/chat';
 import { useFriends } from '@/stores/friends';
+import { bindFocusReporting, resendFocus } from '@/lib/focus';
 import { useCall } from '@/stores/call';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
@@ -15,6 +16,7 @@ export function useSocketBridge(enabled: boolean) {
     if (!enabled) return;
 
     const socket = connectSocket();
+    bindFocusReporting(() => useChat.getState().activeId);
     const chat = useChat.getState;
     const call = useCall.getState;
     const ui = useUi.getState;
@@ -23,6 +25,8 @@ export function useSocketBridge(enabled: boolean) {
     socket.on('connect', () => {
       chat().setConnected(true);
       chat().flushOutbox();
+      // The server holds focus in memory, so a reconnect starts from nothing.
+      resendFocus();
     });
     socket.on('disconnect', () => chat().setConnected(false));
     socket.on('connect_error', () => chat().setConnected(false));
@@ -45,8 +49,12 @@ export function useSocketBridge(enabled: boolean) {
         preview: previewOf(m),
         isActive: state.activeId === m.conversationId,
         muted: Boolean(convo?.muted),
-        sound: (convo?.sound as SoundId) || 'default',
+        // A chat's own sound wins; otherwise the one chosen in Settings.
+        sound: ((convo?.sound && convo.sound !== 'default'
+          ? convo.sound
+          : me.settings?.notifySound) || 'default') as SoundId,
         soundOn: me.settings?.soundOn ?? true,
+        vibrate: me.settings?.notifyVibrate !== false,
         avatarUrl: convo?.avatarUrl || m.sender?.avatarUrl || '',
         accent: convo?.partner?.accent || m.sender?.accent,
         onOpen: (id) => chat().setActive(id),
@@ -101,8 +109,9 @@ export function useSocketBridge(enabled: boolean) {
         preview: r.note || 'wants to chat with you',
         isActive: false,
         muted: false,
-        sound: 'default',
+        sound: (useAuth.getState().me?.settings?.notifySound || 'default') as SoundId,
         soundOn: useAuth.getState().me?.settings?.soundOn !== false,
+        vibrate: useAuth.getState().me?.settings?.notifyVibrate !== false,
         avatarUrl: r.user?.avatarUrl || '',
         onOpen: () => ui().openSheet('requests'),
       });

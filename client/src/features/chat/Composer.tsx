@@ -11,6 +11,7 @@ import { duration } from '@/lib/format';
 import { compressImage } from '@/lib/color';
 import { transcribe, canTranscribe } from '@/lib/transcribe';
 import SnapCamera from './SnapCamera';
+import EmojiPicker from './EmojiPicker';
 import type { PublicQuietHours, Conversation as Convo } from '@/lib/types';
 import {
   IconSend,
@@ -30,12 +31,6 @@ import {
   IconLock,
 } from '@/components/Icon';
 
-const EMOJI = [
-  '😀','😂','🥲','😊','😍','😘','😎','🤔','🙃','😴','🥹','😭','😤','😱','🤯','🤗',
-  '👍','👎','👏','🙏','💪','🤝','👋','✌️','❤️','🧡','💚','💙','💜','🔥','✨','🎉',
-  '☕','🍕','🌧','🌙','⭐','🚗','🏠','📎',
-];
-
 interface Props {
   conversationId: string;
 }
@@ -53,6 +48,7 @@ export default function Composer({ conversationId }: Props) {
   const [text, setText] = useState('');
   const [attachOpen, setAttachOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiAnchor, setEmojiAnchor] = useState<{ left: number; bottom: number } | null>(null);
   const [snapMode, setSnapMode] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
   const [snapFile, setSnapFile] = useState<File | null>(null);
@@ -67,6 +63,7 @@ export default function Composer({ conversationId }: Props) {
   const imageInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const snapPickInput = useRef<HTMLInputElement>(null);
+  const emojiButton = useRef<HTMLButtonElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const recTimer = useRef<number>();
@@ -524,31 +521,6 @@ export default function Composer({ conversationId }: Props) {
               </motion.div>
             )}
 
-            {emojiOpen && (
-              <motion.div
-                className="attach-menu"
-                style={{ left: 52, width: 300, minWidth: 0 }}
-                variants={popIn}
-                initial="hidden"
-                animate="show"
-                exit="exit"
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 2 }}>
-                  {EMOJI.map((e) => (
-                    <button
-                      key={e}
-                      style={{ fontSize: 20, padding: 6, borderRadius: 10 }}
-                      onClick={() => {
-                        setText((t) => t + e);
-                        textarea.current?.focus();
-                      }}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
           </AnimatePresence>
 
           <div className="composer-input">
@@ -573,13 +545,25 @@ export default function Composer({ conversationId }: Props) {
               aria-label="Message"
             />
             <button
+              ref={emojiButton}
               className={`clay-round${emojiOpen ? ' on' : ''}`}
               style={{ width: 38, height: 38 }}
               onClick={() => {
+                // Measured at open time, not on mount: the composer grows as
+                // the textarea does, so a position captured earlier would put
+                // the panel in the wrong place after a two-line message.
+                const box = emojiButton.current?.getBoundingClientRect();
+                if (box) {
+                  setEmojiAnchor({
+                    left: Math.min(box.left, window.innerWidth - 388),
+                    bottom: window.innerHeight - box.top + 10,
+                  });
+                }
                 setEmojiOpen((v) => !v);
                 setAttachOpen(false);
               }}
               aria-label="Emoji"
+              aria-expanded={emojiOpen}
             >
               <IconEmoji size={19} />
             </button>
@@ -705,6 +689,18 @@ export default function Composer({ conversationId }: Props) {
             setCamOpen(true);
           }
           e.target.value = '';
+        }}
+      />
+
+      <EmojiPicker
+        open={emojiOpen}
+        anchor={emojiAnchor}
+        onClose={() => setEmojiOpen(false)}
+        onPick={(e) => {
+          setText((t) => t + e);
+          // Deliberately stays open: choosing emoji is nearly always plural,
+          // and a picker that closes after one turns "🎉🎉🎉" into three trips.
+          textarea.current?.focus();
         }}
       />
 

@@ -10,6 +10,7 @@ import { popIn } from '@/lib/motion';
 import { enablePush, disablePush, pushState } from '@/lib/push';
 import { askToNotify } from '@/lib/notify';
 import { toClock, fromClock, isQuietNow } from '@/lib/rooms';
+import { SOUNDS, previewSound } from '@/lib/sounds';
 import type { QuietHours } from '@/lib/types';
 import {
   IconSun,
@@ -714,6 +715,56 @@ export default function SettingsSheet() {
                 aria-checked={me.settings.notifyRequests !== false}
               />
             </button>
+
+            <button
+              className="list-row"
+              onClick={() => {
+                const next = me.settings.notifyVibrate === false;
+                patchMe({ settings: { ...me.settings, notifyVibrate: next } });
+                // Feel it the moment you turn it on — a vibration setting you
+                // cannot test is a setting you have to take on faith.
+                if (next) navigator.vibrate?.([60, 45, 60]);
+              }}
+            >
+              <IconMic size={19} />
+              <span className="grow">
+                <span className="list-row-label">Vibrate</span>
+                <span className="list-row-sub">
+                  A short buzz with each message — the part a phone on silent still gets
+                </span>
+              </span>
+              <span className="toggle" role="switch" aria-checked={me.settings.notifyVibrate !== false} />
+            </button>
+
+            {/*
+              The sound used when a chat has not chosen its own. Per-chat
+              sounds already existed and still win; this is the default behind
+              them, which is what most people actually want to change.
+            */}
+            <div className="sheet-section" style={{ paddingTop: 4 }}>
+              <span className="eyebrow">Notification sound</span>
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                {SOUNDS.map((s) => (
+                  <button
+                    key={s.id}
+                    className={`chip${(me.settings.notifySound || 'default') === s.id ? '' : ' chip-quiet'}`}
+                    style={{ height: 34 }}
+                    onClick={() => {
+                      patchMe({ settings: { ...me.settings, notifySound: s.id } });
+                      previewSound(s.id);
+                    }}
+                    aria-pressed={(me.settings.notifySound || 'default') === s.id}
+                    title={s.description}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <p className="tiny faint" style={{ margin: '6px 0 0' }}>
+                Tap one to hear it. A chat with its own sound keeps it. When Nook is closed the
+                phone uses its system notification sound — browsers do not let an app choose that.
+              </p>
+            </div>
           </>
         )}
       </div>

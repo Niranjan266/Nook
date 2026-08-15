@@ -62,3 +62,56 @@ export async function disablePush() {
     await sub.unsubscribe().catch(() => {});
   }
 }
+
+/**
+ * Bring an existing permission back to life, quietly.
+ *
+ * Notifications only ever worked if someone found the toggle in Settings, and
+ * nothing pointed them at it — so for most people push was simply never turned
+ * on, which looks exactly like it being broken. This runs at sign-in: if the
+ * browser has already granted permission, resubscribe without asking again.
+ *
+ * It also repairs the case that used to leave people silently unsubscribed:
+ * push subscriptions are bound to the VAPID key they were created with, so
+ * rotating the server key invalidates every one of them, and the browser will
+ * keep handing back the dead subscription until it is explicitly replaced.
+ */
+export async function resumePush(): Promise<PushStatus> {
+  if (!supported()) return 'unsupported';
+  if (Notification.permission !== 'granted') return pushState();
+
+  const registration =
+    (await navigator.serviceWorker.getRegistration()) || (await registerServiceWorker());
+  if (!registration) return 'unsupported';
+
+  try {
+    const { publicKey } = await get<{ publicKey: string }>('/push/key');
+    const wanted = urlBase64ToUint8Array(publicKey);
+    const existing = await registration.pushManager.getSubscription();
+
+    // A subscription made with a different key is dead on arrival; the server
+    // will never be able to send to it, and nothing surfaces the failure.
+    if (existing) {
+      const same =
+        existing.options?.applicationServerKey &&
+        new Uint8Array(existing.options.applicationServerKey).every((b, i) => b === wanted[i]);
+      if (!same) await existing.unsubscribe().catch(() => {});
+    }
+
+    const sub =
+      (await registration.pushManager.getSubscription()) ||
+      (await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: wanted,
+      }));
+
+    await post('/push/subscribe', sub.toJSON());
+    localStorage.setItem('nook.push', 'on');
+    return 'on';
+  } catch {
+    return pushState();
+  }
+}
+
+/** Have we already asked, and been ignored rather than refused? */
+export const neverAsked = () => supported() && Notification.permission === 'default';

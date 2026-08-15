@@ -3,7 +3,7 @@ import * as M from '../db/messages.js';
 import { findUserById, blockExistsBetween } from '../db/users.js';
 import { areFriends } from '../db/friends.js';
 import { serializeMessage } from '../lib/serialize.js';
-import { emitToConversation, emitToUser, isOnline } from '../sockets/hub.js';
+import { emitToConversation, emitToUser, isOnline, isWatching } from '../sockets/hub.js';
 import { notify } from './push.js';
 import { isQuietNow } from './quietHours.js';
 import { fetchPreview, firstUrlIn } from './linkPreview.js';
@@ -187,11 +187,19 @@ export async function deliver({ message, convo, senderId, threadRoot, system = f
     });
   }
 
-  // Push for everyone else — unless muted, or it's their quiet hours.
+  /**
+   * Push everyone who is not currently reading this conversation.
+   *
+   * The old condition skipped anyone with a live socket, which is why messages
+   * arrived silently: a backgrounded tab, a locked phone and a sleeping laptop
+   * all still hold a socket. Being connected is not the same as being present,
+   * and only the second one is a reason not to interrupt someone.
+   */
   const sender = await findUserById(senderId);
   for (const member of convo.members) {
     const uid = String(member.user?.id || member.user);
-    if (uid === String(senderId) || member.muted || isOnline(uid)) continue;
+    if (uid === String(senderId) || member.muted) continue;
+    if (isWatching(uid, convo.id)) continue;
 
     /**
      * A locked chat gets no push at all.
