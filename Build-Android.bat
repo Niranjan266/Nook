@@ -72,6 +72,15 @@ if errorlevel 1 goto :failed
 
 echo.
 echo   [3/4] Syncing it into the Android project...
+REM The previous APK lives in client\public so the website can serve it, which
+REM means the web build just copied it into dist. Left there, Capacitor packs
+REM it into the new APK and every build carries the one before it - 5 MB, then
+REM 9, then 13. build.gradle refuses to package *.apk as a backstop; this keeps
+REM it out of the Android project's assets folder in the first place, so the
+REM staged files match what actually ships.
+if exist "client\dist\nook.apk" del /q "client\dist\nook.apk"
+if exist "client\android\app\src\main\assets\public\nook.apk" del /q "client\android\app\src\main\assets\public\nook.apk"
+
 REM This also writes capacitor.build.gradle and capacitor.settings.gradle,
 REM which the Gradle build needs and which are not committed because they are
 REM generated from whatever plugins are installed.
@@ -87,14 +96,23 @@ echo.
 echo   [4/4] Building the APK... (the first run downloads Gradle - be patient)
 pushd client\android
 
+REM `clean` first, and it earns the extra twenty seconds.
+REM
+REM Android's incremental packaging rewrites the existing APK rather than
+REM building a fresh one, and removing a file from it leaves the space behind.
+REM After dropping an 8 MB stray from the assets, the package still weighed
+REM 13 MB with nothing in it to account for the difference - the bytes were
+REM simply dead. A clean build produced 4.7 MB from the same inputs. Since
+REM this script's output is what people download, it should be the honest
+REM size every time rather than however the last few builds happened to go.
 if exist "keystore.properties" (
   echo         Signing key found - building a release APK.
-  call gradlew.bat assembleRelease
+  call gradlew.bat clean assembleRelease
   set "APK=app\build\outputs\apk\release\app-release.apk"
 ) else (
   echo         No signing key - building a debug APK.
   echo         Fine for testing. See docs\ANDROID.md to sign a real release.
-  call gradlew.bat assembleDebug
+  call gradlew.bat clean assembleDebug
   set "APK=app\build\outputs\apk\debug\app-debug.apk"
 )
 

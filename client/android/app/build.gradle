@@ -44,7 +44,16 @@ android {
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+             //
+             // `!*.apk` is ours, and it is not hypothetical tidiness. The
+             // published APK is served from client/public/, Vite copies
+             // everything in public/ into dist/, and Capacitor copies dist/
+             // into the app's assets — so each build packaged the previous
+             // build inside itself. 5 MB became 9, then 13, and it would have
+             // kept going. Excluding it here stops it at the packaging step,
+             // which is the only place that holds no matter what order the
+             // build ran in or what was left over in dist/.
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!*.apk:!*.aab'
         }
     }
     signingConfigs {
