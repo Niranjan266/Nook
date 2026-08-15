@@ -8,6 +8,7 @@
  */
 
 import { nicknamesFor } from './nicknames.js';
+import { canWriteTo } from './friendcache.js';
 
 const iso = (value) => (value instanceof Date ? value.toISOString() : value || null);
 
@@ -162,6 +163,16 @@ export function serializeConversation(c, viewerId) {
       joinedAt: iso(m.joinedAt),
     })),
     createdBy: c.createdBy ? String(c.createdBy) : null,
+
+    /**
+     * Whether this viewer may write here yet.
+     *
+     * Only direct chats can be locked; a group you are a member of was already
+     * an invitation someone extended. This is advisory — the composer uses it
+     * to show the right thing instead of a text box that will bounce — and the
+     * real refusal happens in `createMessage` against the database.
+     */
+    canMessage: c.type !== 'direct' || !partner || canWriteTo(viewer, String(partner._id || partner.id)),
 
     /**
      * A personal wallpaper overrides the room's, for this viewer alone. Both

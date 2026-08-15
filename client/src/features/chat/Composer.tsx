@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChat } from '@/stores/chat';
+import { useFriends } from '@/stores/friends';
 import { useAuth } from '@/stores/auth';
 import { useUi } from '@/stores/ui';
 import { getSocket } from '@/lib/socket';
@@ -10,7 +11,7 @@ import { duration } from '@/lib/format';
 import { compressImage } from '@/lib/color';
 import { transcribe, canTranscribe } from '@/lib/transcribe';
 import SnapCamera from './SnapCamera';
-import type { PublicQuietHours } from '@/lib/types';
+import type { PublicQuietHours, Conversation as Convo } from '@/lib/types';
 import {
   IconSend,
   IconPlus,
@@ -26,6 +27,7 @@ import {
   IconClock,
   IconMoon2,
   IconSun,
+  IconLock,
 } from '@/components/Icon';
 
 const EMOJI = [
@@ -298,6 +300,18 @@ export default function Composer({ conversationId }: Props) {
     };
     rec.stop();
     recorder.current = null;
+  }
+
+  /**
+   * A chat you may not write in yet gets a panel instead of a text box.
+   *
+   * Showing a working-looking composer that bounces every message would be the
+   * cruellest version of this feature: you type, you send, nothing arrives,
+   * and the reason is a sentence in a toast. Replacing the input says what is
+   * true and — more usefully — puts the one action that changes it right there.
+   */
+  if (conversation && conversation.canMessage === false) {
+    return <LockedComposer conversation={conversation} />;
   }
 
   return (
@@ -711,6 +725,104 @@ export default function Composer({ conversationId }: Props) {
           cameraInput.current?.click();
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * What you see in a direct chat before the other person has agreed to talk.
+ *
+ * Four states, and each one gets the single action that moves it along:
+ * they asked you (accept or decline), you asked them (wait, or take it back),
+ * nobody has asked (ask), or they turned you down — which, deliberately, looks
+ * identical to still waiting. Telling someone they were declined invites a
+ * second attempt or an argument, and gives an unwanted stranger a signal.
+ */
+function LockedComposer({ conversation }: { conversation: Convo }) {
+  const partner = conversation.partner;
+  const { toast } = useUi();
+  const { incoming, outgoing, send, accept, decline, cancel } = useFriends();
+  const [busy, setBusy] = useState(false);
+
+  if (!partner) return null;
+
+  const theyAsked = incoming.some((r) => r.user.id === partner.id);
+  const youAsked = outgoing.some((r) => r.user.id === partner.id);
+  const firstName = partner.displayName?.split(' ')[0] || 'they';
+
+  const run = async (fn: () => Promise<unknown>, done?: string) => {
+    setBusy(true);
+    try {
+      await fn();
+      if (done) toast(done);
+    } catch (e: any) {
+      toast(e?.message || 'That did not work.', true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="composer">
+      <div className="locked-composer clay">
+        <span className="clay-round" style={{ width: 38, height: 38, flex: 'none', background: 'var(--clay-sunk)', boxShadow: 'none' }}>
+          <IconLock size={17} />
+        </span>
+
+        <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
+          <span className="list-row-label">
+            {theyAsked
+              ? `${firstName} wants to chat`
+              : youAsked
+                ? `Waiting for ${firstName}`
+                : `You're not connected yet`}
+          </span>
+          <span className="list-row-sub">
+            {theyAsked
+              ? 'Accept and you can both start writing.'
+              : youAsked
+                ? 'They can accept whenever they see it.'
+                : `Send a request — ${firstName} decides.`}
+          </span>
+        </div>
+
+        <div className="row" style={{ gap: 6, flex: 'none' }}>
+          {theyAsked ? (
+            <>
+              <button
+                className="clay-btn"
+                disabled={busy}
+                onClick={() => run(() => decline(partner.id), 'Declined')}
+              >
+                Decline
+              </button>
+              <button
+                className="slab"
+                disabled={busy}
+                onClick={() => run(() => accept(partner.id), `You and ${firstName} can chat now`)}
+              >
+                Accept
+              </button>
+            </>
+          ) : youAsked ? (
+            <button
+              className="clay-btn"
+              disabled={busy}
+              onClick={() => run(() => cancel(partner.id), 'Request taken back')}
+            >
+              Cancel request
+            </button>
+          ) : (
+            <button
+              className="slab"
+              disabled={busy}
+              onClick={() => run(() => send(partner.id), 'Request sent')}
+            >
+              Add friend
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

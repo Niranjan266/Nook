@@ -1442,3 +1442,26 @@
   flex: none;
   opacity: 0.7;
 }
+
+/* A direct chat you may not write in yet: the composer is replaced by the one
+   action that changes that, rather than an input which would silently bounce. */
+.locked-composer {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 10px 12px;
+  border-radius: var(--r-clay);
+  background: var(--clay-raised);
+  box-shadow: var(--clay-1);
+}
+@media (max-width: 460px) {
+  .locked-composer {
+    flex-wrap: wrap;
+  }
+  .locked-composer .row {
+    width: 100%;
+  }
+  .locked-composer .row > button {
+    flex: 1;
+  }
+}

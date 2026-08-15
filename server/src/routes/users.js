@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import * as U from '../db/users.js';
+import * as F from '../db/friends.js';
 import { asyncRoute, requireAuth } from '../middleware/auth.js';
 import { httpError } from '../middleware/error.js';
 import { publicQuietHours } from '../services/quietHours.js';
 import { emitToUser } from '../sockets/hub.js';
 import { notify } from '../services/push.js';
 import { warmNicknames } from '../lib/nicknames.js';
+import { warmFriends } from '../lib/friendcache.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -34,6 +36,27 @@ const publicUser = (u, extra = {}, nicks = {}) => {
   };
 };
 
+/**
+ * One word for where two people stand with each other, so the client never has
+ * to derive it from two nullable rows and get it subtly wrong in three places:
+ *
+ *   'me'       — yourself
+ *   'friends'  — either side accepted; you may write to each other
+ *   'sent'     — you asked, they have not answered
+ *   'received' — they asked, you have not answered
+ *   'declined' — you asked and were turned down (they are told nothing)
+ *   'none'     — no history
+ */
+async function friendship(meId, otherId) {
+  if (meId === otherId) return 'me';
+  const { outgoing, incoming } = await F.edgeBetween(meId, otherId);
+  if (outgoing?.status === F.ACCEPTED || incoming?.status === F.ACCEPTED) return 'friends';
+  if (incoming?.status === F.PENDING) return 'received';
+  if (outgoing?.status === F.PENDING) return 'sent';
+  if (outgoing?.status === F.DECLINED) return 'declined';
+  return 'none';
+}
+
 /* ── search people by username, display name or Nook ID ───────────────────── */
 
 router.get(
@@ -49,8 +72,17 @@ router.get(
     ]);
 
     const users = await U.searchUsers({ query: q, excludeId: req.user.id, excludeIds: blocked });
+
+    // Search is where you decide whether to reach out, so it is the one place
+    // that must say what will happen if you tap: ask, wait, or just open the
+    // chat. Resolving it here costs one query per result and saves the client
+    // a round trip per person.
+    const states = await Promise.all(users.map((u) => friendship(req.user.id, u.id)));
+
     res.json({
-      users: users.map((u) => publicUser(u, { isContact: contacts.includes(u.id) }, nicks)),
+      users: users.map((u, i) =>
+        publicUser(u, { isContact: contacts.includes(u.id), friendship: states[i] }, nicks)
+      ),
       // Lets the client say "that's a Nook ID and nobody has it" rather than
       // the vaguer "no results", which reads like a typo in your own code.
       exactNookId: U.looksLikeNookId(q),
@@ -257,6 +289,173 @@ router.get(
   })
 );
 
+/* ── friend requests ──────────────────────────────────────────────────────── */
+
+/**
+ * Both directions in one call. The badge on the chat list and the list itself
+ * read from the same response, so they cannot disagree about how many are
+ * waiting — a mismatch there is the kind of thing people notice immediately
+ * and trust for the rest of the session.
+ */
+router.get(
+  '/friends/requests',
+  asyncRoute(async (req, res) => {
+    const [incoming, outgoing, nicks] = await Promise.all([
+      F.incoming(req.user.id),
+      F.outgoing(req.user.id),
+      U.nicknameMap(req.user.id),
+    ]);
+
+    const ids = [...incoming.map((r) => r.fromId), ...outgoing.map((r) => r.toId)];
+    const people = await U.findUsersByIds(ids);
+    const byId = new Map(people.map((u) => [u.id, u]));
+    const shape = (r, otherId) => {
+      const person = byId.get(otherId);
+      return person
+        ? { user: publicUser(person, {}, nicks), note: r.note, at: new Date(r.createdAt).toISOString() }
+        : null;
+    };
+
+    res.json({
+      incoming: incoming.map((r) => shape(r, r.fromId)).filter(Boolean),
+      outgoing: outgoing.map((r) => shape(r, r.toId)).filter(Boolean),
+    });
+  })
+);
+
+router.get(
+  '/friends',
+  asyncRoute(async (req, res) => {
+    const [ids, nicks] = await Promise.all([F.friendIds(req.user.id), U.nicknameMap(req.user.id)]);
+    const people = await U.findUsersByIds(ids);
+    res.json({ friends: people.map((u) => publicUser(u, { friendship: 'friends' }, nicks)) });
+  })
+);
+
+router.post(
+  '/:id/friend',
+  asyncRoute(async (req, res) => {
+    const { note } = z.object({ note: z.string().trim().max(200).optional() }).parse(req.body || {});
+    if (req.params.id === req.user.id) throw httpError(400, 'You are already your own friend.');
+
+    const person = await U.findUserById(req.params.id);
+    if (!person) throw httpError(404, 'No such person.');
+    if (await U.blockExistsBetween(req.user.id, person.id))
+      throw httpError(403, 'You cannot reach this person.');
+
+    const state = await friendship(req.user.id, person.id);
+    if (state === 'friends') throw httpError(409, 'You are already friends.');
+
+    /**
+     * If they already asked you, asking back is obviously a yes. Making the
+     * person cancel their own request and go find the incoming one instead
+     * would be pedantry: the two of you agree, which is the whole test.
+     */
+    if (state === 'received') {
+      await F.setStatus(person.id, req.user.id, F.ACCEPTED);
+      await Promise.all([U.addContact(req.user.id, person.id), U.addContact(person.id, req.user.id)]);
+      await Promise.all([warmFriends(req.user.id), warmFriends(person.id)]);
+      emitToUser(person.id, 'friend:accepted', { user: publicUser(req.user) });
+      emitToUser(req.user.id, 'friend:accepted', { user: publicUser(person) });
+      return res.json({ friendship: 'friends' });
+    }
+
+    await F.sendRequest(req.user.id, person.id, note || '');
+
+    emitToUser(person.id, 'friend:request', {
+      user: publicUser(req.user),
+      note: note || '',
+      at: new Date().toISOString(),
+    });
+
+    // A request nobody sees is a request that never happened. Push reaches the
+    // person who is not currently looking at Nook, which is most of them.
+    notify(person.id, {
+      title: `${req.user.displayName} wants to chat`,
+      body: note || 'Tap to accept or decline.',
+      data: { kind: 'friend-request', userId: req.user.id },
+    }).catch(() => {});
+
+    res.status(201).json({ friendship: 'sent' });
+  })
+);
+
+router.post(
+  '/:id/friend/accept',
+  asyncRoute(async (req, res) => {
+    const request = await F.findRequest(req.params.id, req.user.id);
+    if (!request || request.status !== F.PENDING) throw httpError(404, 'No request from that person.');
+
+    const person = await U.findUserById(req.params.id);
+    if (!person) throw httpError(404, 'No such person.');
+
+    await F.setStatus(person.id, req.user.id, F.ACCEPTED);
+    // Accepting is also the natural moment to become contacts — it is exactly
+    // what the person meant, and it makes them findable in the contacts list
+    // without a second deliberate step nobody would think to take.
+    await Promise.all([U.addContact(req.user.id, person.id), U.addContact(person.id, req.user.id)]);
+    // Both sides' cached "who may I write to" sets are now wrong. Re-warm them
+    // here rather than waiting for the next sign-in: the whole point of
+    // accepting is that the chat unlocks now.
+    await Promise.all([warmFriends(req.user.id), warmFriends(person.id)]);
+
+    emitToUser(person.id, 'friend:accepted', { user: publicUser(req.user) });
+    emitToUser(req.user.id, 'friend:accepted', { user: publicUser(person) });
+
+    notify(person.id, {
+      title: `${req.user.displayName} accepted`,
+      body: 'You can talk now.',
+      data: { kind: 'friend-accepted', userId: req.user.id },
+    }).catch(() => {});
+
+    res.json({ friendship: 'friends' });
+  })
+);
+
+/**
+ * Declining is silent on purpose.
+ *
+ * Telling someone they were turned down invites a second request, or an
+ * argument, and gives an unwanted stranger a signal to act on. The requester
+ * simply keeps seeing "sent" — which is also true, since nothing stops them
+ * asking again later.
+ */
+router.post(
+  '/:id/friend/decline',
+  asyncRoute(async (req, res) => {
+    const request = await F.findRequest(req.params.id, req.user.id);
+    if (!request || request.status !== F.PENDING) throw httpError(404, 'No request from that person.');
+    await F.setStatus(req.params.id, req.user.id, F.DECLINED);
+    emitToUser(req.user.id, 'friend:resolved', { userId: req.params.id });
+    res.json({ friendship: 'none' });
+  })
+);
+
+/** Take back a request you sent, before they answer. */
+router.delete(
+  '/:id/friend',
+  asyncRoute(async (req, res) => {
+    await F.cancelRequest(req.user.id, req.params.id);
+    emitToUser(req.params.id, 'friend:resolved', { userId: req.user.id });
+    res.json({ friendship: 'none' });
+  })
+);
+
+/** Unfriend: drop both rows, and stop being contacts, so it is a clean slate. */
+router.post(
+  '/:id/unfriend',
+  asyncRoute(async (req, res) => {
+    await F.unfriend(req.user.id, req.params.id);
+    await Promise.all([
+      U.removeContact(req.user.id, req.params.id),
+      U.removeContact(req.params.id, req.user.id),
+    ]);
+    await Promise.all([warmFriends(req.user.id), warmFriends(req.params.id)]);
+    emitToUser(req.params.id, 'friend:removed', { userId: req.user.id });
+    res.json({ friendship: 'none' });
+  })
+);
+
 /* ── nicknames — what you call someone, private to you ────────────────────── */
 
 router.put(
@@ -342,9 +541,10 @@ router.get(
     const user = await U.findUserById(req.params.id);
     if (!user) throw httpError(404, 'No such person.');
 
-    const [contacts, blocked] = await Promise.all([
+    const [contacts, blocked, state] = await Promise.all([
       U.contactIds(req.user.id),
       U.blockedIds(req.user.id),
+      friendship(req.user.id, user.id),
     ]);
     const isContact = contacts.includes(user.id);
     const allow = (rule) => rule === 'everyone' || (rule === 'contacts' && isContact);
@@ -363,6 +563,7 @@ router.get(
         quietHours: publicQuietHours(user),
         isContact,
         isBlocked: blocked.includes(user.id),
+        friendship: state,
       },
     });
   })

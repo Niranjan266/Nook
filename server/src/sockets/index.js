@@ -5,6 +5,7 @@ import * as M from '../db/messages.js';
 import * as Calls from '../db/misc.js';
 import { serializeMessage } from '../lib/serialize.js';
 import { warmNicknames } from '../lib/nicknames.js';
+import { warmFriends } from '../lib/friendcache.js';
 import { createMessage, markRead } from '../services/messages.js';
 import { notify } from '../services/push.js';
 import { parseJson } from '../db/index.js';
@@ -35,7 +36,7 @@ export function attachSockets(io) {
 
       // Socket emits serialise for recipients other than the requester, so
       // each connected viewer's nicknames must be warm for the whole session.
-      await warmNicknames(user.id);
+      await Promise.all([warmNicknames(user.id), warmFriends(user.id)]);
 
       next();
     } catch {

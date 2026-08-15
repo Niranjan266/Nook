@@ -16,6 +16,7 @@ export type SheetKind =
   | 'calls'
   | 'forward'
   | 'contacts'
+  | 'requests'
   | 'room'
   | 'folders'
   | 'scheduled'

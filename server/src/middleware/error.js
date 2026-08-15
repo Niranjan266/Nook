@@ -20,10 +20,15 @@ export function errorHandler(err, req, res, _next) {
     const first = Object.values(err.errors)[0];
     return res.status(400).json({ error: first?.message || 'Invalid data.' });
   }
-  if (err?.status) return res.status(err.status).json({ error: err.message });
+  // `code` is for the client to branch on. Matching on the message text works
+  // right up until someone rewords it, so anything the UI must react to
+  // differently — rather than merely display — carries a stable code.
+  if (err?.status)
+    return res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
 
   console.error('  error    ', err);
   res.status(500).json({ error: 'Something broke on our side.' });
 }
 
-export const httpError = (status, message) => Object.assign(new Error(message), { status });
+export const httpError = (status, message, extra = {}) =>
+  Object.assign(new Error(message), { status, ...extra });

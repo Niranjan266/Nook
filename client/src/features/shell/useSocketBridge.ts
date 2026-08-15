@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket';
 import { useChat } from '@/stores/chat';
+import { useFriends } from '@/stores/friends';
 import { useCall } from '@/stores/call';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
@@ -17,6 +18,7 @@ export function useSocketBridge(enabled: boolean) {
     const chat = useChat.getState;
     const call = useCall.getState;
     const ui = useUi.getState;
+    const friends = useFriends.getState;
 
     socket.on('connect', () => {
       chat().setConnected(true);
@@ -85,6 +87,40 @@ export function useSocketBridge(enabled: boolean) {
     // the cheapest correct response is to re-fetch rather than try to patch
     // the new name into every cached conversation, member list and message.
     socket.on('nickname:update', () => chat().loadConversations());
+
+    /* ── friend requests ──────────────────────────────────────────────────
+       A request has no conversation to land in, so it needs its own arrival
+       path: into the store for the badge and the list, and a banner so it is
+       not silently waiting in a screen nobody has open.                    */
+    socket.on('friend:request', (r) => {
+      friends().onRequest(r);
+      notifier.messageArrived({
+        conversationId: `friend:${r.user?.id}`,
+        conversationName: r.user?.displayName || 'Someone',
+        senderName: r.user?.displayName || 'Someone',
+        preview: r.note || 'wants to chat with you',
+        isActive: false,
+        muted: false,
+        sound: 'default',
+        soundOn: useAuth.getState().me?.settings?.soundOn !== false,
+        avatarUrl: r.user?.avatarUrl || '',
+        onOpen: () => ui().openSheet('requests'),
+      });
+    });
+
+    // Accepted from either side: the chat unlocks, so the conversation has to
+    // be refetched — `canMessage` is baked into the serialised conversation.
+    socket.on('friend:accepted', ({ user }) => {
+      friends().onResolved(user?.id);
+      chat().loadConversations();
+      if (user?.displayName) ui().toast(`${user.displayName} accepted — you can chat now`);
+    });
+
+    socket.on('friend:resolved', ({ userId }) => friends().onResolved(userId));
+    socket.on('friend:removed', ({ userId }) => {
+      friends().onResolved(userId);
+      chat().loadConversations();
+    });
     socket.on('wallpaper:changed', (p) => chat().onWallpaper(p));
 
     socket.on('call:incoming', (p) => call().receive(p));

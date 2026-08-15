@@ -10,6 +10,7 @@ import Shelf from '@/features/shell/Shelf';
 import Conversation from '@/features/chat/Conversation';
 import CallOverlay from '@/features/calls/CallOverlay';
 import { useSocketBridge } from '@/features/shell/useSocketBridge';
+import { useFriends } from '@/stores/friends';
 
 import Toasts from '@/components/Toasts';
 import Lightbox from '@/components/Lightbox';
@@ -20,6 +21,7 @@ import {
   SearchSheet,
   StarredSheet,
   CallsSheet,
+  RequestsSheet,
 } from '@/features/sheets/PeopleSheets';
 import ChatInfoSheet from '@/features/sheets/ChatInfoSheet';
 import WallpaperSheet from '@/features/sheets/WallpaperSheet';
@@ -149,6 +151,10 @@ function Nook() {
       // Scope the offline cache to this account before anything reads it.
       setCacheScope(me.id);
       hydrate();
+      // Requests are not conversations, so they are not in the conversation
+      // load. Without this the badge would be zero until the first socket
+      // event, which for anyone who was asked while signed out is never.
+      useFriends.getState().load().catch(() => {});
     }
   }, [me?.id]);
 
@@ -221,6 +227,7 @@ function Nook() {
       <SearchSheet />
       <StarredSheet />
       <CallsSheet />
+      <RequestsSheet />
       <ChatInfoSheet />
       <WallpaperSheet />
       <SettingsSheet />

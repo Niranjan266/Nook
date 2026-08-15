@@ -1,4 +1,11 @@
 export type Accent = 'terracotta' | 'moss' | 'ochre' | 'clay-blue' | 'rust';
+
+/**
+ * Where two people stand with each other. Decided by the server and sent as
+ * one word, so no screen has to derive it from a pair of nullable rows and get
+ * it subtly different from the screen next to it.
+ */
+export type Friendship = 'me' | 'friends' | 'sent' | 'received' | 'declined' | 'none';
 export type Visibility = 'everyone' | 'contacts' | 'nobody';
 
 export interface Person {
@@ -22,6 +29,7 @@ export interface Person {
   online?: boolean;
   lastSeen?: string | null;
   isContact?: boolean;
+  friendship?: Friendship;
   quietHours?: PublicQuietHours | null;
 }
 
@@ -225,6 +233,8 @@ export interface Conversation {
   members: { user: Person | { id: string }; role: 'member' | 'admin'; joinedAt: string }[];
   createdBy: string | null;
   wallpaper: Wallpaper;
+  /** False in a direct chat where the other person has not accepted yet. */
+  canMessage: boolean;
   /** A look you chose for yourself; overrides the room's, for you only. */
   myWallpaper: { url: string; preset: string; tint: string; dim: number; blur: number } | null;
 

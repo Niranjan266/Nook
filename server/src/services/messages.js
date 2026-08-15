@@ -1,6 +1,7 @@
 import * as C from '../db/conversations.js';
 import * as M from '../db/messages.js';
 import { findUserById, blockExistsBetween } from '../db/users.js';
+import { areFriends } from '../db/friends.js';
 import { serializeMessage } from '../lib/serialize.js';
 import { emitToConversation, emitToUser, isOnline } from '../sockets/hub.js';
 import { notify } from './push.js';
@@ -44,11 +45,26 @@ export async function createMessage({ conversationId, senderId, payload }) {
     }
   }
 
-  // Blocked either way? Refuse.
+  /**
+   * Blocked either way, or not friends yet? Refuse.
+   *
+   * This is the single choke point every message goes through — REST, sockets,
+   * scheduled sends and forwards all land here — which is exactly why the rule
+   * belongs here and nowhere else. Enforcing at send rather than at creation
+   * is deliberate: the conversation is allowed to exist so the recipient has
+   * something to accept *from*, and so a rejected sender can still see the
+   * chat they are waiting on rather than a dead end.
+   */
   if (convo.type === 'direct') {
     const otherId = (await C.memberIdsOf(convo.id, senderId))[0];
-    if (otherId && (await blockExistsBetween(senderId, otherId)))
-      throw httpError(403, 'You cannot message this person.');
+    if (otherId) {
+      if (await blockExistsBetween(senderId, otherId))
+        throw httpError(403, 'You cannot message this person.');
+      if (!(await areFriends(senderId, otherId)))
+        throw httpError(403, 'They need to accept your request before you can chat.', {
+          code: 'NOT_FRIENDS',
+        });
+    }
   }
 
   // A thread reply must belong to a real root in this same conversation, and

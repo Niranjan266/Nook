@@ -1,6 +1,7 @@
 import { verifyAccess } from '../services/tokens.js';
 import { findUserById } from '../db/users.js';
 import { warmNicknames } from '../lib/nicknames.js';
+import { warmFriends } from '../lib/friendcache.js';
 
 export async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -40,7 +41,7 @@ export async function requireAuth(req, res, next) {
 
     // The serialisers read nicknames synchronously, so this viewer's map has
     // to be in memory before any handler runs. One small indexed query.
-    await warmNicknames(user.id);
+    await Promise.all([warmNicknames(user.id), warmFriends(user.id)]);
 
     next();
   } catch {

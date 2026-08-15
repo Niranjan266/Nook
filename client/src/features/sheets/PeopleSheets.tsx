@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { get, post } from '@/lib/api';
 import { useChat } from '@/stores/chat';
+import { useFriends } from '@/stores/friends';
 import { useUi } from '@/stores/ui';
 import Sheet from '@/components/Sheet';
 import Avatar from '@/components/Avatar';
@@ -23,6 +24,7 @@ import {
 export function NewChatSheet() {
   const { sheet, closeSheet, openSheet, toast } = useUi();
   const { openDirect, setActive } = useChat();
+  const { send: sendRequest, accept } = useFriends();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Person[]>([]);
   const [contacts, setContacts] = useState<Person[]>([]);
@@ -53,15 +55,38 @@ export function NewChatSheet() {
     return () => clearTimeout(t);
   }, [q]);
 
+  /**
+   * What tapping a person does now depends on where you stand with them.
+   *
+   * Opening a chat you cannot write in is not useless — you can see the
+   * request state and act on it there — so every state still opens the
+   * conversation. What changes is whether a request goes out first, and what
+   * the row says will happen, which is the part that was missing.
+   */
   const start = async (person: Person) => {
     try {
       const id = await openDirect(person.id);
-      await post(`/users/${person.id}/contact`);
+      if (person.friendship === 'none' || person.friendship === 'declined') {
+        await sendRequest(person.id);
+        toast(`Request sent to ${person.displayName.split(' ')[0]}`);
+      } else if (person.friendship === 'received') {
+        await accept(person.id);
+        toast(`You and ${person.displayName.split(' ')[0]} can chat now`);
+      } else if (person.friendship === 'friends') {
+        await post(`/users/${person.id}/contact`);
+      }
       setActive(id);
       closeSheet();
     } catch (e: any) {
       toast(e?.message || 'Could not open that conversation.', true);
     }
+  };
+
+  const actionFor = (p: Person) => {
+    if (p.friendship === 'sent') return 'Waiting';
+    if (p.friendship === 'received') return 'Accept';
+    if (p.friendship === 'friends' || !p.friendship) return '';
+    return 'Add';
   };
 
   const shown = q.trim().length >= 2 ? results : contacts;
@@ -98,13 +123,20 @@ export function NewChatSheet() {
         {shown.map((p) => (
           <button key={p.id} className="list-row" onClick={() => start(p)}>
             <Avatar name={p.displayName} src={p.avatarUrl} id={p.id} accent={p.accent} size={42} online={p.online} showDot />
-            <span className="grow">
+            <span className="grow" style={{ minWidth: 0 }}>
               <span className="list-row-label">{p.displayName}</span>
               <span className="list-row-sub">
                 @{p.username}
                 {p.nookId ? ` · ${p.nookId}` : ''}
               </span>
             </span>
+            {/* Says what the tap will do, so nobody discovers the rule by
+                hitting it. Blank for people you can already talk to. */}
+            {actionFor(p) && (
+              <span className={`chip${p.friendship === 'sent' ? ' chip-quiet' : ''}`} style={{ flex: 'none' }}>
+                {actionFor(p)}
+              </span>
+            )}
           </button>
         ))}
         {shown.length === 0 && (
@@ -445,6 +477,115 @@ export function CallsSheet() {
         })}
         {!calls.length && <p className="small muted">No calls yet.</p>}
       </div>
+    </Sheet>
+  );
+}
+
+/* ── friend requests ──────────────────────────────────────────────────────── */
+
+/**
+ * Both directions in one sheet.
+ *
+ * Incoming is the part that needs an answer, so it goes first and carries the
+ * buttons. Outgoing is there so "did I already ask them?" has an answer that
+ * is not "search for them and squint at the button label" — and so a request
+ * sent to the wrong person can be taken back.
+ */
+export function RequestsSheet() {
+  const { sheet, closeSheet, toast } = useUi();
+  const { openDirect, setActive } = useChat();
+  const { incoming, outgoing, load, accept, decline, cancel } = useFriends();
+  const [busy, setBusy] = useState('');
+  const open = sheet === 'requests';
+
+  useEffect(() => {
+    if (open) load().catch(() => {});
+  }, [open]);
+
+  const run = async (id: string, fn: () => Promise<unknown>, done?: string) => {
+    setBusy(id);
+    try {
+      await fn();
+      if (done) toast(done);
+    } catch (e: any) {
+      toast(e?.message || 'That did not work.', true);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const openChatWith = async (p: Person) => {
+    try {
+      setActive(await openDirect(p.id));
+      closeSheet();
+    } catch (e: any) {
+      toast(e?.message || 'Could not open that conversation.', true);
+    }
+  };
+
+  return (
+    <Sheet open={open} onClose={closeSheet} title="Requests">
+      <div className="sheet-section">
+        <span className="eyebrow">Waiting for you</span>
+        {incoming.map((r) => (
+          <div key={r.user.id} className="list-row" style={{ cursor: 'default' }}>
+            <Avatar name={r.user.displayName} src={r.user.avatarUrl} id={r.user.id} accent={r.user.accent} size={42} />
+            <span className="grow" style={{ minWidth: 0 }}>
+              <span className="list-row-label">{r.user.displayName}</span>
+              <span className="list-row-sub">{r.note || `@${r.user.username}`}</span>
+            </span>
+            <span className="row" style={{ gap: 6, flex: 'none' }}>
+              <button
+                className="clay-btn"
+                disabled={busy === r.user.id}
+                onClick={() => run(r.user.id, () => decline(r.user.id), 'Declined')}
+              >
+                Decline
+              </button>
+              <button
+                className="slab"
+                disabled={busy === r.user.id}
+                onClick={() =>
+                  run(r.user.id, async () => {
+                    await accept(r.user.id);
+                    await openChatWith(r.user);
+                  })
+                }
+              >
+                Accept
+              </button>
+            </span>
+          </div>
+        ))}
+        {incoming.length === 0 && (
+          <p className="small muted" style={{ padding: '10px 4px' }}>
+            Nobody is waiting on you.
+          </p>
+        )}
+      </div>
+
+      {outgoing.length > 0 && (
+        <div className="sheet-section">
+          <span className="eyebrow">You asked</span>
+          {outgoing.map((r) => (
+            <div key={r.user.id} className="list-row" style={{ cursor: 'default' }}>
+              <Avatar name={r.user.displayName} src={r.user.avatarUrl} id={r.user.id} accent={r.user.accent} size={42} />
+              <span className="grow" style={{ minWidth: 0 }}>
+                <span className="list-row-label">{r.user.displayName}</span>
+                <span className="list-row-sub">Waiting for them to accept</span>
+              </span>
+              <button
+                className="clay-btn"
+                style={{ flex: 'none' }}
+                disabled={busy === r.user.id}
+                onClick={() => run(r.user.id, () => cancel(r.user.id), 'Request taken back')}
+              >
+                Cancel
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </Sheet>
   );
 }

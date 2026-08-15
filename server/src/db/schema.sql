@@ -423,3 +423,35 @@ ALTER TABLE users ADD COLUMN token_epoch INTEGER NOT NULL DEFAULT 0;
 -- Lives on the membership rather than the conversation because it is a
 -- personal preference, exactly like `sound` and `muted` beside it.
 ALTER TABLE conversation_members ADD COLUMN wallpaper TEXT NOT NULL DEFAULT '';
+
+-- ─── Friend requests ────────────────────────────────────────────────────────
+--
+-- Anyone could start a direct conversation and send into it. This makes that
+-- an invitation instead: the conversation may exist, but nothing can be said
+-- in it until the other person agrees.
+--
+-- One row per ordered pair, so "you asked me" and "I asked you" are distinct
+-- and a re-request after a decline overwrites the old row rather than piling
+-- up. `status` is 'pending', 'accepted' or 'declined'.
+CREATE TABLE IF NOT EXISTS friend_requests (
+  from_id      TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  to_id        TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  status       TEXT NOT NULL DEFAULT 'pending',
+  note         TEXT NOT NULL DEFAULT '',
+  created_at   INTEGER NOT NULL,
+  responded_at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (from_id, to_id)
+);
+
+-- The two questions asked constantly: "who is waiting on me" and "are these
+-- two allowed to talk". Both want the pair, one wants it by recipient.
+CREATE INDEX IF NOT EXISTS idx_friend_requests_to ON friend_requests (to_id, status);
+CREATE INDEX IF NOT EXISTS idx_friend_requests_from ON friend_requests (from_id, status);
+
+-- One-time migrations that are not schema changes and so cannot be expressed
+-- as an idempotent DDL statement. A key here means "this already ran".
+CREATE TABLE IF NOT EXISTS app_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT '',
+  at    INTEGER NOT NULL
+);

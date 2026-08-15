@@ -153,6 +153,19 @@ await migrate();
 }
 
 /**
+ * Friend requests arrived after people were already talking. Anyone with a
+ * direct conversation has plainly consented, so they start as friends —
+ * without this, switching the rule on would lock every existing pair out of
+ * their own history, which looks exactly like data loss even though nothing
+ * is lost. Idempotent, so it costs one query on every later boot.
+ */
+{
+  const { backfillFromConversations } = await import('./db/friends.js');
+  const paired = await backfillFromConversations();
+  if (paired) console.log(`  db        grandfathered ${paired} existing pair(s) as friends`);
+}
+
+/**
  * An empty database has nothing to look at, so development fills it with demo
  * accounts. Those accounts have a published password ("nookdemo1"), so seeding
  * them into a production deployment would hand anyone who has read this repo

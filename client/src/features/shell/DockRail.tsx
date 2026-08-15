@@ -3,14 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useChat } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
+import { useFriends, selectPendingCount } from '@/stores/friends';
 import Avatar from '@/components/Avatar';
 import { spring, popIn } from '@/lib/motion';
-import { IconMenu, IconPlus, IconSettings, IconPhone, IconSearch } from '@/components/Icon';
+import { IconMenu, IconPlus, IconSettings, IconPhone, IconSearch, IconUser } from '@/components/Icon';
 
 export default function DockRail() {
   const { conversations, order, activeId, setActive, presence } = useChat();
   const { toggleShelf, openSheet } = useUi();
   const me = useAuth((s) => s.me);
+  const pendingRequests = useFriends(selectPendingCount);
   const [hover, setHover] = useState<string | null>(null);
 
   const pinned = order.map((id) => conversations[id]).filter((c) => c && (c.pinned || c.unread > 0)).slice(0, 8);
@@ -84,6 +86,20 @@ export default function DockRail() {
         <button className="clay-round" onClick={() => openSheet('calls')} aria-label="Call history">
           <IconPhone />
         </button>
+        {/* Only present when someone is actually waiting. A permanent icon for
+            an empty inbox is a permanent invitation to check nothing. */}
+        {pendingRequests > 0 && (
+          <div className="rail-item">
+            <button
+              className="clay-round"
+              onClick={() => openSheet('requests')}
+              aria-label={`${pendingRequests} friend request${pendingRequests === 1 ? '' : 's'}`}
+            >
+              <IconUser />
+            </button>
+            <span className="chip">{pendingRequests > 9 ? '9+' : pendingRequests}</span>
+          </div>
+        )}
         <button className="clay-round" onClick={() => openSheet('new-chat')} aria-label="New conversation">
           <IconPlus />
         </button>
