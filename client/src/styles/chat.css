@@ -1696,22 +1696,28 @@
   }
 }
 
-/* ── the reaction row ─────────────────────────────────────────────────────
-   Replaces an arc that fanned emoji out from a point fixed at 18% of the
-   viewport — nowhere near the message, and off the edge of a phone. A row
-   measured against the message it belongs to fits any screen, and six targets
-   in a line are easier to hit than six on a curve.                        */
+/* ── the reaction discs ───────────────────────────────────────────────────
+   Each emoji floats in its own puffy circle rather than sitting in a shared
+   pill — that is what made them read as objects you can bat at rather than a
+   menu, and it is the part of the old arc worth keeping.
+
+   What the arc got wrong was position, not appearance: it fanned out from a
+   point fixed at 18% of the viewport, so on a phone the emoji landed beside
+   the wrong message and ran off the edge. These are measured against the
+   message and laid along a line, so seven of them fit across a narrow phone.
+   ────────────────────────────────────────────────────────────────────────── */
 
 .react-row {
   position: fixed;
   z-index: 97;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 5px;
-  border-radius: var(--r-pill);
-  background: var(--clay-raised);
-  box-shadow: var(--clay-3);
+  gap: 4px;
+  /* No background of its own — the discs are the object, and a container
+     behind them would turn seven floating things into one bar. */
+  background: none;
+  box-shadow: none;
+  padding: 0;
 }
 
 .react-pick {
@@ -1721,24 +1727,35 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-pill);
-  font-size: 24px;
+  font-size: 23px;
   line-height: 1;
-  background: transparent;
+
+  /* Clay: puffy, no border, soft dual shadow — an object resting above the
+     conversation rather than a control drawn onto it. */
+  background: var(--clay-raised);
+  box-shadow: var(--clay-2);
+
   transition:
-    background var(--dur-fast) var(--ease-out),
-    transform var(--dur-fast) var(--ease-out);
-}
-.react-pick:hover {
-  background: var(--clay-sunk);
-}
-.react-pick:active {
-  transform: scale(0.86);
+    transform var(--dur-fast) var(--ease-clay),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
+.react-pick:hover,
+.react-pick:focus-visible {
+  transform: translateY(-3px) scale(1.08);
+  box-shadow: var(--clay-3);
+}
+
+.react-pick:active {
+  transform: translateY(0) scale(0.9);
+  box-shadow: var(--clay-1);
+}
+
+/* The plus is the same disc, quieter — it opens a choice rather than being
+   one, so it should not compete with the six emoji beside it. */
 .react-more {
   color: var(--muted);
-  background: var(--clay-sunk);
-  box-shadow: var(--clay-in);
+  background: var(--clay-surface);
 }
 .react-more:hover {
   color: var(--ink);
@@ -1748,6 +1765,8 @@
   .react-pick {
     transition: none;
   }
+  .react-pick:hover,
+  .react-pick:focus-visible,
   .react-pick:active {
     transform: none;
   }

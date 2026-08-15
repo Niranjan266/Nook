@@ -14,9 +14,12 @@ import { IconPlus } from '@/components/Icon';
  * simply ran off the right edge, and the emoji appeared beside a message three
  * rows above the one you pressed.
  *
- * A row anchored to the message is duller and correct: it appears where you
- * pressed, it fits any screen because it is measured against one, and six
- * targets in a line are easier to hit than six on a curve.
+ * The circles themselves were the good part and are kept: each emoji floats in
+ * its own puffy disc rather than sitting in a shared pill, which is what made
+ * them read as objects you can bat at rather than a menu. What changed is
+ * where they are — measured against the message, so they appear where you
+ * pressed, and laid along a line rather than an arc so seven of them still fit
+ * across a narrow phone.
  *
  * Rendered into <body>. The bubble it belongs to is inside a Framer Motion
  * element that carries a transform for swipe-to-reply, and a transform makes
@@ -64,8 +67,15 @@ interface Props {
   onClose: () => void;
 }
 
-const ROW_W = 296;
-const ROW_H = 52;
+/**
+ * Seven discs — six emoji and the plus — laid across the narrowest phone worth
+ * supporting. 7 x 42 + 6 x 4 = 318, which clears 360px minus the 12px margins
+ * with room to spare, while keeping every target at 42px.
+ */
+const CELL = 42;
+const GAP = 4;
+const ROW_W = CELL * 7 + GAP * 6;
+const ROW_H = CELL;
 
 export default function ReactionBar({ open, anchor, mine, onPick, onClose }: Props) {
   const [quick, setQuick] = useState<string[]>(readQuick);
@@ -122,7 +132,7 @@ export default function ReactionBar({ open, anchor, mine, onPick, onClose }: Pro
 
             <motion.div
               ref={row}
-              className="react-row clay"
+              className="react-row"
               style={{ top, left, width: ROW_W }}
               initial={{ opacity: 0, scale: 0.9, y: above ? 6 : -6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -135,9 +145,12 @@ export default function ReactionBar({ open, anchor, mine, onPick, onClose }: Pro
                 <motion.button
                   key={`${emoji}-${i}`}
                   className="react-pick"
-                  initial={{ scale: 0.4, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ ...spring, delay: i * 0.02 }}
+                  /* Each disc lands in turn, slightly from below — the same
+                     unfolding the arc had, without the arc. */
+                  initial={{ scale: 0.3, opacity: 0, y: 10 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.4, opacity: 0 }}
+                  transition={{ ...spring, delay: i * 0.03 }}
                   onClick={() => choose(emoji)}
                   aria-label={`React ${emoji}`}
                   role="menuitem"
@@ -150,9 +163,10 @@ export default function ReactionBar({ open, anchor, mine, onPick, onClose }: Pro
                   become yours over time without a settings screen. */}
               <motion.button
                 className="react-pick react-more"
-                initial={{ scale: 0.4, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ ...spring, delay: quick.length * 0.02 }}
+                initial={{ scale: 0.3, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.4, opacity: 0 }}
+                transition={{ ...spring, delay: quick.length * 0.03 }}
                 onClick={() => setBrowsing(true)}
                 aria-label="Choose another emoji"
                 role="menuitem"
