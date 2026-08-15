@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
+        android:name=".CrashReport"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -41,6 +42,16 @@
             </intent-filter>
 
         </activity>
+
+        <!--
+          Where a startup crash goes instead of Android's "Nook keeps stopping".
+          Not exported: only this app can open it, and only by crashing.
+        -->
+        <activity
+            android:name=".CrashActivity"
+            android:exported="false"
+            android:process=":crash"
+            android:label="@string/app_name" />
 
         <!--
           A white-on-transparent status bar icon. Without this Android uses the
