@@ -12,7 +12,7 @@ import CallOverlay from '@/features/calls/CallOverlay';
 import { useSocketBridge } from '@/features/shell/useSocketBridge';
 import { useFriends } from '@/stores/friends';
 import { resumePush } from '@/lib/push';
-import { registerNativePush, bindBackButton, isNativeApp } from '@/lib/native';
+import { bindBackButton, isNativeApp } from '@/lib/native';
 
 import Toasts from '@/components/Toasts';
 import NotifyNudge from '@/components/NotifyNudge';
@@ -224,14 +224,22 @@ function Nook() {
       // load. Without this the badge would be zero until the first socket
       // event, which for anyone who was asked while signed out is never.
       useFriends.getState().load().catch(() => {});
-      // If permission was granted before, resubscribe silently — including
-      // after a VAPID key rotation, which invalidates every old subscription
-      // and otherwise leaves people quietly unsubscribed forever.
-      // Two transports, one call site. In a browser the native path returns
-      // immediately and web push does the work; in the APK it is the reverse,
-      // because Web Push does not exist inside an Android WebView.
+      /**
+       * If notifications were on before, turn them back on — quietly.
+       *
+       * One call, both transports: resumePush picks web push or FCM based on
+       * where it is running. It used to be two calls, and the second one
+       * registered for FCM unconditionally at sign-in. That was the crash —
+       * PushNotifications.register() throws on Capacitor's own thread when
+       * there is no Firebase config, which no try/catch here can catch — and
+       * it was also simply rude, firing Android's permission dialog over the
+       * first screen of the app before anyone had asked for anything.
+       *
+       * On the web this also repairs a VAPID key rotation, which invalidates
+       * every old subscription and otherwise leaves people quietly
+       * unsubscribed forever.
+       */
       resumePush().catch(() => {});
-      registerNativePush().catch(() => {});
     }
   }, [me?.id]);
 

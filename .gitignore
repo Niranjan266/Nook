@@ -45,7 +45,16 @@ client/android/capacitor-cordova-android-plugins/
 
 # Firebase credentials for push. Contains project identifiers tied to your
 # account; regenerate rather than share.
-client/android/app/google-services.json
+# Any path, not just the one Gradle reads.
+#
+# This used to name a single location, client/android/app/. The file was put
+# one directory up instead — which is easy to do, because that is where the
+# Android project root is — and the specific rule did not match, so a routine
+# `git add -A` committed it. A rule that only protects the correct location is
+# no protection at all: the whole point is to catch the case where something
+# ended up in the wrong place.
+google-services.json
+**/google-services.json
 
 # The signing key and its passwords. Losing this means never being able to
 # update an installed app; leaking it means someone else can.

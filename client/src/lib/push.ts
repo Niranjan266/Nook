@@ -1,11 +1,37 @@
 import { get, post } from './api';
+import { isNativeApp, registerNativePush, unregisterNativePush } from './native';
 
 export type PushStatus = 'on' | 'off' | 'denied' | 'unsupported';
 
+/**
+ * WHY EVERY FUNCTION HERE FORKS ON isNativeApp()
+ *
+ * There are two completely different push systems behind this one interface.
+ * On the web it is Web Push: a service worker, a PushManager subscription and
+ * a VAPID key. In the Android app it is FCM: a native token handed up by the
+ * Capacitor plugin.
+ *
+ * `PushManager` does not exist in an Android WebView. So `supported()` was
+ * false inside the app, and the toggle in Settings — which called straight
+ * into the web path — returned 'unsupported' and said "Notifications are not
+ * available here." Which was true of the code it ran, and false of the app it
+ * ran in: the whole reason the Android app exists is notifications on a locked
+ * phone.
+ *
+ * The native branch lives here rather than at each call site because there are
+ * three call sites — the Settings toggle, the nudge, and the resume at
+ * sign-in — and a fork repeated three times is a fork that will only ever be
+ * fixed twice.
+ */
 const supported = () =>
   'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
 export function pushState(): PushStatus {
+  // In the app there is no Notification.permission to read: Android's own
+  // permission is asked for by the plugin, and what we know is whether
+  // registration has succeeded before.
+  if (isNativeApp()) return localStorage.getItem('nook.push') === 'on' ? 'on' : 'off';
+
   if (!supported()) return 'unsupported';
   if (Notification.permission === 'denied') return 'denied';
   return localStorage.getItem('nook.push') === 'on' ? 'on' : 'off';
@@ -27,6 +53,14 @@ const urlBase64ToUint8Array = (base64: string) => {
 };
 
 export async function enablePush(): Promise<PushStatus> {
+  if (isNativeApp()) {
+    const result = await registerNativePush();
+    if (result === 'on') localStorage.setItem('nook.push', 'on');
+    // 'unavailable' means this build has no Firebase configuration, which is
+    // the same shape of answer as a browser that cannot do push at all.
+    return result === 'unavailable' ? 'unsupported' : result;
+  }
+
   if (!supported()) return 'unsupported';
 
   const permission = await Notification.requestPermission();
@@ -55,6 +89,14 @@ export async function enablePush(): Promise<PushStatus> {
 
 export async function disablePush() {
   localStorage.setItem('nook.push', 'off');
+
+  if (isNativeApp()) {
+    // Drops the FCM token and tells the server, so the next person to use this
+    // phone does not receive messages meant for whoever is signing out.
+    await unregisterNativePush();
+    return;
+  }
+
   const registration = await navigator.serviceWorker?.getRegistration();
   const sub = await registration?.pushManager.getSubscription();
   if (sub) {
@@ -77,6 +119,22 @@ export async function disablePush() {
  * keep handing back the dead subscription until it is explicitly replaced.
  */
 export async function resumePush(): Promise<PushStatus> {
+  if (isNativeApp()) {
+    /**
+     * Only re-register for someone who already had it on.
+     *
+     * Registering unasked would fire Android's permission dialog at sign-in,
+     * over the first screen of the app, before anyone has done anything worth
+     * being notified about. Someone who has turned it on once should not have
+     * to find the toggle again on every device, and someone who has not should
+     * not be interrupted.
+     */
+    if (localStorage.getItem('nook.push') !== 'on') return pushState();
+    const result = await registerNativePush();
+    if (result !== 'on') localStorage.setItem('nook.push', 'off');
+    return result === 'unavailable' ? 'unsupported' : result;
+  }
+
   if (!supported()) return 'unsupported';
   if (Notification.permission !== 'granted') return pushState();
 
