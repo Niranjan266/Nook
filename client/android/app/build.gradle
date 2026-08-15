@@ -1,5 +1,23 @@
 apply plugin: 'com.android.application'
 
+/**
+ * Release signing, read from an untracked properties file.
+ *
+ * Without this, `assembleRelease` produces an *unsigned* APK — it builds
+ * happily, looks like a success, and then Android refuses to install it with
+ * a message that does not mention signing. The failure is at the end of a
+ * fifteen-minute build and on a different machine from the mistake, which is
+ * the worst place for it.
+ *
+ * No properties file means the release build is skipped in favour of a debug
+ * one (see Build-Android.bat), so a first-time build still works.
+ */
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "in.niranjand.nook"
     compileSdk rootProject.ext.compileSdkVersion
@@ -16,10 +34,28 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                // rootProject, not file(): inside the app module `file()`
+                // resolves from client/android/app/, so a path written
+                // relative to where the properties file lives would quietly
+                // point three directories from where anyone expects.
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
