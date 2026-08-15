@@ -161,10 +161,10 @@
       </p>
 
       <div class="card">
-        <a class="slab" id="get" href="https://github.com/Niranjan266/Nook/releases/latest/download/nook.apk">Download Nook · APK</a>
+        <a class="slab" id="get" href="/nook.apk" download="nook.apk">Download Nook · APK</a>
         <p class="meta" id="meta">Android 5.1 or newer · about 5 MB</p>
         <p class="meta" style="margin-top: 4px" id="hosted">
-          Hosted on GitHub Releases, so you always get the newest build.
+          Served from this site — nothing to sign in to.
         </p>
       </div>
 
@@ -236,46 +236,25 @@
     </div>
     <script>
       /*
-        The one bit of script on the page, and it earns its place.
+        The APK is deployed with this page, so it is always present — no
+        "published yet?" question to ask, which is why the GitHub lookup that
+        used to live here is gone.
 
-        The button points at `releases/latest/download/nook.apk`, which is a
-        404 until a release with that asset exists. A download button that
-        silently fails is worse than one that admits it is not ready — someone
-        taps it, gets GitHub's error page, and concludes the app is broken.
-
-        So: ask GitHub whether a build is published, and say plainly if it is
-        not. Failing to reach the API leaves the button exactly as it was,
-        because an offline visitor is not evidence that no release exists.
+        This only fills in the real size. A HEAD request costs nothing and
+        beats a number in the markup that quietly goes stale after every build.
       */
-      (async () => {
-        const button = document.getElementById('get');
-        const meta = document.getElementById('meta');
-        const hosted = document.getElementById('hosted');
-
-        try {
-          const res = await fetch('https://api.github.com/repos/Niranjan266/Nook/releases/latest', {
-            headers: { accept: 'application/vnd.github+json' },
-          });
+      fetch('/nook.apk', { method: 'HEAD' })
+        .then((res) => {
           if (!res.ok) throw new Error(String(res.status));
-
-          const release = await res.json();
-          const apk = (release.assets || []).find((a) => a.name.endsWith('.apk'));
-          if (!apk) throw new Error('no apk in the latest release');
-
-          button.href = apk.browser_download_url;
-          const mb = (apk.size / 1048576).toFixed(1);
-          meta.textContent = `Android 5.1 or newer · ${mb} MB · ${release.tag_name || 'latest'}`;
-          hosted.textContent = `Published ${new Date(release.published_at).toLocaleDateString()}.`;
-        } catch {
-          button.textContent = 'Not published yet';
-          button.removeAttribute('href');
-          button.style.background = 'var(--surface)';
-          button.style.color = 'var(--muted)';
-          button.style.cursor = 'default';
-          meta.textContent = 'The Android build is not out yet.';
-          hosted.textContent = 'Nook works in your browser in the meantime — see below.';
-        }
-      })();
+          const bytes = Number(res.headers.get('content-length') || 0);
+          if (!bytes) return;
+          document.getElementById('meta').textContent =
+            `Android 5.1 or newer · ${(bytes / 1048576).toFixed(1)} MB`;
+        })
+        .catch(() => {
+          /* Leave the printed estimate. A failed HEAD says nothing about
+             whether the download itself will work. */
+        });
     </script>
   </body>
 </html>

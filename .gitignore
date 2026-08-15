@@ -53,6 +53,21 @@ client/android/app/google-services.json
 *.jks
 client/android/keystore.properties
 
-# The built APK. Copied to client/public/nook.apk for the download page.
+# The built APK.
+#
+# `client/public/nook.apk` is the exception and IS committed, because that is
+# what makes the download work. The alternative was GitHub Releases, which
+# needs the repository to be public — release assets on a private repo return
+# 404 to anyone not signed in, so the download button could never have worked
+# while this repo stays private.
+#
+# The cost is a few megabytes per release in git history. The benefit is that
+# publishing is a deploy: no separate hosting, no auth, and the file is served
+# from the same domain as the page offering it.
 *.apk
 *.aab
+!client/public/nook.apk
+
+# TypeScript's incremental build cache. Pure machine state — it changes on
+# every build and merges badly, and deleting it costs one slow compile.
+*.tsbuildinfo

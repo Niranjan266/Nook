@@ -1,0 +1,29 @@
+# Line endings.
+#
+# Without this, every Windows tool that touches a .bat file rewrites all its
+# line endings, and git reports the whole file as changed — 92 insertions and
+# 92 deletions in gradlew.bat with not one character of content different.
+# That noise buries the real diff, which is the only thing worth reviewing.
+#
+# So: normalise to LF in the repository, and check out the files that Windows
+# genuinely needs as CRLF. A .bat file with LF endings can fail outright on
+# older cmd.exe, so this is correctness, not tidiness.
+
+* text=auto eol=lf
+
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binary — never touch these, and never try to diff them as text.
+*.apk   binary
+*.aab   binary
+*.keystore binary
+*.jar   binary
+*.png   binary
+*.jpg   binary
+*.webp  binary
+*.mp3   binary
+*.ogg   binary
+*.wav   binary
+*.ico   binary

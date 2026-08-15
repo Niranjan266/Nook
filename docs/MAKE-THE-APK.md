@@ -115,33 +115,40 @@ what fixes that.
 
 ## Part 4 — Publish it
 
-The download page at <https://nook.niranjand.in/download> reads the newest
-GitHub release. Until one exists it honestly says *"Not published yet"* rather
-than offering a button that 404s.
+**`Build-Android.bat` does this for you.** It copies the APK into
+`client/public/`, commits it and pushes; Vercel deploys it and the download
+page serves it about two minutes later. There is nothing else to do.
 
-### The easy way
+### Why it is served from your own site
 
-Install the [GitHub CLI](https://cli.github.com), then once:
+The obvious home for an APK is GitHub Releases, and that is where this started.
+It does not work here: **release assets on a private repository return 404 to
+anyone who is not signed in**, so the download button would have been broken
+for every actual user while the repo stays private. Making the whole repository
+public to host one file is a large change for a small reason.
 
-```powershell
-gh auth login
-```
+Shipping it with the site instead means:
 
-After that, `Build-Android.bat` publishes automatically every time it builds —
-it creates the release, tags it from the version in `client/package.json`, and
-replaces the APK if that release already exists.
+- publishing is a deploy, with no second service to keep in step;
+- the file comes from the same domain as the page offering it, so no redirect,
+  no CORS, and the `Content-Type` that makes Android offer to install it rather
+  than save a file it will not open;
+- the repository can stay private.
+
+The cost is a few megabytes per release in git history. For a handful of
+releases that is fine; if it ever becomes a lot, that is the moment to move to
+Releases and make the repo public — not before.
 
 ### By hand
 
-1. Go to <https://github.com/Niranjan266/Nook/releases/new>
-2. **Tag**: `v1.0.0` (click "Create new tag on publish")
-3. **Title**: `Nook v1.0.0`
-4. Drag `nook.apk` into the attachments box.
-   **The filename must be exactly `nook.apk`.**
-5. Click **Publish release**.
+If you built without the script:
 
-Refresh the download page. The button turns live and shows the real size,
-version and date — **no redeploy needed**, it reads GitHub directly.
+```powershell
+copy /Y nook.apk client\public\nook.apk
+git add client/public/nook.apk
+git commit -m "Publish the Android app"
+git push
+```
 
 ---
 

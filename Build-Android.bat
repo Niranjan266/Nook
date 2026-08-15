@@ -104,42 +104,29 @@ if exist "client\android\!APK!" (
   echo.
 
   REM ---------------------------------------------------------- publish it
-  REM The download page reads the newest GitHub release, so publishing is the
-  REM step that actually puts the app in front of anyone. Done here rather
-  REM than left as homework, because a build nobody can download is not a
-  REM finished job.
-  where gh >nul 2>&1
+  REM The APK ships with the website rather than through GitHub Releases.
+  REM Release assets on a private repository return 404 to anyone not signed
+  REM in, so the download button could never have worked while this repo is
+  REM private - and making it public to host one file is a large change for a
+  REM small reason. Copying it into client\public means publishing is a deploy.
+  copy /Y "nook.apk" "client\public\nook.apk" >nul
+  echo   Copied into the website at client\public\nook.apk
+  echo.
+
+  git rev-parse --is-inside-work-tree >nul 2>&1
   if errorlevel 1 (
-    echo   [i] The GitHub CLI is not installed, so I cannot publish it for you.
-    echo.
-    echo       Either install it from https://cli.github.com and run this again,
-    echo       or upload nook.apk by hand:
-    echo.
-    echo         1. github.com/Niranjan266/Nook/releases/new
-    echo         2. Tag: v1.0.0
-    echo         3. Attach nook.apk  ^(the name must be exactly nook.apk^)
-    echo         4. Publish
-    echo.
-    echo       The download page picks it up straight away - no redeploy.
+    echo   [i] Not a git checkout, so nothing was published.
   ) else (
-    echo   Publishing to GitHub Releases...
-    for /f "tokens=*" %%v in ('powershell -NoProfile -Command "(Get-Content client\package.json ^| ConvertFrom-Json).version"') do set "VER=%%v"
-    if "!VER!"=="" set "VER=1.0.0"
-
-    gh release view "v!VER!" >nul 2>&1
+    git add client/public/nook.apk
+    git commit -m "Publish the Android app" >nul 2>&1
+    git push
     if errorlevel 1 (
-      gh release create "v!VER!" "nook.apk" --title "Nook v!VER!" --notes "Nook for Android. Install from https://nook.niranjand.in/download"
+      echo   [i] The push failed. Run 'git push' yourself once that is sorted.
     ) else (
-      echo   Release v!VER! already exists - replacing the APK.
-      gh release upload "v!VER!" "nook.apk" --clobber
-    )
-
-    if errorlevel 1 (
-      echo   [i] Publishing failed. Run 'gh auth login' once, then try again.
-    ) else (
-      echo.
       echo   ==========================================
-      echo     Live at https://nook.niranjand.in/download
+      echo     Pushed. Vercel is deploying it now.
+      echo     Live in ~2 minutes at:
+      echo     https://nook.niranjand.in/download
       echo   ==========================================
     )
   )
