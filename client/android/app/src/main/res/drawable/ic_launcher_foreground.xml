@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The nook itself: an alcove cut into the room, which also reads as a
+  lowercase n.
+
+  Same shape as logo.svg, moved and scaled to suit an adaptive icon rather
+  than a web page. The web mark sits low in its box because the rounded square
+  around it gives it a floor; here the launcher supplies the shape, so the
+  alcove has to be centred on its own or it looks like it has slipped.
+
+  The geometry, so the next person does not have to reverse it:
+    logo.svg draws the alcove on a 96x96 canvas at x 32..64, y 46..74.
+    Shifted to the origin and scaled by 1.1875, then placed at (35, 37.375),
+    it spans x 35..73 and y 37.375..70.625 — 38 wide, 33 tall, centred on
+    (54, 54), and 25.2 from the centre at its furthest corner.
+
+  That last number is the one that matters. Adaptive icons guarantee only the
+  middle 72x72 square, and launchers that mask to a circle show a 66 diameter
+  — radius 33. At 25.2 the mark clears a circular mask comfortably, so it is
+  never clipped no matter which launcher is installed.
+
+  It is drawn smaller than it needs to be, and that is the point. Filling the
+  safe zone was tried first: the alcove ran edge to edge and stopped reading
+  as a recess cut into a wall — it became a plain terracotta arch with some
+  bisque behind it. The margin is what makes the shape mean something.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- the alcove -->
+    <path
+        android:pathData="M35,70.625 V37.375 a19,19 0 0 1 38,0 V70.625 Z"
+        android:fillColor="#C0603C" />
+
+    <!-- light catching the left wall, which is what stops it reading flat -->
+    <path
+        android:pathData="M35,70.625 V37.375 a19,19 0 0 1 7.8375,-15.3188 l4.0375,5.7 A13.0625,13.0625 0 0 0 42.125,37.375 V70.625 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.18" />
+
+    <!-- the floor, in shadow -->
+    <path
+        android:pathData="M35,65.875 h38 v4.75 h-38 Z"
+        android:fillColor="#1E1A17"
+        android:fillAlpha="0.18" />
+</vector>

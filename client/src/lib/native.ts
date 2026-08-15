@@ -14,10 +14,28 @@ import { post, del } from './api';
  * downloads.
  */
 
-/** True only inside the Capacitor shell, not in a mobile browser. */
+/**
+ * True only inside the Capacitor shell, not in a mobile browser.
+ *
+ * The user agent is checked as well as the bridge, and that second test is not
+ * belt-and-braces — it is the one that matters when things go wrong.
+ *
+ * Because the app loads the live site rather than files inside the APK,
+ * Capacitor has to inject its bridge into a page it fetched over the network.
+ * That injection can fail for reasons that have nothing to do with this code:
+ * a slow first load, a proxy that re-encodes the HTML, a WebView that serves
+ * the page from its own cache. When it does fail, `window.Capacitor` is simply
+ * absent, and a check that only looked there would conclude it was running in
+ * Chrome — and then hand the person a sign-in flow that cannot come back.
+ *
+ * `appendUserAgent` in capacitor.config.ts stamps `NookApp/1` onto the web
+ * view's user agent natively, before any JavaScript runs. It cannot be missing
+ * while the bridge is present, and it is present when the bridge is not.
+ */
 export function isNativeApp(): boolean {
   const cap = (window as any).Capacitor;
-  return Boolean(cap?.isNativePlatform?.());
+  if (cap?.isNativePlatform?.()) return true;
+  return / NookApp\//.test(navigator.userAgent);
 }
 
 /**
@@ -203,16 +221,33 @@ export async function tap() {
 export async function startGoogleSignIn(apiBase: string, admin = false): Promise<boolean> {
   if (!isNativeApp()) return false;
 
+  const url = `${apiBase}/api/auth/google/start?native=1${admin ? '&admin=1' : ''}`;
+
   try {
     const { Browser } = await import('@capacitor/browser');
-    const url = `${apiBase}/api/auth/google/start?native=1${admin ? '&admin=1' : ''}`;
     await Browser.open({ url, presentationStyle: 'popover' });
     return true;
   } catch {
-    // No Custom Tab available. Falling back to a normal navigation still
-    // works, because the deep link is what actually carries the result — the
-    // browser choice only affects how it looks.
-    return false;
+    /**
+     * No Custom Tab — but this still has to finish inside the app, and this is
+     * exactly where it used to stop finishing.
+     *
+     * Capacitor sends any navigation to a host other than the one the app was
+     * loaded from straight to the system browser (Bridge.launchIntent). The
+     * API is on a different subdomain, so `location.href` here does not
+     * navigate the web view at all: it opens Chrome. That is fine — Google
+     * needs a real browser anyway — but only if the URL says `native=1`, so
+     * the server finishes at `nook://auth` and Android hands the result back.
+     *
+     * The old fallback returned false and let the caller navigate to the
+     * plain start URL instead. Without `native=1` the server finished at
+     * https://nook.niranjand.in, so the sign-in completed in Chrome, the
+     * session belonged to the browser, and the app was left sitting on the
+     * front door with no way to explain itself. That is the whole of "it logs
+     * in on the web and then kicks me out of the app".
+     */
+    window.location.href = url;
+    return true;
   }
 }
 
@@ -229,7 +264,7 @@ export async function bindDeepLinks(onCode: (code: string) => void, onError: (wh
   try {
     const { App } = await import('@capacitor/app');
 
-    await App.addListener('appUrlOpen', async ({ url }) => {
+    const handle = async (url?: string | null) => {
       if (!url?.startsWith('nook://')) return;
 
       // `new URL` on a custom scheme is unreliable across engines; the query
@@ -249,7 +284,26 @@ export async function bindDeepLinks(onCode: (code: string) => void, onError: (wh
 
       if (code) onCode(code);
       else if (failed) onError(failed);
-    });
+    };
+
+    await App.addListener('appUrlOpen', ({ url }) => handle(url));
+
+    /**
+     * The same link, but for a launch rather than a resume.
+     *
+     * `appUrlOpen` only fires at an app that is already running. Android is
+     * free to kill Nook while the person is off in the browser signing in —
+     * it is a backgrounded app and the browser wants the memory — and then
+     * the deep link *starts* the app instead of resuming it. In that case the
+     * event fired long before this listener existed, and waiting for it means
+     * waiting forever: the person signs in successfully, lands back in Nook,
+     * and finds the front door.
+     *
+     * `getLaunchUrl` is the intent the app was started with, so it catches
+     * exactly the case the listener cannot. Both routes run the same handler.
+     */
+    const launch = await App.getLaunchUrl();
+    await handle(launch?.url);
   } catch {
     /* not native */
   }

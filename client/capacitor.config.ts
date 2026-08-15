@@ -53,8 +53,39 @@ const config: CapacitorConfig = {
     // The web app already draws its own background; a white flash between the
     // splash screen and the first paint is more noticeable than the wait.
     backgroundColor: '#E9E1D6',
-    webContentsDebuggingEnabled: false,
+
+    /**
+     * Leave this on until the app is signed with a real key and in front of
+     * real people.
+     *
+     * Two rounds of "sign-in doesn't work on my phone" were diagnosed by
+     * reading source and guessing, because there was no way to see what the
+     * app was actually doing. With this on, plugging the phone in and opening
+     * chrome://inspect shows the app's console directly. That is worth more
+     * right now than closing an attack surface on a debug-signed APK that is
+     * already trivially inspectable.
+     */
+    webContentsDebuggingEnabled: true,
   },
+
+  /**
+   * Stamp the app onto the user agent.
+   *
+   * This exists so the web code can know it is inside the app *without* asking
+   * Capacitor. Because Nook loads the live site rather than files inside the
+   * APK, the JavaScript bridge has to be injected into a page fetched over the
+   * network, and that injection is not guaranteed. When it fails,
+   * `window.Capacitor` is missing and every native code path silently turns
+   * itself off — including the one that makes Google sign-in return to the app
+   * rather than ending in Chrome.
+   *
+   * The user agent is set natively before the first byte of the page is
+   * requested, so it cannot go missing the way the bridge can. Capacitor
+   * joins this to Android's own string with a space of its own (Bridge.java:
+   * `defaultUserAgent + " " + appendUserAgent`), so it must not start with
+   * one.
+   */
+  appendUserAgent: 'NookApp/1',
 
   plugins: {
     PushNotifications: {

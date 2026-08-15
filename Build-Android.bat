@@ -20,13 +20,22 @@ if errorlevel 1 (
 )
 
 REM ---------------------------------------------------------------- Java check
-REM Gradle needs a JDK. Android Studio ships one, which is the easiest source
-REM if JAVA_HOME is not already set.
-if "%JAVA_HOME%"=="" (
-  if exist "%ProgramFiles%\Android\Android Studio\jbr" (
-    set "JAVA_HOME=%ProgramFiles%\Android\Android Studio\jbr"
-    echo   [i] Using the JDK that came with Android Studio.
-  ) else (
+REM Gradle needs a JDK, and it is fussy about which one.
+REM
+REM Android Studio's bundled JDK is preferred even when JAVA_HOME already
+REM points somewhere else, which looks rude but is not. A newer JDK than the
+REM Android Gradle Plugin supports does not fail politely - it dies inside
+REM jlink with "Failed to transform core-for-system-modules.jar", which reads
+REM like a corrupt SDK and sends you looking in the wrong place entirely.
+REM This machine had JAVA_HOME on JDK 26 and lost a build to exactly that.
+REM
+REM The JDK that ships with Android Studio is by definition the one that
+REM matches the Android tooling installed next to it, so it wins.
+if exist "%ProgramFiles%\Android\Android Studio\jbr" (
+  set "JAVA_HOME=%ProgramFiles%\Android\Android Studio\jbr"
+  echo   [i] Using the JDK that came with Android Studio.
+) else (
+  if "%JAVA_HOME%"=="" (
     echo   [X] No JDK found.
     echo.
     echo       Easiest fix: install Android Studio, which includes one.

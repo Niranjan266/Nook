@@ -1,4 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!--
+      Kept only because the generated project referenced it, and something
+      else may still. The adaptive icon now uses @drawable/ic_launcher_background
+      instead, which carries the gradient a flat colour cannot. This is the
+      bisque that gradient starts from, so anything still pointing here gets
+      the right family of colour rather than the white it used to get.
+    -->
+    <color name="ic_launcher_background">#E9E1D6</color>
 </resources>

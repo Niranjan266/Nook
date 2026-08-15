@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Themed icons, Android 13 and later.
+
+  When someone turns on themed icons the launcher throws away both colour
+  layers and tints this silhouette to match their wallpaper. An app with no
+  monochrome layer gets a washed-out, auto-generated approximation instead —
+  usually the foreground flattened to one colour, which for Nook would be a
+  terracotta arch with a white highlight and a dark floor all collapsing into
+  a single flat block.
+
+  So it is drawn deliberately: the alcove alone, solid, with the highlight and
+  the floor dropped because tinting makes them meaningless. Colour is ignored
+  here; only the shape survives.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M35,70.625 V37.375 a19,19 0 0 1 38,0 V70.625 Z"
+        android:fillColor="#000000" />
+</vector>
