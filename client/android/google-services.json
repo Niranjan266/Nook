@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "127684226392",
+    "project_id": "nook-2639c",
+    "storage_bucket": "nook-2639c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:127684226392:android:e413a395955c310c50092d",
+        "android_client_info": {
+          "package_name": "in.niranjand.nook"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBlWbfiMEXrqch9wWrTO0JqwRn6JUPlZZg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

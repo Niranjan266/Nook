@@ -162,7 +162,7 @@
 
       <div class="card">
         <a class="slab" id="get" href="/nook.apk" download="nook.apk">Download Nook · APK</a>
-        <p class="meta" id="meta">Version 1.0.1 · Android 5.1 or newer · about 5 MB</p>
+        <p class="meta" id="meta">Version 1.0.3 · Android 5.1 or newer · about 5 MB</p>
         <p class="meta" style="margin-top: 4px" id="hosted">
           Served from this site — nothing to sign in to.
         </p>
@@ -256,7 +256,7 @@
           if (!bytes) return;
           const meta = document.getElementById('meta');
           // Keep whatever version is printed; only the size is measured.
-          const version = (meta.textContent.match(/^Version [\d.]+/) || ['Version 1.0.1'])[0];
+          const version = (meta.textContent.match(/^Version [\d.]+/) || ['Version 1.0.3'])[0];
           meta.textContent =
             `${version} · Android 5.1 or newer · ${(bytes / 1048576).toFixed(1)} MB`;
         })
