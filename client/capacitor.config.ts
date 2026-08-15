@@ -55,17 +55,24 @@ const config: CapacitorConfig = {
     backgroundColor: '#E9E1D6',
 
     /**
-     * Leave this on until the app is signed with a real key and in front of
-     * real people.
+     * `webContentsDebuggingEnabled` is deliberately absent.
      *
-     * Two rounds of "sign-in doesn't work on my phone" were diagnosed by
-     * reading source and guessing, because there was no way to see what the
-     * app was actually doing. With this on, plugging the phone in and opening
-     * chrome://inspect shows the app's console directly. That is worth more
-     * right now than closing an attack surface on a debug-signed APK that is
-     * already trivially inspectable.
+     * It was set to true here so a phone could be plugged in and inspected —
+     * two rounds of "sign-in doesn't work on my phone" had to be diagnosed by
+     * reading Capacitor's source, which is no way to work. But a hardcoded
+     * true is a footgun: it ships in the signed release too, and it relies on
+     * somebody remembering to remove it on exactly the right day.
+     *
+     * Capacitor already does the right thing when the key is missing. From
+     * CapConfig.java:
+     *
+     *   webContentsDebuggingEnabled =
+     *     JSONUtils.getBoolean(configJSON, "android.webContentsDebuggingEnabled", isDebug);
+     *
+     * The default is the build's own debuggable flag. So a debug APK is
+     * inspectable and a release APK is not, decided by which one was built
+     * rather than by anyone's memory.
      */
-    webContentsDebuggingEnabled: true,
   },
 
   /**

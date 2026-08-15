@@ -65,6 +65,13 @@ echo.
 echo     Write it down somewhere safe FIRST. There is no way to
 echo     recover it, and without it the key is useless - which
 echo     means never being able to update the app again.
+echo.
+echo     Avoid backslashes. The password is stored in a Java
+echo     properties file, where a backslash starts an escape - so a
+echo     password containing one is read back wrong and the build
+echo     fails claiming the password is incorrect, which sends you
+echo     looking anywhere but here. Letters, digits and punctuation
+echo     other than \ are all fine.
 echo   ------------------------------------------------------------
 echo.
 echo   keytool will also ask for your name, city and so on. None of
