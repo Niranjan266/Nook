@@ -71,3 +71,8 @@ client/android/keystore.properties
 # TypeScript's incremental build cache. Pure machine state — it changes on
 # every build and merges badly, and deleting it costs one slow compile.
 *.tsbuildinfo
+
+# The signing key's password, written by Make-Signing-Key.bat so it can be
+# backed up. The keystore and keystore.properties are already ignored above;
+# this is the third copy of the same secret and it must never be committed.
+NOOK-SIGNING-PASSWORD.txt
