@@ -48,6 +48,26 @@ export default function WallpaperSheet() {
     setScope('mine');
   }, [open, conversation?.id]);
 
+  /**
+   * Mirror the choice onto the real conversation behind this sheet.
+   *
+   * ABOVE the early return, and that placement is the bug fix, not tidiness.
+   * This component renders with no conversation selected — every sheet does —
+   * and returns early. A hook that sits below that return does not run on
+   * those renders, so the moment a chat opened, the component called two more
+   * hooks than the render before and React tore the whole tree down:
+   * "Rendered more hooks than during the previous render", experienced as
+   * every chat page turning blank. Same trap as the hooks-order crash this
+   * sheet had once before; hooks live above every conditional return, always.
+   *
+   * Gated on `open` so a closed sheet never pushes a draft over the chat.
+   */
+  const setWallpaperDraft = useUi((s) => s.setWallpaperDraft);
+  useEffect(() => {
+    if (!open) return;
+    setWallpaperDraft({ url, preset, tint, dim, blur });
+  }, [open, url, preset, tint, dim, blur, setWallpaperDraft]);
+
   if (!conversation) return null;
 
   const isGroup = conversation.type === 'group';
@@ -108,17 +128,6 @@ export default function WallpaperSheet() {
     }
   };
 
-  /**
-   * Mirror the choice onto the real conversation behind this sheet.
-   *
-   * Everything the sliders and the swatches change flows out here, and
-   * closeSheet clears it — so cancelling leaves no trace, and only the Set
-   * button ever writes anything down.
-   */
-  const setWallpaperDraft = useUi((s) => s.setWallpaperDraft);
-  useEffect(() => {
-    setWallpaperDraft({ url, preset, tint, dim, blur });
-  }, [url, preset, tint, dim, blur, setWallpaperDraft]);
 
   const previewStyle: React.CSSProperties = {
     backgroundImage: url ? `url(${url})` : undefined,
