@@ -675,3 +675,55 @@ button.list-row:active {
   background: rgba(30, 26, 23, 0.08);
   backdrop-filter: none;
 }
+
+/* ── the welcome, once per new account ─────────────────────────────────────
+   Over everything including sheets: it fires seconds after signup, when
+   nothing else is open, but "usually" is not "always".                     */
+.welcome-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(30, 26, 23, 0.45);
+  backdrop-filter: blur(3px);
+}
+.welcome-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 380px;
+  width: 100%;
+  padding: 36px 28px 28px;
+  border-radius: var(--r-clay-lg, 28px);
+  text-align: center;
+  /* Shards fly out from behind the mark and past the card's edge; clipping
+     them would turn a burst into a peek. */
+  overflow: visible;
+}
+.welcome-shard {
+  position: absolute;
+  top: 84px;
+  left: 50%;
+  pointer-events: none;
+}
+.welcome-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.welcome-title span { display: inline-block; white-space: pre; }
+.welcome-quote {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--muted);
+  font-style: italic;
+  max-width: 300px;
+}
+.welcome-go { margin-top: 8px; padding: 12px 32px; }

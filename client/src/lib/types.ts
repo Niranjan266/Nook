@@ -41,6 +41,8 @@ export interface Person {
 export interface Me extends Omit<Person, 'quietHours'> {
   email: string;
   emailVerified: boolean;
+  /** When the account was made — how the welcome knows you are new here. */
+  createdAt?: string;
   privacy: { lastSeen: Visibility; readReceipts: boolean; avatar: Visibility };
   settings: {
     theme: 'light' | 'dark' | 'system';

@@ -15,6 +15,7 @@ import { resumePush } from '@/lib/push';
 import { bindBackButton, isNativeApp } from '@/lib/native';
 
 import Toasts from '@/components/Toasts';
+import Welcome, { shouldWelcome } from '@/components/Welcome';
 import NotifyNudge from '@/components/NotifyNudge';
 import Lightbox from '@/components/Lightbox';
 import {
@@ -249,6 +250,19 @@ function Nook() {
    * interruption that vanishes when you navigate is not an interruption.
    */
   const [banner, setBanner] = useState<BannerMessage | null>(null);
+
+  /**
+   * The welcome, decided when the account first arrives.
+   *
+   * Keyed on createdAt rather than on either signup flow: the form and Google
+   * finish in different places (and Google in three, counting the deep link),
+   * and one fact the server already sends is true for all of them — an
+   * account minutes old is an account that just signed up.
+   */
+  const [welcome, setWelcome] = useState(false);
+  useEffect(() => {
+    if (me && shouldWelcome(me)) setWelcome(true);
+  }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(
     () =>
       onBanner((m) =>
@@ -331,6 +345,14 @@ function Nook() {
       <Lightbox />
       <MessageBanner message={banner} onDismiss={() => setBanner(null)} />
       <Toasts />
+      {me && (
+        <Welcome
+          open={welcome}
+          name={me.displayName}
+          userId={me.id}
+          onClose={() => setWelcome(false)}
+        />
+      )}
       <OfflineBar />
     </>
   );
