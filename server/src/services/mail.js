@@ -88,6 +88,15 @@ async function send({ to, subject, html, text }) {
   }
 }
 
+/**
+ * Escape before interpolating anything a person typed. A display name is
+ * whatever someone chose to call themselves, and went into these emails raw —
+ * so a name could carry a link or a fake "reset here" button into a message
+ * that really did come from Nook.
+ */
+const esc = (s) =>
+  String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 const shell = (heading, lead, code) => `
 <div style="background:#E9E1D6;padding:40px 16px;font-family:ui-sans-serif,system-ui,sans-serif">
   <div style="max-width:440px;margin:0 auto;background:#F4EEE6;border-radius:28px;padding:36px;
@@ -111,8 +120,8 @@ export function sendRecoveryCode({ to, code, displayName }) {
     subject: `${code} is your Nook recovery code`,
     html: shell(
       'Get back into your nook',
-      `Hi ${displayName} — use this code to reset your password.`,
-      code
+      `Hi ${esc(displayName)} — use this code to reset your password.`,
+      esc(code)
     ),
     text: `Your Nook recovery code is ${code}. It expires in 15 minutes.`,
   });
@@ -135,7 +144,7 @@ export function sendEmailVerification({ to, code, displayName }) {
   return send({
     to,
     subject: copy.subject,
-    html: shell(copy.heading, copy.lede, copy.code),
+    html: shell(esc(copy.heading), esc(copy.lede), esc(copy.code)),
     text: copy.body,
   });
 }
@@ -218,7 +227,7 @@ function welcomeHtml({ displayName, username, nookId, appUrl }) {
       <tr><td>
         <div style="font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:${MUTED}">Nook</div>
         <h1 style="margin:14px 0 10px;font-size:28px;line-height:1.15;color:${INK};letter-spacing:-0.02em">
-          Welcome, ${displayName}.
+          Welcome, ${esc(displayName)}.
         </h1>
         <p style="margin:0 0 26px;font-size:15px;line-height:1.65;color:${MUTED}">
           Your corner of the internet is ready. No feed, no reels, no strangers —
@@ -227,8 +236,8 @@ function welcomeHtml({ displayName, username, nookId, appUrl }) {
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
                style="margin:0 0 26px">
-          ${row('Your username', '@' + username)}
-          ${row('Your Nook ID', nookId)}
+          ${row('Your username', '@' + esc(username))}
+          ${row('Your Nook ID', esc(nookId))}
         </table>
 
         <p style="margin:0 0 22px;font-size:14px;line-height:1.65;color:${MUTED}">
@@ -285,9 +294,6 @@ export function sendWelcome({ to, displayName, username, nookId }) {
    other Nook email so it does not look like it came from somewhere else.
    ────────────────────────────────────────────────────────────────────────── */
 
-/** Escape before interpolating: the body is typed by a human, not by us. */
-const esc = (s) =>
-  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Blank line = paragraph. Single newline = line break. Nothing else. */
 const paragraphs = (body) =>

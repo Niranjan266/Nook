@@ -6,7 +6,7 @@
  * vocabulary. The database changed; the shape the rest of the app sees did not.
  */
 import crypto from 'node:crypto';
-import { all, one, run, newId, now, parseJson, toJson, bool, placeholders } from './index.js';
+import { all, one, run, tx, newId, now, parseJson, toJson, bool, placeholders } from './index.js';
 
 /**
  * Nook IDs — the short code you hand out instead of your username.
@@ -249,7 +249,18 @@ export async function uniqueUsernameFrom(seed) {
   return `${base.slice(0, 12)}${crypto.randomBytes(4).toString('hex')}`;
 }
 
+/**
+ * Names nobody may sign up with. Announcements arrive from an account called
+ * "nook", and anyone who registered that name first could write to people
+ * wearing the app's own voice. Checked here, in the one function every path
+ * that hands out a username asks, so signup, rename and Google all agree.
+ */
+const RESERVED_USERNAMES = new Set(['nook', 'admin', 'administrator', 'system', 'support', 'root']);
+
+export const isReservedUsername = (username) => RESERVED_USERNAMES.has(String(username).toLowerCase());
+
 export async function usernameTaken(username) {
+  if (isReservedUsername(username)) return true;
   const row = await one('SELECT 1 AS x FROM users WHERE username = ?', [String(username).toLowerCase()]);
   return Boolean(row);
 }
@@ -412,6 +423,12 @@ export async function contactIds(userId) {
   return rows.map((r) => r.contact_id);
 }
 
+/** The people who have saved this user as a contact — the other direction. */
+export async function contactOfIds(userId) {
+  const rows = await all('SELECT user_id FROM user_contacts WHERE contact_id = ?', [userId]);
+  return rows.map((r) => r.user_id);
+}
+
 export async function blockedIds(userId) {
   const rows = await all('SELECT blocked_id FROM user_blocks WHERE user_id = ?', [userId]);
   return rows.map((r) => r.blocked_id);
@@ -519,25 +536,29 @@ export async function listFolders(userId) {
 }
 
 /** Replace the whole set — simplest correct semantics for a reorderable list. */
+/**
+ * One transaction. As separate statements, a failed insert — two folders with
+ * the same id was enough — landed after the deletes, and the person was left
+ * with no folders at all.
+ */
 export async function replaceFolders(userId, folders) {
-  await run('DELETE FROM folder_conversations WHERE user_id = ?', [userId]);
-  await run('DELETE FROM folders WHERE user_id = ?', [userId]);
-
+  const statements = [
+    { sql: 'DELETE FROM folder_conversations WHERE user_id = ?', args: [userId] },
+    { sql: 'DELETE FROM folders WHERE user_id = ?', args: [userId] },
+  ];
   for (const [index, folder] of folders.entries()) {
-    await run('INSERT INTO folders (id, user_id, name, emoji, position) VALUES (?, ?, ?, ?, ?)', [
-      folder.id,
-      userId,
-      folder.name,
-      folder.emoji || '',
-      index,
-    ]);
+    statements.push({
+      sql: 'INSERT INTO folders (id, user_id, name, emoji, position) VALUES (?, ?, ?, ?, ?)',
+      args: [folder.id, userId, folder.name, folder.emoji || '', index],
+    });
     for (const conversationId of folder.conversations || []) {
-      await run(
-        'INSERT OR IGNORE INTO folder_conversations (user_id, folder_id, conversation_id) VALUES (?, ?, ?)',
-        [userId, folder.id, conversationId]
-      );
+      statements.push({
+        sql: 'INSERT OR IGNORE INTO folder_conversations (user_id, folder_id, conversation_id) VALUES (?, ?, ?)',
+        args: [userId, folder.id, conversationId],
+      });
     }
   }
+  await tx(statements);
   return listFolders(userId);
 }
 

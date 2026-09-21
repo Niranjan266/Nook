@@ -513,3 +513,21 @@ ALTER TABLE message_views ADD COLUMN opens INTEGER NOT NULL DEFAULT 1;
 -- leading and trailing commas so `LIKE '%,id,%'` cannot match a prefix of a
 -- longer id.
 ALTER TABLE messages ADD COLUMN saved_by TEXT NOT NULL DEFAULT '';
+
+-- Retries of the same send. The client resends with the same clientId when an
+-- ack times out, and without a lookup by it every retry became a second copy
+-- of the message. Not UNIQUE: older rows can already hold duplicates, and a
+-- unique index that fails to build would stop the server booting.
+CREATE INDEX IF NOT EXISTS idx_messages_client ON messages (sender_id, client_id);
+
+-- Who uploaded each stored file.
+--
+-- Unsending a message deletes its file at the provider, and the file's id used
+-- to come from the client. Anyone who could see a message could therefore
+-- send one naming its file and unsend it, deleting somebody else's photo. A
+-- message now keeps a file id only if its sender is the one who uploaded it.
+CREATE TABLE IF NOT EXISTS media_uploads (
+  public_id  TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL
+);

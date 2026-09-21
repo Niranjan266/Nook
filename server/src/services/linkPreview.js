@@ -14,6 +14,7 @@ import net from 'node:net';
 const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
 const MAX_BYTES = 512 * 1024; // stop reading after 512 KB of HTML
 const TIMEOUT = 6000;
+const MAX_REDIRECTS = 3;
 
 /** url -> { at, data } */
 const cache = new Map();
@@ -39,13 +40,39 @@ function isPrivateV4(ip) {
   });
 }
 
+/**
+ * An IPv4 address hiding inside an IPv6 one — `::ffff:127.0.0.1`, or the same
+ * thing as URL parsing normalises it, `::ffff:7f00:1`. Both reach the IPv4
+ * host, so both have to be judged as that host.
+ */
+function embeddedV4(v) {
+  const m = v.match(/^(?:::ffff:|::ffff:0:|::|64:ff9b::)(?:(\d+\.\d+\.\d+\.\d+)|([0-9a-f]{1,4}):([0-9a-f]{1,4}))$/);
+  if (!m) return null;
+  if (m[1]) return m[1];
+  const hi = parseInt(m[2], 16);
+  const lo = parseInt(m[3], 16);
+  return [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+}
+
 const isPrivateV6 = (ip) => {
-  const v = ip.toLowerCase();
-  return v === '::1' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80') || v === '::';
+  const v = ip.toLowerCase().replace(/^\[|\]$/g, '');
+  const v4 = embeddedV4(v);
+  if (v4) return isPrivateV4(v4);
+  return (
+    v === '::1' ||
+    v === '::' ||
+    v.startsWith('fc') ||
+    v.startsWith('fd') ||
+    /^fe[89ab]/.test(v) || // link-local
+    /^fe[c-f]/.test(v) || // old site-local
+    v.startsWith('ff') // multicast
+  );
 };
 
 /** Reject anything that resolves inside our own network. */
-async function assertPublic(hostname) {
+async function assertPublic(rawHostname) {
+  // URL keeps the brackets on an IPv6 literal; net.isIP does not accept them.
+  const hostname = rawHostname.replace(/^\[|\]$/g, '');
   if (net.isIP(hostname)) {
     const priv = net.isIPv4(hostname) ? isPrivateV4(hostname) : isPrivateV6(hostname);
     if (priv) throw new Error('Refusing to fetch a private address.');
@@ -117,44 +144,60 @@ export async function fetchPreview(rawUrl) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL) return hit.data;
 
-  await assertPublic(url.hostname);
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT);
 
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        // Identify honestly; many sites serve better metadata to known bots.
-        'user-agent': 'Mozilla/5.0 (compatible; NookBot/1.0; +https://nook.app/bot)',
-        accept: 'text/html,application/xhtml+xml',
-      },
-    });
+    /**
+     * Redirects are followed by hand, checking every hop before it is
+     * requested. With `redirect: 'follow'` the check ran on the final URL,
+     * after the request to it had already been made — so a public page that
+     * redirected to 169.254.169.254 got fetched, and only the *answer* was
+     * refused. For SSRF the request is the damage.
+     */
+    let current = url;
+    let res;
+    for (let hop = 0; ; hop += 1) {
+      if (!['http:', 'https:'].includes(current.protocol)) throw new Error('Only http and https.');
+      await assertPublic(current.hostname);
+      res = await fetch(current, {
+        signal: controller.signal,
+        redirect: 'manual',
+        headers: {
+          // Identify honestly; many sites serve better metadata to known bots.
+          'user-agent': 'Mozilla/5.0 (compatible; NookBot/1.0; +https://nook.app/bot)',
+          accept: 'text/html,application/xhtml+xml',
+        },
+      });
+      const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+      if (!location) break;
+      if (hop >= MAX_REDIRECTS) throw new Error('Too many redirects.');
+      res.body?.cancel?.().catch(() => {});
+      current = new URL(location, current);
+    }
 
     if (!res.ok) throw new Error(`That page returned ${res.status}.`);
     const type = res.headers.get('content-type') || '';
     if (!type.includes('html')) throw new Error('Not a web page.');
 
-    // A redirect can land somewhere private even when the first host was fine.
-    await assertPublic(new URL(res.url).hostname);
-
+    const finalUrl = current.toString();
     const html = await readCapped(res);
 
     const data = {
-      url: res.url,
+      url: finalUrl,
       title:
         metaTag(html, ['og:title', 'twitter:title']) ||
         decode(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || ''),
       description: metaTag(html, ['og:description', 'twitter:description', 'description']),
       image: metaTag(html, ['og:image:secure_url', 'og:image', 'twitter:image']),
-      siteName: metaTag(html, ['og:site_name']) || new URL(res.url).hostname.replace(/^www\./, ''),
+      siteName: metaTag(html, ['og:site_name']) || current.hostname.replace(/^www\./, ''),
     };
 
+    // The page chooses this, and it ends up in an <img src>: web URLs only.
     if (data.image) {
       try {
-        data.image = new URL(data.image, res.url).toString();
+        const image = new URL(data.image, finalUrl);
+        data.image = ['http:', 'https:'].includes(image.protocol) ? image.toString() : '';
       } catch {
         data.image = '';
       }

@@ -153,4 +153,92 @@ for (let i = 0; i < 8; i += 1) {
 }
 ok('guessing an email code is stopped', refused > 0, `${refused} of 8 refused`);
 
+/* ── SOCKETS ──────────────────────────────────────────────────────────── */
+const ORIGIN = BASE.replace(/\/api$/, '');
+const sa = await reg('socka');
+const sb = await reg('sockb');
+await befriend(sa, sb);
+const scid2 = (await api('/conversations/direct', { method: 'POST', token: sa.token, body: { userId: sb.id } })).json.conversation.id;
+
+const { io } = await import('../../client/node_modules/socket.io-client/build/esm/index.js');
+const sock = await new Promise((resolve, reject) => {
+  const s = io(ORIGIN, { auth: { token: sa.token }, transports: ['websocket'], reconnection: false });
+  s.on('connect', () => resolve(s));
+  s.on('connect_error', reject);
+  setTimeout(() => reject(new Error('socket never connected')), 8000);
+}).catch(() => null);
+ok('a socket can connect', Boolean(sock));
+
+if (sock) {
+  // Each of these used to throw inside a handler; the first one killed the process.
+  sock.emit('typing:stop');
+  sock.emit('typing:start', null);
+  sock.emit('message:read');
+  sock.emit('call:answer', 42);
+  const who = await new Promise((done) => sock.emit('presence:who', 'not-a-list', done));
+  await settle(500);
+  const health = await fetch(`${ORIGIN}/api/health`).catch(() => null);
+  ok('malformed socket events do not take the server down', health?.status === 200 && sock.connected,
+     `${health?.status} connected=${sock.connected}`);
+  ok('presence:who wants a list', JSON.stringify(who) === '{}', JSON.stringify(who));
+
+  const send = (payload) => new Promise((done) => sock.emit('message:send', { conversationId: scid2, ...payload }, done));
+  let ack = await send({ type: 'system', body: 'I am the server' });
+  ok('the socket refuses a forged system message', ack?.ok === false, JSON.stringify(ack).slice(0, 160));
+  ack = await send({ type: 'image', media: { url: 'javascript:alert(1)' } });
+  ok('the socket refuses a javascript: media link', ack?.ok === false, JSON.stringify(ack).slice(0, 160));
+  ack = await send({ type: 'snap', viewOnce: true, viewSeconds: 999999, media: { url: 'https://example.com/x.jpg' } });
+  ok('the socket caps the snap timer like REST does', ack?.ok === false, JSON.stringify(ack).slice(0, 160));
+
+  const first = await send({ type: 'text', body: 'once', clientId: 'retry-1' });
+  const again = await send({ type: 'text', body: 'once', clientId: 'retry-1' });
+  ok('a resend with the same clientId returns the same message',
+     first?.ok && again?.ok && first.message.id === again.message.id,
+     `${first?.message?.id} vs ${again?.message?.id}`);
+  sock.close();
+}
+
+/* ── MEDIA ────────────────────────────────────────────────────────────── */
+r = await api(`/messages/${scid2}`, { method: 'POST', token: sa.token, body: { type: 'image', media: { url: 'javascript:alert(1)' } } });
+ok('REST refuses a javascript: media link', r.status === 400, String(r.status));
+
+const upload = async (token, name, type, content) => {
+  const form = new FormData();
+  form.append('kind', 'message');
+  form.append('file', new Blob([content], { type }), name);
+  const res = await fetch(`${BASE}/media`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: form });
+  return (await res.json()).media;
+};
+
+// B uploads a picture; A names B's file in a message of their own and unsends it.
+const theirs = await upload(sb.token, 'mine.txt', 'text/plain', 'a file of my own');
+if (theirs?.publicId && theirs.url.startsWith('/uploads/')) {
+  const sent = await api(`/messages/${scid2}`, { method: 'POST', token: sa.token, body: { type: 'image', media: { url: theirs.url, publicId: theirs.publicId } } });
+  await api(`/messages/${sent.json.message?.id}?scope=everyone`, { method: 'DELETE', token: sa.token });
+  const still = await fetch(ORIGIN + theirs.url);
+  ok("unsending cannot delete someone else's upload", still.status === 200, String(still.status));
+
+  const page = await upload(sa.token, 'evil.html', 'text/html', '<script>alert(document.domain)</script>');
+  const served = await fetch(ORIGIN + page.url);
+  ok('an uploaded page is served as a download',
+     /attachment/.test(served.headers.get('content-disposition') || '') &&
+       !/html/.test(served.headers.get('content-type') || '') &&
+       served.headers.get('x-content-type-options') === 'nosniff',
+     `${served.headers.get('content-type')} / ${served.headers.get('content-disposition')}`);
+  const svg = await upload(sa.token, 'x.svg', 'image/svg+xml', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+  const svgServed = await fetch(ORIGIN + svg.url);
+  ok('an uploaded SVG is not served inline', /attachment/.test(svgServed.headers.get('content-disposition') || ''),
+     String(svgServed.headers.get('content-disposition')));
+}
+
+/* ── SPACES ───────────────────────────────────────────────────────────── */
+const grp = (await api('/conversations/group', { method: 'POST', token: sa.token, body: { name: 'mine', memberIds: [sb.id] } })).json.conversation;
+const space = (await api('/spaces', { method: 'POST', token: sb.token, body: { name: 'takeover' } })).json.space;
+r = await api(`/spaces/conversations/${grp.id}/space`, { method: 'PATCH', token: sb.token, body: { spaceId: space.id } });
+ok('a plain member cannot move a group into their space', r.status === 403, String(r.status));
+r = await api(`/spaces/conversations/${scid2}/space`, { method: 'PATCH', token: sb.token, body: { spaceId: space.id } });
+ok('a direct chat cannot be moved into a space', r.status === 400, String(r.status));
+r = await api(`/spaces/${space.id}/members/${sa.id}`, { method: 'DELETE', token: sb.token });
+ok('revoking someone outside the space is refused', r.status === 404, String(r.status));
+
 process.exit(t.done() ? 1 : 0);

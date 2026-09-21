@@ -8,12 +8,15 @@ import { asyncRoute, requireAuth } from '../middleware/auth.js';
 import { httpError } from '../middleware/error.js';
 import {
   signAccess,
+  verifyAccess,
   verifyRefresh,
   clearRefreshCookie,
   attachSession,
   readRefreshToken,
 } from '../services/tokens.js';
 import { revokeAllFor } from '../lib/lockgrants.js';
+import { bumpTokenEpoch } from '../db/admin.js';
+import { disconnectUser } from '../sockets/hub.js';
 import { sendRecoveryCode, sendEmailVerification, sendWelcome, mailProvider } from '../services/mail.js';
 
 const router = Router();
@@ -226,7 +229,16 @@ router.post(
       throw httpError(400, 'Current password is wrong.');
 
     await U.updateUser(req.user.id, { passwordHash: await hashPassword(next) });
-    res.json({ ok: true });
+
+    /**
+     * A new password is usually a response to someone else having the old
+     * one, so every other session ends here. This one carries on with the
+     * fresh tokens below, minted after the epoch moved.
+     */
+    await bumpTokenEpoch(req.user.id);
+    disconnectUser(req.user.id);
+    const session = attachSession(req, res, req.user.id);
+    res.json({ ok: true, accessToken: signAccess(req.user.id), ...session });
   })
 );
 
@@ -428,6 +440,10 @@ router.post(
       passwordHash: await hashPassword(password),
       recovery: { code: '', expiresAt: null },
     });
+
+    // Whoever had the old password is signed out; the session below is new.
+    await bumpTokenEpoch(updated.id);
+    disconnectUser(updated.id);
 
     const session = attachSession(req, res, updated.id);
     res.json({ user: await me(updated), accessToken: signAccess(updated.id), ...session });

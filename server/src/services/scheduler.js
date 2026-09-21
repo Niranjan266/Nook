@@ -15,7 +15,7 @@
  */
 import * as M from '../db/messages.js';
 import * as C from '../db/conversations.js';
-import { deliver } from './messages.js';
+import { deliver, assertMayReach } from './messages.js';
 
 const TICK = 20_000;
 let timer = null;
@@ -28,8 +28,21 @@ async function releaseDueMessages() {
     // Claim it first, so a slow delivery can't be picked up twice.
     if (!(await M.claimScheduled(stub.id))) continue;
 
+    /**
+     * Claiming marks it delivered, and a delivered row is in everybody's
+     * history. So if the sender may no longer reach these people — blocked or
+     * unfriended since they scheduled it — the row has to go, not merely stay
+     * un-fanned-out: otherwise the refused message turns up on the next load.
+     */
     const convo = await C.findConversation(stub.conversation_id);
-    if (!convo) continue;
+    try {
+      if (!convo) throw new Error('conversation is gone');
+      await assertMayReach(convo, stub.sender_id);
+    } catch (err) {
+      console.error('  scheduler dropped', stub.id, err.message);
+      await M.deleteMessageRow(stub.id);
+      continue;
+    }
 
     const message = await M.findMessage(stub.id);
     const threadRoot = stub.thread_root_id ? await M.findMessage(stub.thread_root_id) : null;

@@ -167,6 +167,11 @@ router.delete(
     if (!(await canAdmin(req.params.id, req.user.id)))
       throw httpError(403, 'Only owners and admins can remove people.');
     if (String(space.owner) === req.params.userId) throw httpError(400, 'The owner cannot be removed.');
+    // Revoking reaches into every conversation in the space, so it is only for
+    // people actually in it — not a way to evict anyone from a group that
+    // happens to have been filed here.
+    if (!(await S.isSpaceMember(space.id, req.params.userId)))
+      throw httpError(404, 'That person is not in this space.');
 
     await S.removeSpaceMember(space.id, req.params.userId);
     const revoked = await S.revokeSpaceAccess(space.id, req.params.userId);
@@ -246,6 +251,17 @@ router.patch(
 
     const convo = await C.findConversationForUser(req.params.conversationId, req.user.id);
     if (!convo) throw httpError(404, 'That conversation is not yours.');
+
+    /**
+     * Filing a conversation in a space hands its admins real power over it:
+     * retention that deletes history, and "revoke" that removes members. Any
+     * member could do this to any group, then use their own space to wipe it
+     * or evict its admins. So it is a group admin's decision, and a direct
+     * chat — where the other person has no say at all — cannot be filed.
+     */
+    if (convo.type !== 'group') throw httpError(400, 'Only groups can be moved into a space.');
+    const mine = convo.members.find((m) => String(m.user?.id || m.user) === String(req.user.id));
+    if (mine?.role !== 'admin') throw httpError(403, 'Only group admins can move a group.');
 
     if (spaceId) {
       if (!(await S.isSpaceMember(spaceId, req.user.id))) throw httpError(404, 'No such space.');

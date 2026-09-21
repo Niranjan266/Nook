@@ -42,7 +42,7 @@ const searchLimit = rateLimit({
  * responses consistent with everything `serialize.js` produces — a person you
  * have renamed reads the same in search results as in the chat header.
  */
-const publicUser = (u, extra = {}, nicks = {}, viewer = null) => {
+const publicUser = (u, extra = {}, nicks = {}, listsViewer = false) => {
   const nickname = nicks[u.id] || '';
 
   /**
@@ -50,11 +50,14 @@ const publicUser = (u, extra = {}, nicks = {}, viewer = null) => {
    * shape — used by search, contacts, friends and the request list — ignored
    * both. Search was therefore a stronger leak than the profile it linked to:
    * it published online status and last-seen for people who had set them to
-   * "contacts" or even "nobody". `viewer` is what makes the rule applicable;
-   * without it, assume no relationship rather than full disclosure.
+   * "contacts" or even "nobody".
+   *
+   * `listsViewer` is whether *this person* has saved the viewer — "contacts"
+   * means their contacts, not yours. `extra.isContact` is the other direction,
+   * for the UI, and deciding privacy from it let anyone see you by saving you.
+   * Without it, assume no relationship rather than full disclosure.
    */
-  const isContact = extra.isContact ?? (viewer ? viewer.contacts?.includes(u.id) : false);
-  const allow = (rule) => rule === 'everyone' || (rule === 'contacts' && isContact);
+  const allow = (rule) => rule === 'everyone' || (rule === 'contacts' && listsViewer);
   const seeLastSeen = allow(u.privacy?.lastSeen || 'contacts');
 
   return {
@@ -103,9 +106,10 @@ router.get(
     const q = String(req.query.q || '').trim();
     if (q.length < 2) return res.json({ users: [] });
 
-    const [blocked, contacts, nicks] = await Promise.all([
+    const [blocked, contacts, listsMe, nicks] = await Promise.all([
       U.blockedIds(req.user.id),
       U.contactIds(req.user.id),
+      U.contactOfIds(req.user.id),
       U.nicknameMap(req.user.id),
     ]);
 
@@ -119,7 +123,12 @@ router.get(
 
     res.json({
       users: users.map((u, i) =>
-        publicUser(u, { isContact: contacts.includes(u.id), friendship: states[i] }, nicks)
+        publicUser(
+          u,
+          { isContact: contacts.includes(u.id), friendship: states[i] },
+          nicks,
+          listsMe.includes(u.id)
+        )
       ),
       // Lets the client say "that's a Nook ID and nobody has it" rather than
       // the vaguer "no results", which reads like a typo in your own code.
@@ -236,6 +245,11 @@ const folderSchema = z.object({
   conversations: z.array(z.string()).max(500).optional(),
 });
 
+const folderList = z
+  .array(folderSchema)
+  .max(12)
+  .refine((list) => new Set(list.map((f) => f.id)).size === list.length, 'Two folders share an id.');
+
 router.get(
   '/me/folders',
   asyncRoute(async (req, res) => res.json({ folders: await U.listFolders(req.user.id) }))
@@ -244,7 +258,7 @@ router.get(
 router.put(
   '/me/folders',
   asyncRoute(async (req, res) => {
-    const { folders } = z.object({ folders: z.array(folderSchema).max(12) }).parse(req.body);
+    const { folders } = z.object({ folders: folderList }).parse(req.body);
     res.json({ folders: await U.replaceFolders(req.user.id, folders) });
   })
 );
@@ -590,13 +604,16 @@ router.get(
     const user = await U.findUserById(req.params.id);
     if (!user) throw httpError(404, 'No such person.');
 
-    const [contacts, blocked, state] = await Promise.all([
+    const [contacts, theirs, blocked, state] = await Promise.all([
       U.contactIds(req.user.id),
+      U.contactIds(user.id),
       U.blockedIds(req.user.id),
       friendship(req.user.id, user.id),
     ]);
     const isContact = contacts.includes(user.id);
-    const allow = (rule) => rule === 'everyone' || (rule === 'contacts' && isContact);
+    // Their "contacts" setting is about their list, so ask whether you are on it.
+    const listsMe = theirs.includes(req.user.id);
+    const allow = (rule) => rule === 'everyone' || (rule === 'contacts' && listsMe);
 
     res.json({
       user: {

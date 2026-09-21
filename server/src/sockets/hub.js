@@ -20,6 +20,16 @@ export function bindIo(instance) {
 
 export const getIo = () => io;
 
+/**
+ * Close every live connection a person has. Refusing new tokens is not enough
+ * on its own: a socket is authenticated once, at connect, so a suspended or
+ * signed-out account kept sending and receiving until it happened to drop.
+ */
+export function disconnectUser(userId) {
+  if (!io) return;
+  io.in(`user:${String(userId)}`).disconnectSockets(true);
+}
+
 export function trackConnect(userId, socketId) {
   const key = String(userId);
   if (!online.has(key)) online.set(key, new Set());

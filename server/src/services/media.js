@@ -102,7 +102,8 @@ export async function uploadBuffer(file, { folder = 'nook' } = {}) {
   }
 
   // ── local disk fallback ─────────────────────────────────────────────────────
-  const ext = path.extname(file.originalname) || '';
+  // The extension decides the Content-Type it is served with, so keep it tame.
+  const ext = (path.extname(file.originalname) || '').toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 10);
   const safeFolder = folder.replace(/[^a-z0-9/_-]/gi, '');
   const dir = path.join(UPLOAD_DIR, safeFolder);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

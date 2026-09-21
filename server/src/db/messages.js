@@ -262,6 +262,15 @@ export const dueScheduled = (limit = 50) =>
     limit,
   ]);
 
+/** A message this sender already created under this clientId, if any. */
+export const findByClientId = async (conversationId, senderId, clientId) => {
+  const row = await one(
+    'SELECT id FROM messages WHERE sender_id = ? AND client_id = ? AND conversation_id = ? LIMIT 1',
+    [senderId, clientId, conversationId]
+  );
+  return row ? findMessage(row.id) : null;
+};
+
 export const lastMessageFrom = (conversationId, senderId) =>
   one(
     'SELECT created_at FROM messages WHERE conversation_id = ? AND sender_id = ? ORDER BY created_at DESC LIMIT 1',
@@ -334,8 +343,18 @@ export const editHistory = (id) =>
 export const setLinkPreview = (id, preview) =>
   run('UPDATE messages SET link_preview = ? WHERE id = ?', [toJson(preview), id]);
 
-export const deleteForEveryone = (id) =>
-  run(`UPDATE messages SET deleted_for_all = 1, body = '', media = NULL, link_preview = NULL WHERE id = ?`, [id]);
+/**
+ * Unsend. The edit history goes with it: keeping it meant the unsent text was
+ * still one `/history` request away, which is not unsending anything.
+ */
+export async function deleteForEveryone(id) {
+  await run(
+    `UPDATE messages SET deleted_for_all = 1, body = '', media = NULL, link_preview = NULL, transcript = ''
+      WHERE id = ?`,
+    [id]
+  );
+  await run('DELETE FROM message_edits WHERE message_id = ?', [id]);
+}
 
 export const deleteForMe = (id, userId) =>
   run('INSERT OR IGNORE INTO message_deletions (message_id, user_id) VALUES (?, ?)', [id, userId]);
@@ -474,11 +493,21 @@ export const bumpThread = (rootId) =>
     rootId,
   ]);
 
-/** Claim a scheduled message so two workers can't deliver it twice. */
+/**
+ * Claim a scheduled message so two workers can't deliver it twice.
+ *
+ * A disappearing timer counts from delivery, not from when it was written, so
+ * `expires_at` moves forward by however late the delivery actually ran.
+ */
 export async function claimScheduled(id) {
+  const t = now();
   const result = await run(
-    'UPDATE messages SET delivered = 1, created_at = ? WHERE id = ? AND delivered = 0',
-    [now(), id]
+    `UPDATE messages
+        SET delivered = 1, created_at = ?,
+            expires_at = CASE WHEN expires_at IS NULL THEN NULL
+                              ELSE expires_at + (? - COALESCE(scheduled_for, ?)) END
+      WHERE id = ? AND delivered = 0`,
+    [t, t, t, id]
   );
   return (result.rowsAffected ?? 0) > 0;
 }
@@ -500,9 +529,24 @@ export const cancelScheduled = (id, userId) =>
  * principle applied to the timer.
  */
 export const deleteExpired = () =>
-  run("DELETE FROM messages WHERE expires_at IS NOT NULL AND expires_at <= ? AND saved_by = ''", [
-    Date.now(),
+  // `delivered = 1`: a scheduled message has not happened yet, so its timer
+  // has not started — sweeping it would delete it before anyone saw it.
+  run(
+    "DELETE FROM messages WHERE expires_at IS NOT NULL AND expires_at <= ? AND saved_by = '' AND delivered = 1",
+    [Date.now()]
+  );
+
+/* ── uploads ─────────────────────────────────────────────────────────────── */
+
+export const recordUpload = (publicId, userId) =>
+  run('INSERT OR IGNORE INTO media_uploads (public_id, user_id, created_at) VALUES (?, ?, ?)', [
+    publicId,
+    userId,
+    now(),
   ]);
+
+export const uploadOwner = async (publicId) =>
+  (await one('SELECT user_id FROM media_uploads WHERE public_id = ?', [publicId]))?.user_id || null;
 
 /** Retention. Starred messages are never swept — someone deliberately kept them. */
 export const applyRetention = (conversationId, cutoff) =>

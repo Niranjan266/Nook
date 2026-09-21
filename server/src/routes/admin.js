@@ -32,6 +32,7 @@ import { catalogue, render } from '../services/templates.js';
 import { createMessage } from '../services/messages.js';
 import * as C from '../db/conversations.js';
 import { claimHandoff } from './google.js';
+import { disconnectUser } from '../sockets/hub.js';
 
 const router = Router();
 
@@ -230,7 +231,10 @@ router.patch(
     // Suspending without cutting existing sessions would leave them signed in
     // until their token expired, which is up to fifteen minutes of nothing
     // having happened.
-    if (suspended) await A.bumpTokenEpoch(user.id);
+    if (suspended) {
+      await A.bumpTokenEpoch(user.id);
+      disconnectUser(user.id);
+    }
 
     res.json({ ok: true, suspended });
   })
@@ -248,6 +252,7 @@ router.post(
       ip: clientIp(req),
     });
     await A.bumpTokenEpoch(user.id);
+    disconnectUser(user.id);
     res.json({ ok: true });
   })
 );
@@ -273,6 +278,7 @@ router.delete(
     });
 
     await A.deleteUser(user.id);
+    disconnectUser(user.id);
     res.json({ ok: true });
   })
 );
@@ -412,19 +418,39 @@ router.post(
  * app assumes that is true. Created on first use so a fresh instance does not
  * carry a mystery account nobody asked for.
  */
+const ANNOUNCER_KEY = 'announcer-user-id';
+
+/**
+ * Found by the id recorded when it was made, not by the name. Looking it up as
+ * "whoever is called nook" meant anyone who registered that name first became
+ * the voice of every announcement. The name is reserved now, and an older
+ * "nook" is only adopted if it looks like one this code made: no password, no
+ * email.
+ */
 async function announcer() {
-  const existing = await U.findUserByUsername('nook');
-  if (existing) return existing;
+  const knownId = await A.getMeta(ANNOUNCER_KEY);
+  const known = knownId ? await U.findUserById(knownId) : null;
+  if (known) return known;
+
+  const legacy = await U.findUserByUsername('nook');
+  if (legacy && legacy.passwordless && !legacy.email) {
+    await A.setMeta(ANNOUNCER_KEY, legacy.id);
+    return legacy;
+  }
 
   const { hash } = await import('../services/password.js');
-  return U.createUser({
-    username: 'nook',
+  const created = await U.createUser({
+    // If somebody already holds "nook", the announcer takes a different handle
+    // rather than borrowing theirs.
+    username: legacy ? `nook_${crypto.randomBytes(3).toString('hex')}` : 'nook',
     displayName: 'Nook',
     // No one signs in as this account, so give it a password nobody knows.
     passwordHash: await hash(crypto.randomBytes(48).toString('base64')),
     passwordless: true,
     about: 'Announcements from the people who run this Nook.',
   });
+  await A.setMeta(ANNOUNCER_KEY, created.id);
+  return created;
 }
 
 router.post(

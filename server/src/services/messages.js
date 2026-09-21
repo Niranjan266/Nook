@@ -60,6 +60,16 @@ export async function createMessage({ conversationId, senderId, payload, system 
   const convo = await C.findConversationForUser(conversationId, senderId);
   if (!convo) throw httpError(404, 'That conversation is not yours.');
 
+  /**
+   * A retry, not a new message. The client resends with the same clientId when
+   * an ack times out — usually because the first send landed and only the ack
+   * was lost — so the answer is the message that already exists.
+   */
+  if (payload.clientId) {
+    const existing = await M.findByClientId(convo.id, senderId, payload.clientId);
+    if (existing) return { message: existing, conversation: convo, duplicate: true, scheduled: !existing.delivered };
+  }
+
   /* ── slow mode ─────────────────────────────────────────────────────────
      Per person, not per conversation: one chatty member shouldn't be able to
      mute everyone else.                                                    */
@@ -98,8 +108,20 @@ export async function createMessage({ conversationId, senderId, payload, system 
     threadRoot = root.threadRoot ? await M.findMessage(root.threadRoot) : root;
   }
 
+  // Quoting only works within one conversation. A reply id from elsewhere
+  // would render another chat's message — body, sender, thumbnail — as the quote.
+  let replyTo = null;
+  if (payload.replyTo) {
+    const quoted = await M.findMessage(payload.replyTo);
+    if (quoted && String(quoted.conversation) === String(convo.id)) replyTo = quoted.id;
+  }
+
   const scheduledFor = payload.scheduledFor ? new Date(payload.scheduledFor) : null;
   const isScheduled = Boolean(scheduledFor && scheduledFor.getTime() > Date.now() + 5000);
+
+  // A disappearing timer starts when the message arrives, not when it was
+  // written; claimScheduled shifts it again if delivery runs late.
+  const startsAt = isScheduled ? scheduledFor.getTime() : Date.now();
 
   const id = await M.createMessageRow({
     conversationId: convo.id,
@@ -107,7 +129,7 @@ export async function createMessage({ conversationId, senderId, payload, system 
     type: payload.type || 'text',
     body: payload.body,
     media: payload.media,
-    replyTo: payload.replyTo || null,
+    replyTo,
     forwardedFrom: payload.forwardedFrom || null,
     mentions: payload.mentions || [],
     clientId: payload.clientId || '',
@@ -118,7 +140,7 @@ export async function createMessage({ conversationId, senderId, payload, system 
     scheduledFor: isScheduled ? scheduledFor : null,
     delivered: !isScheduled,
     call: payload.call,
-    expiresAt: convo.disappearAfter ? new Date(Date.now() + convo.disappearAfter * 1000) : null,
+    expiresAt: convo.disappearAfter ? new Date(startsAt + convo.disappearAfter * 1000) : null,
   });
 
   const message = await M.findMessage(id);

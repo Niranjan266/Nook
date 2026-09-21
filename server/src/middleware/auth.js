@@ -8,8 +8,20 @@ export async function requireAuth(req, res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Not signed in.' });
 
+  /**
+   * Only a bad token is a 401. This used to wrap the database calls too, so a
+   * blip there told every client its session had expired — and the client
+   * does exactly what that says, which is sign the person out.
+   */
+  let claims;
   try {
-    const { sub, iat } = verifyAccess(token);
+    claims = verifyAccess(token);
+  } catch {
+    return res.status(401).json({ error: 'Session expired.', code: 'TOKEN_EXPIRED' });
+  }
+
+  try {
+    const { sub, iat } = claims;
     const user = await findUserById(sub);
     if (!user) return res.status(401).json({ error: 'Account no longer exists.' });
 
@@ -42,11 +54,10 @@ export async function requireAuth(req, res, next) {
     // The serialisers read nicknames synchronously, so this viewer's map has
     // to be in memory before any handler runs. One small indexed query.
     await Promise.all([warmNicknames(user.id), warmFriends(user.id)]);
-
-    next();
-  } catch {
-    return res.status(401).json({ error: 'Session expired.', code: 'TOKEN_EXPIRED' });
+  } catch (err) {
+    return next(err);
   }
+  next();
 }
 
 export const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);

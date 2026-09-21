@@ -3,6 +3,7 @@ import multer from 'multer';
 import { asyncRoute, requireAuth } from '../middleware/auth.js';
 import { httpError } from '../middleware/error.js';
 import { uploadBuffer, mediaProvider } from '../services/media.js';
+import { recordUpload } from '../db/messages.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -28,6 +29,8 @@ router.post(
     if (!req.file) throw httpError(400, 'No file arrived.');
     const kind = FOLDERS[req.body.kind] ? req.body.kind : 'message';
     const result = await uploadBuffer(req.file, { folder: FOLDERS[kind] });
+    // Remembered so a message can only carry a file id its sender uploaded.
+    if (result.publicId) await recordUpload(result.publicId, req.user.id);
     res.status(201).json({ media: result, provider: mediaProvider() });
   })
 );

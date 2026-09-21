@@ -62,7 +62,33 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 if (!isProd) app.use(morgan('  :method :url :status :response-time[0]ms'));
 
-app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '30d' }));
+/**
+ * Uploaded files are served from the API's own origin, so anything a browser
+ * would treat as a page — an .html, or an .svg with a script in it — would run
+ * with the API origin's authority. Pictures, video and sound are shown inline;
+ * everything else, SVG included, is a download, and nothing here may sniff its
+ * way into being something else or load anything.
+ */
+const INLINE_MEDIA = /^(image\/(png|jpeg|gif|webp|avif|bmp|heic|heif)|video\/|audio\/)/i;
+
+app.use(
+  '/uploads',
+  express.static(UPLOAD_DIR, {
+    maxAge: '30d',
+    setHeaders(res, filePath) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox"
+      );
+      const type = express.static.mime.lookup(filePath);
+      if (!INLINE_MEDIA.test(type)) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', 'attachment');
+      }
+    },
+  })
+);
 
 /**
  * Deployment self-check. Every third-party service in Nook degrades quietly
@@ -209,4 +235,10 @@ const shutdown = () => {
   setTimeout(() => process.exit(0), 3000);
 };
 process.on('SIGINT', shutdown);
+
+// A backstop, not a strategy: a promise nobody awaited should cost a log line,
+// not the process and every conversation on it.
+process.on('unhandledRejection', (reason) => {
+  console.error('  unhandled rejection', reason);
+});
 process.on('SIGTERM', shutdown);

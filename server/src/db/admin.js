@@ -173,6 +173,12 @@ export const deleteUser = (id) => run('DELETE FROM users WHERE id = ?', [id]);
  * second-granularity `iat`, and pushing the epoch forward would reject tokens
  * minted immediately afterwards — locking the person out of signing back in.
  */
+/** One-off facts about this instance, such as which account announces. */
+export const getMeta = async (key) => (await one('SELECT value FROM app_meta WHERE key = ?', [key]))?.value || '';
+
+export const setMeta = (key, value) =>
+  run('INSERT OR REPLACE INTO app_meta (key, value, at) VALUES (?, ?, ?)', [key, String(value), now()]);
+
 export const bumpTokenEpoch = (id) =>
   run('UPDATE users SET token_epoch = ?, updated_at = ? WHERE id = ?', [now(), now(), id]);
 

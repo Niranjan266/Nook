@@ -9,6 +9,7 @@ import { emitToConversation, emitToUser } from '../sockets/hub.js';
 import { createMessage, markRead } from '../services/messages.js';
 import { destroy } from '../services/media.js';
 import { hasUnlock } from '../lib/lockgrants.js';
+import { parseSendPayload } from '../lib/sendPayload.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -103,24 +104,8 @@ router.get(
 router.post(
   '/:conversationId',
   asyncRoute(async (req, res) => {
-    const payload = z
-      .object({
-        type: z.enum(['text', 'image', 'video', 'audio', 'voice', 'file', 'snap']).default('text'),
-        body: z.string().max(8000).optional(),
-        media: z.any().optional(),
-        replyTo: z.string().nullable().optional(),
-        forwardedFrom: z.string().nullable().optional(),
-        mentions: z.array(z.string()).optional(),
-        clientId: z.string().optional(),
-        viewOnce: z.boolean().optional(),
-        // How long the recipient may look at a snap. 0 means they close it
-        // themselves; capped at a minute so "view once" keeps meaning something.
-        viewSeconds: z.number().int().min(0).max(60).optional(),
-        threadRoot: z.string().nullable().optional(),
-        scheduledFor: z.string().nullable().optional(),
-        transcript: z.string().max(8000).optional(),
-      })
-      .parse(req.body);
+    // The same schema the socket path uses — see lib/sendPayload.js.
+    const payload = await parseSendPayload(req.body, req.user.id);
 
     const { message } = await createMessage({
       conversationId: req.params.conversationId,
@@ -139,7 +124,8 @@ router.get(
   asyncRoute(async (req, res) => {
     const root = await M.findMessage(req.params.rootId);
     if (!root) throw httpError(404, 'That thread is gone.');
-    await mustBeMember(root.conversation, req.user.id);
+    // Unlocked, not merely a member: a thread is the chat's contents too.
+    await mustBeUnlocked(root.conversation, req.user.id);
 
     const replies = await M.listThread({ rootId: root.id, userId: req.user.id });
     res.json({
@@ -157,6 +143,8 @@ router.get(
   '/:id/history',
   asyncRoute(async (req, res) => {
     const msg = await loadMessage(req.params.id, req.user.id);
+    // An unsent message has no history to show, whatever might be left over.
+    if (msg.deletedForAll) return res.json({ history: [] });
     const previous = await M.editHistory(msg.id);
     res.json({
       history: [
@@ -325,6 +313,15 @@ router.post(
     const { conversationIds } = z.object({ conversationIds: z.array(z.string()).min(1) }).parse(req.body);
     const source = await loadMessage(req.params.id, req.user.id);
 
+    // Someone else's snap was theirs to show you once, not yours to pass on.
+    if (source.viewOnce?.enabled && String(source.sender.id) !== req.user.id)
+      throw httpError(403, 'Snaps cannot be forwarded.');
+
+    // The copy shares the file but must not own it: unsending a forward would
+    // otherwise delete the original sender's picture out from under them.
+    const media = source.media ? { ...source.media } : null;
+    if (media) delete media.publicId;
+
     const created = [];
     for (const conversationId of conversationIds) {
       const { message } = await createMessage({
@@ -335,7 +332,7 @@ router.post(
           // designed to be seen once and vanish would defeat the point.
           type: source.type === 'snap' ? 'image' : source.type,
           body: source.body,
-          media: source.media,
+          media,
           forwardedFrom: source.sender.id,
         },
       });
