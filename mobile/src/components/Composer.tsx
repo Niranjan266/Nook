@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, TextInput, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +36,16 @@ export default function Composer({
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [seconds, setSeconds] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+
+  // Leaving the chat mid-recording must release the microphone.
+  useEffect(
+    () => () => {
+      if (timer.current) clearInterval(timer.current);
+      recordingRef.current?.stopAndUnloadAsync().catch(() => {});
+    },
+    []
+  );
   const lastTyping = useRef(0);
 
   const submit = async () => {
@@ -136,6 +146,7 @@ export default function Composer({
       const { recording: rec } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
+      recordingRef.current = rec;
       setRecording(rec);
       setSeconds(0);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -147,6 +158,7 @@ export default function Composer({
 
   async function stopRecording(discard = false) {
     if (!recording) return;
+    recordingRef.current = null;
     if (timer.current) clearInterval(timer.current);
 
     const length = seconds;

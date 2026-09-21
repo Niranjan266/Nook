@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Pressable, Image } from 'react-native';
+import { View, Pressable, Image, Modal } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -11,10 +11,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { useChat, type Message, type Conversation } from '../stores';
-import { useTheme, radii, spacing, type, accentFor, spring } from '../theme';
+import { useTheme, radii, spacing, type, accentFor, spring, type AccentName } from '../theme';
 import { Avatar, Body, Chip } from './ui';
 import { clock, duration, bytes } from '../lib/format';
-import { mediaUrl } from '../lib/api';
+import { mediaUrl, post } from '../lib/api';
 import VoiceNote from './VoiceNote';
 
 const QUICK = ['❤️', '😂', '👍', '😮', '😢', '🙏'];
@@ -44,6 +44,7 @@ export default function Bubble({
   const t = useTheme();
   const { react, star, remove, pin } = useChat();
   const [menu, setMenu] = useState(false);
+  const [snapOpen, setSnapOpen] = useState(false);
 
   const mine = m.sender.id === meId;
   const x = useSharedValue(0);
@@ -138,6 +139,36 @@ export default function Bubble({
                 {mine ? 'Snap sent' : 'Snap opened — it is gone now'}
               </Body>
             </View>
+          );
+        // An unopened snap is never drawn inline: opening it is what counts a
+        // look and tells the sender it was seen.
+        if (m.type === 'snap' && !mine)
+          return (
+            <Pressable
+              onPress={async () => {
+                try {
+                  await post(`/messages/${m.id}/view`);
+                  setSnapOpen(true);
+                } catch {
+                  /* gone or unreachable — the next sync redraws it as burnt */
+                }
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: 4 }}
+            >
+              <View
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 13,
+                  backgroundColor: t.c.sunk,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="flame" size={20} color={textColor} />
+              </View>
+              <Body style={{ color: textColor, fontSize: type.sizes.sm }}>Tap to view snap</Body>
+            </Pressable>
           );
         return (
           <Image
@@ -259,7 +290,7 @@ export default function Bubble({
                 style={{
                   fontSize: type.sizes.xs,
                   fontWeight: '700',
-                  color: t.a[(m.sender.accent as any) || accentFor(m.sender.id)],
+                  color: t.a[(m.sender.accent as AccentName) || accentFor(m.sender.id)],
                   marginBottom: 2,
                 }}
               >
@@ -448,6 +479,15 @@ export default function Bubble({
           </View>
         </>
       )}
+
+      <Modal visible={snapOpen} transparent animationType="fade" onRequestClose={() => setSnapOpen(false)}>
+        <Pressable
+          onPress={() => setSnapOpen(false)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Image source={{ uri: mediaUrl(m.media?.url) }} style={{ width: '100%', height: '80%' }} resizeMode="contain" />
+        </Pressable>
+      </Modal>
     </View>
   );
 }

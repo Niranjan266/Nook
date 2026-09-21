@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useTheme, radii, type, spacing, initials, accentFor, type Theme } from '../theme';
+import { useTheme, radii, type, spacing, initials, accentFor, type Theme, type AccentName } from '../theme';
+import { Image } from 'expo-image';
+import { mediaUrl } from '../lib/api';
 
 /**
  * The two materials, in React Native.
@@ -226,15 +228,19 @@ export function Avatar({
   showDot?: boolean;
 }) {
   const t = useTheme();
-  const tone = t.a[(accent as any) || accentFor(id || name)] || t.a.terracotta;
+  const tone = t.a[(accent as AccentName) || accentFor(id || name)] || t.a.terracotta;
   const radius = square ? Math.max(10, size * 0.28) : radii.pill;
 
   return (
     <View style={{ width: size, height: size }}>
       {uri ? (
         <View style={[{ width: size, height: size, borderRadius: radius, overflow: 'hidden' }, t.clay(1)]}>
-          {/* expo-image is imported lazily by the caller where it matters. */}
-          <View style={{ flex: 1, backgroundColor: t.c.sunk }} />
+          <Image
+            source={{ uri: mediaUrl(uri) }}
+            style={{ flex: 1, backgroundColor: t.c.sunk }}
+            contentFit="cover"
+            transition={120}
+          />
         </View>
       ) : (
         <View

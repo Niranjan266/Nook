@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import { post } from './api';
+import { api, post } from './api';
 import { SOUND_NAMES, soundChannel } from './sounds';
 
 /**
@@ -56,13 +56,11 @@ export async function registerForPush(): Promise<boolean> {
   await setupChannels();
 
   try {
-    const token = await Notifications.getExpoPushTokenAsync();
-    await post('/push/subscribe', {
-      // The server's schema wants an endpoint + keys; an Expo token maps onto
-      // it cleanly, which avoids a second table for the same concept.
-      endpoint: `expo:${token.data}`,
-      keys: { p256dh: 'expo', auth: token.data },
-    });
+    // The server sends native push straight through FCM (POST /push/device),
+    // so it needs the raw device token, not an Expo push token. /push/subscribe
+    // is the Web Push route and cannot deliver to a phone.
+    const token = await Notifications.getDevicePushTokenAsync();
+    await post('/push/device', { token: String(token.data), platform: Platform.OS });
     return true;
   } catch {
     return false;
@@ -71,8 +69,8 @@ export async function registerForPush(): Promise<boolean> {
 
 export async function disablePush() {
   try {
-    const token = await Notifications.getExpoPushTokenAsync();
-    await post('/push/unsubscribe', { endpoint: `expo:${token.data}` });
+    const token = await Notifications.getDevicePushTokenAsync();
+    await api('/push/device', { method: 'DELETE', body: { token: String(token.data) } });
   } catch {
     /* nothing to unsubscribe */
   }

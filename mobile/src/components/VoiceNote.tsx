@@ -21,6 +21,8 @@ const FALLBACK = Array.from({ length: 30 }, (_, i) => 0.35 + Math.abs(Math.sin(i
 export default function VoiceNote({ message, tint }: { message: Message; tint: string }) {
   const t = useTheme();
   const sound = useRef<Audio.Sound | null>(null);
+  const loading = useRef(false);
+  const unmounted = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [speed, setSpeed] = useState(1);
@@ -30,6 +32,7 @@ export default function VoiceNote({ message, tint }: { message: Message; tint: s
 
   useEffect(() => {
     return () => {
+      unmounted.current = true;
       sound.current?.unloadAsync().catch(() => {});
       sound.current = null;
     };
@@ -38,6 +41,10 @@ export default function VoiceNote({ message, tint }: { message: Message; tint: s
   async function toggle() {
     try {
       if (!sound.current) {
+        // A second tap while the first load is in flight would create a second
+        // Sound that nothing ever unloads.
+        if (loading.current) return;
+        loading.current = true;
         await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
         const { sound: s } = await Audio.Sound.createAsync(
           { uri: mediaUrl(message.media?.url) },
@@ -52,6 +59,12 @@ export default function VoiceNote({ message, tint }: { message: Message; tint: s
             }
           }
         );
+        loading.current = false;
+        // Scrolled away (or left the chat) while loading: nothing can stop it now.
+        if (unmounted.current) {
+          s.unloadAsync().catch(() => {});
+          return;
+        }
         sound.current = s;
         return;
       }
@@ -61,6 +74,7 @@ export default function VoiceNote({ message, tint }: { message: Message; tint: s
       if (status.isPlaying) await sound.current.pauseAsync();
       else await sound.current.playAsync();
     } catch {
+      loading.current = false;
       /* audio unavailable — nothing worth interrupting the user for */
     }
   }

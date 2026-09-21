@@ -86,12 +86,21 @@ export class ApiError extends Error {
   }
 }
 
-async function refreshSession(): Promise<boolean> {
+/** Why the last refresh failed: the server said no, or it couldn't be reached. */
+let lastRefreshFailure: 'rejected' | 'network' | null = null;
+export const getRefreshFailure = () => lastRefreshFailure;
+
+export async function refreshSession(): Promise<boolean> {
   if (!refreshing) {
     refreshing = (async () => {
-      const stored = await loadRefreshToken();
-      if (!stored) return false;
       try {
+        // Inside the try: an early return must still clear `refreshing`, or a
+        // resolved `false` stays cached and no later refresh ever runs.
+        const stored = await loadRefreshToken();
+        if (!stored) {
+          lastRefreshFailure = 'rejected';
+          return false;
+        }
         const res = await fetch(apiUrl('/auth/refresh'), {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-nook-client': 'native' },
@@ -100,13 +109,16 @@ async function refreshSession(): Promise<boolean> {
         if (!res.ok) {
           await saveRefreshToken(null);
           setToken(null);
+          lastRefreshFailure = 'rejected';
           return false;
         }
         const data = await res.json();
         setToken(data.accessToken);
         if (data.refreshToken) await saveRefreshToken(data.refreshToken);
+        lastRefreshFailure = null;
         return true;
       } catch {
+        lastRefreshFailure = 'network';
         return false;
       } finally {
         refreshing = null;

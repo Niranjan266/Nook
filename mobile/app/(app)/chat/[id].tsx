@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useRef, useState, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -8,7 +8,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -57,10 +57,25 @@ export default function Chat() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  useEffect(() => {
-    if (id) setActive(id);
-    return () => setActive(null);
-  }, [id]);
+  // Focus, not mount: this screen lives in the tab navigator and stays mounted
+  // after going back, which kept the chat "active" (no unread counts, read
+  // receipts sent for messages nobody saw).
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return;
+      setActive(id);
+      // Tells the server this chat is on screen so it skips pushing for it.
+      // It expires after ~70s, so repeat while we stay here.
+      const ping = () => getSocket()?.emit('focus:conversation', { conversationId: id });
+      ping();
+      const timer = setInterval(ping, 60_000);
+      return () => {
+        clearInterval(timer);
+        getSocket()?.emit('focus:conversation', { conversationId: null });
+        setActive(null);
+      };
+    }, [id])
+  );
 
   const typers = (typing[id!] || []).filter((u) => u !== me?.id);
   const partnerPresence = convo?.partner ? presence[convo.partner.id] : undefined;
@@ -154,16 +169,8 @@ export default function Chat() {
           </View>
         </Pressable>
 
-        {convo.type === 'direct' && (
-          <>
-            <ClayButton size={40} onPress={() => router.push(`/call/${id}?kind=audio`)}>
-              <Ionicons name="call-outline" size={19} color={t.c.ink} />
-            </ClayButton>
-            <ClayButton size={40} onPress={() => router.push(`/call/${id}?kind=video`)}>
-              <Ionicons name="videocam-outline" size={19} color={t.c.ink} />
-            </ClayButton>
-          </>
-        )}
+        {/* Call buttons return once the native app has a call screen — they
+            pointed at a /call route that doesn't exist. */}
       </View>
 
       {/* ── room mood ─────────────────────────────────────────────────── */}

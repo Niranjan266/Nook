@@ -8,7 +8,9 @@ import {
   setToken,
   saveRefreshToken,
   bootstrapSession,
+  getRefreshFailure,
 } from '../lib/api';
+import { disablePush } from '../lib/push';
 import { emitAck, getSocket } from '../lib/socket';
 
 /* ── shared types (mirrors the web client) ───────────────────────────────── */
@@ -103,7 +105,13 @@ export const useAuth = create<AuthState>((set, get) => ({
   status: 'loading',
 
   async init() {
-    const ok = await bootstrapSession();
+    // Offline at launch is not signed out: keep the stored session and retry
+    // until the server answers one way or the other.
+    let ok = await bootstrapSession();
+    for (let wait = 2000; !ok && getRefreshFailure() === 'network'; wait = Math.min(wait * 2, 30000)) {
+      await new Promise((r) => setTimeout(r, wait));
+      ok = await bootstrapSession();
+    }
     if (!ok) return set({ status: 'out', me: null });
     try {
       const { user } = await apiGet<{ user: Me }>('/auth/me');
@@ -128,6 +136,9 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   async logout() {
+    // While the access token still works, or this phone keeps getting pushes
+    // for an account that is no longer signed in on it.
+    await disablePush();
     try {
       await post('/auth/logout');
     } catch {
@@ -199,6 +210,9 @@ interface ChatState {
 
   onMessage: (m: Message) => void;
   onUpdate: (m: Message) => void;
+  onDelete: (m: Message & { deletedForMe?: boolean }) => void;
+  onConversationRead: (id: string) => void;
+  onConversationRemoved: (id: string) => void;
   onConversation: (c: Conversation) => void;
   onReceipt: (kind: 'delivered' | 'read', p: any) => void;
   setTyping: (conversationId: string, userId: string, on: boolean) => void;
@@ -279,7 +293,11 @@ export const useChat = create<ChatState>((set, get) => ({
         set((s) => ({
           threads: {
             ...s.threads,
-            [threadRoot]: [...(s.threads[threadRoot] || []), res.message],
+            // The server's thread:new broadcast can arrive before this ack.
+            [threadRoot]: [
+              ...(s.threads[threadRoot] || []).filter((m) => m.id !== res.message.id),
+              res.message,
+            ],
           },
         }));
       }
@@ -490,6 +508,35 @@ export const useChat = create<ChatState>((set, get) => ({
         [m.conversationId]: (s.messages[m.conversationId] || []).map((x) => (x.id === m.id ? m : x)),
       },
     }));
+  },
+
+  onDelete(m) {
+    if (!m.deletedForMe) return get().onUpdate(m);
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [m.conversationId]: (s.messages[m.conversationId] || []).filter((x) => x.id !== m.id),
+      },
+    }));
+  },
+
+  onConversationRead(id) {
+    set((s) => {
+      const convo = s.conversations[id];
+      if (!convo) return s;
+      return { conversations: { ...s.conversations, [id]: { ...convo, unread: 0 } } };
+    });
+  },
+
+  onConversationRemoved(id) {
+    set((s) => {
+      const { [id]: _gone, ...conversations } = s.conversations;
+      return {
+        conversations,
+        order: sortOrder(conversations),
+        activeId: s.activeId === id ? null : s.activeId,
+      };
+    });
   },
 
   onConversation(c) {

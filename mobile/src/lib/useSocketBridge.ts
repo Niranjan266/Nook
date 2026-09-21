@@ -19,7 +19,7 @@ export function useSocketBridge(enabled: boolean) {
     socket.on('message:edit', (m) => chat().onUpdate(m));
     socket.on('message:react', (m) => chat().onUpdate(m));
     socket.on('message:preview', (m) => chat().onUpdate(m));
-    socket.on('message:delete', (m) => chat().onUpdate(m));
+    socket.on('message:delete', (m) => chat().onDelete(m));
     socket.on('message:snap-viewed', (m) => chat().onUpdate(m));
 
     socket.on('thread:new', ({ rootId, message, root }) => {
@@ -48,6 +48,8 @@ export function useSocketBridge(enabled: boolean) {
 
     socket.on('conversation:new', (c) => chat().onConversation(c));
     socket.on('conversation:update', (c) => chat().onConversation(c));
+    socket.on('conversation:read', ({ conversationId }) => chat().onConversationRead(conversationId));
+    socket.on('conversation:removed', ({ conversationId }) => chat().onConversationRemoved(conversationId));
     socket.on('pins:changed', ({ conversationId, pins }) => {
       useChat.setState((s) => {
         const convo = s.conversations[conversationId];
@@ -70,8 +72,10 @@ export function useSocketBridge(enabled: boolean) {
      */
     const appState = AppState.addEventListener('change', (next) => {
       if (next === 'active') {
+        // Reconnect the SAME socket: connectSocket() would build a new one
+        // without any of the listeners registered above.
         const s = getSocket();
-        if (!s?.connected) connectSocket();
+        if (s && !s.connected) s.connect();
         chat().load().catch(() => {});
         const activeId = chat().activeId;
         if (activeId) chat().loadMessages(activeId).catch(() => {});
