@@ -8,6 +8,7 @@ import { upload } from '@/lib/api';
 import { WALLPAPER_PRESETS, dominantColor, prepareWallpaper } from '@/lib/color';
 import { spring } from '@/lib/motion';
 import { IconImage, IconCheck, IconUsers, IconUser, IconRefresh } from '@/components/Icon';
+import { cssUrl } from '@/lib/config';
 
 export default function WallpaperSheet() {
   const { sheet, closeSheet, toast } = useUi();
@@ -130,7 +131,7 @@ export default function WallpaperSheet() {
 
 
   const previewStyle: React.CSSProperties = {
-    backgroundImage: url ? `url(${url})` : undefined,
+    backgroundImage: url ? cssUrl(url) : undefined,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     filter: blur ? `blur(${blur}px)` : undefined,

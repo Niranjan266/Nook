@@ -5,13 +5,13 @@ import {
   enqueue,
   dequeue,
   readOutbox,
+  clearCacheScope,
   cacheMessages,
   readCached,
   cacheConversations,
   readCachedConversations,
   type Outgoing,
 } from '@/lib/outbox';
-import { playSound, type SoundId } from '@/lib/sounds';
 import { useUi } from '@/stores/ui';
 import { watchConversation } from '@/lib/focus';
 import type { Conversation, Message, Person } from '@/lib/types';
@@ -33,8 +33,14 @@ interface ChatState {
   replyTo: Message | null;
   editing: Message | null;
   connected: boolean;
+  /** Lists cached before a reconnect, which may have missed events meanwhile. */
+  stale: Record<string, boolean>;
 
   hydrate: () => Promise<void>;
+  /** After a reconnect: refetch what the socket may have missed while down. */
+  resync: () => Promise<void>;
+  /** Sign-out: nothing of the previous account may survive into the next. */
+  reset: () => void;
   loadConversations: () => Promise<void>;
   setActive: (id: string | null) => void;
   loadMessages: (conversationId: string, opts?: { more?: boolean }) => Promise<void>;
@@ -122,9 +128,21 @@ interface ChatState {
   onMessageUpdate: (m: Message) => void;
   onConversation: (c: Conversation) => void;
   onConversationRemoved: (id: string) => void;
+  /** Read on another device or tab. */
+  onConversationRead: (id: string) => void;
   onReceipt: (kind: 'delivered' | 'read', payload: any) => void;
   onWallpaper: (payload: { conversationId: string; wallpaper: Conversation['wallpaper'] }) => void;
 }
+
+/**
+ * Only these mean "the server never heard it". Anything else is the server
+ * answering no, and replaying a refusal from the outbox just earns the same
+ * refusal on every reconnect, forever.
+ */
+const isTransient = (err: any) => err?.message === 'offline' || err?.message === 'timeout';
+
+/** One flush at a time: `connect` and `online` often fire together. */
+let flushing: Promise<void> | null = null;
 
 const uid = () => `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -148,6 +166,7 @@ export const useChat = create<ChatState>((set, get) => ({
   replyTo: null,
   editing: null,
   connected: false,
+  stale: {},
 
   /* ── boot from cache, then network ──────────────────────────────────── */
 
@@ -170,6 +189,41 @@ export const useChat = create<ChatState>((set, get) => ({
       .catch(() => {});
 
     await fresh;
+  },
+
+  async resync() {
+    const { activeId, messages } = get();
+    // Every other list is kept for painting but refetched when next opened.
+    const stale: Record<string, boolean> = {};
+    Object.keys(messages).forEach((id) => {
+      if (id !== activeId) stale[id] = true;
+    });
+    set({ stale });
+    await Promise.all([
+      get().loadConversations().catch(() => {}),
+      activeId ? get().loadMessages(activeId) : Promise.resolve(),
+    ]);
+  },
+
+  reset() {
+    clearCacheScope();
+    set({
+      conversations: {},
+      order: [],
+      messages: {},
+      hasMore: {},
+      loading: {},
+      activeId: null,
+      presence: {},
+      typing: {},
+      replyTo: null,
+      editing: null,
+      connected: false,
+      stale: {},
+      threads: {},
+      openThreadId: null,
+      scheduled: [],
+    });
   },
 
   async loadConversations() {
@@ -196,7 +250,7 @@ export const useChat = create<ChatState>((set, get) => ({
     // some other way.
     watchConversation(id);
     if (id) {
-      if (!get().messages[id]) get().loadMessages(id);
+      if (!get().messages[id] || get().stale[id]) get().loadMessages(id);
       get().markRead(id);
     }
   },
@@ -223,11 +277,28 @@ export const useChat = create<ChatState>((set, get) => ({
       set((s) => {
         const current = s.messages[conversationId] || [];
         const pending = current.filter((m) => m.status === 'pending' || m.status === 'failed');
+        // Anything that arrived over the socket while this request was in
+        // flight is newer than the page it returns, and replacing the list
+        // outright would drop it until the next reload.
+        const fetched = new Set(data.messages.map((m) => m.id));
+        const newest = data.messages.length
+          ? new Date(data.messages[data.messages.length - 1].createdAt).getTime()
+          : -Infinity;
+        const arrived = current.filter(
+          (m) =>
+            m.status !== 'pending' &&
+            m.status !== 'failed' &&
+            !fetched.has(m.id) &&
+            new Date(m.createdAt).getTime() > newest
+        );
         const merged = more
-          ? [...data.messages, ...current.filter((m) => !data.messages.some((n) => n.id === m.id))]
-          : [...data.messages, ...pending];
+          ? [...data.messages, ...current.filter((m) => !fetched.has(m.id))]
+          : [...data.messages, ...arrived, ...pending];
+        const stale = { ...s.stale };
+        delete stale[conversationId];
         return {
           messages: { ...s.messages, [conversationId]: merged },
+          stale,
           hasMore: { ...s.hasMore, [conversationId]: data.hasMore },
           loading: { ...s.loading, [conversationId]: false },
         };
@@ -321,6 +392,7 @@ export const useChat = create<ChatState>((set, get) => ({
       replyTo: replyTo || null,
       viewOnce,
       viewSeconds,
+      transcript,
       queuedAt: Date.now(),
     };
 
@@ -332,7 +404,8 @@ export const useChat = create<ChatState>((set, get) => ({
       if (!res?.ok || !res.message) throw new Error(res?.error || 'send failed');
       get().onMessage({ ...res.message, status: 'sent' });
     } catch (err: any) {
-      await enqueue(payload);
+      const transient = isTransient(err);
+      if (transient) await enqueue(payload);
       set((s) => ({
         messages: {
           ...s.messages,
@@ -357,8 +430,11 @@ export const useChat = create<ChatState>((set, get) => ({
        * outbox really will send it and a toast for every subway tunnel would
        * be noise.
        */
-      const refused = typeof err?.message === 'string' && err.message !== 'send failed' && err.message.length > 0;
-      if (refused) useUi.getState().toast(err.message, true);
+      if (!transient)
+        useUi.getState().toast(
+          err?.message && err.message !== 'send failed' ? err.message : 'That message could not be sent.',
+          true
+        );
       else console.warn('  send  queued for later:', err);
     }
   },
@@ -374,45 +450,74 @@ export const useChat = create<ChatState>((set, get) => ({
         ),
       },
     }));
+    // Rebuilt from the bubble, so it has to carry everything the first send
+    // did — a snap's timer and a voice note's transcript included.
+    const payload: Outgoing = {
+      clientId,
+      conversationId,
+      type: msg.type,
+      body: msg.body,
+      media: msg.media,
+      replyTo: msg.replyTo?.id || null,
+      viewOnce: Boolean(msg.viewOnce?.enabled),
+      viewSeconds: msg.viewOnce?.enabled ? msg.viewOnce.seconds : undefined,
+      transcript: msg.transcript || undefined,
+      queuedAt: Date.now(),
+    };
     try {
-      const res = await emitAck<{ ok: boolean; message?: Message }>('message:send', {
-        clientId,
-        conversationId,
-        type: msg.type,
-        body: msg.body,
-        media: msg.media,
-        replyTo: msg.replyTo?.id || null,
-        viewOnce: Boolean(msg.viewOnce?.enabled),
-      });
-      if (res?.ok && res.message) {
-        await dequeue(clientId);
-        get().onMessage({ ...res.message, status: 'sent' });
-      } else throw new Error('failed');
-    } catch {
+      const res = await emitAck<{ ok: boolean; message?: Message; error?: string }>('message:send', payload);
+      if (!res?.ok || !res.message) throw new Error(res?.error || 'send failed');
+      await dequeue(clientId);
+      get().onMessage({ ...res.message, status: 'sent' });
+    } catch (err: any) {
+      const transient = isTransient(err);
+      // Still offline: make sure it is queued exactly once. Refused: it must
+      // not be, or the outbox would replay the refusal on every reconnect.
+      await dequeue(clientId);
+      if (transient) await enqueue(payload);
+      else if (err?.message && err.message !== 'send failed') useUi.getState().toast(err.message, true);
       set((s) => ({
         messages: {
           ...s.messages,
           [conversationId]: (s.messages[conversationId] || []).map((m) =>
-            m.clientId === clientId ? { ...m, status: 'failed' } : m
+            m.clientId === clientId ? { ...m, status: 'failed', failedReason: err?.message || '' } : m
           ),
         },
       }));
     }
   },
 
-  async flushOutbox() {
-    const queued = await readOutbox();
-    for (const item of queued) {
-      try {
-        const res = await emitAck<{ ok: boolean; message?: Message }>('message:send', item);
-        if (res?.ok && res.message) {
-          await dequeue(item.clientId);
-          get().onMessage({ ...res.message, status: 'sent' });
+  flushOutbox() {
+    if (flushing) return flushing;
+    flushing = (async () => {
+      const queued = await readOutbox();
+      for (const item of queued) {
+        let res: { ok: boolean; message?: Message; error?: string };
+        try {
+          res = await emitAck('message:send', item);
+        } catch {
+          break; // still offline — keep the rest queued, order preserved
         }
-      } catch {
-        break; // still offline — keep the rest queued, order preserved
+        await dequeue(item.clientId);
+        if (res?.ok && res.message) {
+          get().onMessage({ ...res.message, status: 'sent' });
+        } else {
+          // The server heard it and said no. Show that on the bubble instead
+          // of replaying it silently on every reconnect.
+          set((s) => ({
+            messages: {
+              ...s.messages,
+              [item.conversationId]: (s.messages[item.conversationId] || []).map((m) =>
+                m.clientId === item.clientId ? { ...m, status: 'failed', failedReason: res?.error || '' } : m
+              ),
+            },
+          }));
+        }
       }
-    }
+    })().finally(() => {
+      flushing = null;
+    });
+    return flushing;
   },
 
   /* ── message actions ────────────────────────────────────────────────── */
@@ -489,7 +594,23 @@ export const useChat = create<ChatState>((set, get) => ({
     // Not caught: this one is a deliberate action with a button behind it, so
     // a refusal — a timer on the snap, or a snap already gone — has to be
     // said out loud rather than swallowed.
-    await post(`/messages/${messageId}/save`, { saved });
+    const res = await post<{ ok: boolean; saved: boolean }>(`/messages/${messageId}/save`, { saved });
+    // The server echoes `message:saved` too, but only once it has re-read the
+    // row; reflecting the answer now means the button flips when it is tapped.
+    const kept = res?.saved ?? saved;
+    const meId = (window as any).__nookMeId as string;
+    set((s) => {
+      const messages = { ...s.messages };
+      for (const [cid, list] of Object.entries(s.messages)) {
+        if (!list.some((m) => m.id === messageId)) continue;
+        messages[cid] = list.map((m) => {
+          if (m.id !== messageId) return m;
+          const others = (m.savedBy || []).filter((u) => u !== meId);
+          return { ...m, saved: kept, savedBy: kept ? [...others, meId] : others };
+        });
+      }
+      return { messages };
+    });
   },
 
   setReplyTo: (replyTo) => set({ replyTo, editing: null }),
@@ -819,26 +940,27 @@ export const useChat = create<ChatState>((set, get) => ({
 
     cacheMessages(m.conversationId, get().messages[m.conversationId] || []);
 
-    // Per-person tone. Silent if it's mine, if the chat is muted, if sound is
-    // off globally, or if I'm already looking at this exact conversation.
-    const meId = (window as any).__nookMeId as string;
-    const convo = get().conversations[m.conversationId];
+    // No sound here: notify.messageArrived plays it, honouring the chat's
+    // tone and the Settings switches. Both used to fire, so every message
+    // chimed twice.
     const looking = get().activeId === m.conversationId && document.visibilityState === 'visible';
-    if (m.sender.id !== meId && convo && !convo.muted && !looking) {
-      const soundOn = (window as any).__nookSoundOn !== false;
-      if (soundOn) playSound((convo.sound || 'default') as SoundId);
-    }
 
     if (looking) get().markRead(m.conversationId);
   },
 
   onMessageUpdate(m) {
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [m.conversationId]: (s.messages[m.conversationId] || []).map((x) => (x.id === m.id ? m : x)),
-      },
-    }));
+    set((s) => {
+      const list = s.messages[m.conversationId] || [];
+      return {
+        messages: {
+          ...s.messages,
+          // Deleted for me on another device: it goes, as it did on that one.
+          [m.conversationId]: m.deletedForMe
+            ? list.filter((x) => x.id !== m.id)
+            : list.map((x) => (x.id === m.id ? m : x)),
+        },
+      };
+    });
   },
 
   onConversation(c) {
@@ -861,6 +983,14 @@ export const useChat = create<ChatState>((set, get) => ({
         order: sortOrder(conversations),
         activeId: s.activeId === id ? null : s.activeId,
       };
+    });
+  },
+
+  onConversationRead(id) {
+    set((s) => {
+      const convo = s.conversations[id];
+      if (!convo || !convo.unread) return s;
+      return { conversations: { ...s.conversations, [id]: { ...convo, unread: 0 } } };
     });
   },
 

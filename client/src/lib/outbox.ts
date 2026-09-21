@@ -2,7 +2,7 @@
  * Offline outbox. Anything you send while disconnected is parked in IndexedDB
  * and replayed in order the moment the socket comes back.
  */
-import { get as idbGet, set as idbSet } from 'idb-keyval';
+import { get as idbGet, set as idbSet, keys as idbKeys, delMany as idbDelMany } from 'idb-keyval';
 
 /**
  * IndexedDB can hang rather than fail: a deleted-while-open database, a private
@@ -41,6 +41,8 @@ export interface Outgoing {
    * quietly replaced by the server default on every retry.
    */
   viewSeconds?: number;
+  /** A voice note's transcript, which a replay would otherwise lose. */
+  transcript?: string;
   queuedAt: number;
 }
 
@@ -55,6 +57,19 @@ export interface Outgoing {
 let scope = 'anon';
 export function setCacheScope(userId: string | null) {
   scope = userId || 'anon';
+}
+
+/**
+ * Sign-out: drop everything this account cached, outbox included. On a shared
+ * computer the next person should not find the last one's messages sitting in
+ * IndexedDB, nor have the last one's unsent messages go out on their behalf.
+ */
+export function clearCacheScope() {
+  const prefix = `nook.${scope}.`;
+  idbKeys()
+    .then((all) => idbDelMany(all.filter((k) => typeof k === 'string' && k.startsWith(prefix))))
+    .catch(() => {});
+  scope = 'anon';
 }
 
 const KEY = () => `nook.${scope}.outbox`;

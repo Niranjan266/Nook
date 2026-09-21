@@ -22,11 +22,19 @@ export function useSocketBridge(enabled: boolean) {
     const ui = useUi.getState;
     const friends = useFriends.getState;
 
+    /**
+     * Events sent while the socket was down are gone, not queued. The first
+     * connect is already covered by hydrate(); every one after it has to
+     * refetch, or a message that landed during a blip never shows up.
+     */
+    let connectedBefore = false;
     socket.on('connect', () => {
       chat().setConnected(true);
       chat().flushOutbox();
       // The server holds focus in memory, so a reconnect starts from nothing.
       resendFocus();
+      if (connectedBefore) chat().resync();
+      connectedBefore = true;
     });
     socket.on('disconnect', () => chat().setConnected(false));
     socket.on('connect_error', () => chat().setConnected(false));
@@ -75,10 +83,13 @@ export function useSocketBridge(enabled: boolean) {
     });
     socket.on('message:react', (m) => chat().onMessageUpdate(m));
     socket.on('message:snap-viewed', (m) => chat().onMessageUpdate(m));
+    socket.on('message:saved', (m) => chat().onMessageUpdate(m));
     socket.on('message:delete', (m) => chat().onMessageUpdate(m));
 
     socket.on('receipt:delivered', (p) => chat().onReceipt('delivered', p));
     socket.on('receipt:read', (p) => chat().onReceipt('read', p));
+    // Read on another device: the badge here should clear too.
+    socket.on('conversation:read', ({ conversationId }) => chat().onConversationRead(conversationId));
 
     socket.on('typing:update', ({ conversationId, userId, typing }) =>
       chat().setTyping(conversationId, userId, typing)
@@ -136,7 +147,8 @@ export function useSocketBridge(enabled: boolean) {
     socket.on('call:answered', (p) => call().onAnswered(p));
     socket.on('call:ice', (p) => call().onIce(p));
     socket.on('call:ended', (p) => call().onEnded(p));
-    socket.on('call:cancelled', () => call().onEnded({ callId: '', reason: 'cancelled' }));
+    // Carries the call id, so a stale cancel cannot end whatever call is live now.
+    socket.on('call:cancelled', ({ callId }) => call().onEnded({ callId, reason: 'cancelled' }));
 
     socket.on('snap:peeked', ({ byName }) =>
       ui().toast(`${byName} may have taken a screenshot of your snap.`, true)

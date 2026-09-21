@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { get as apiGet, post, patch, setToken, getToken, bootstrapSession } from '@/lib/api';
 import type { Me } from '@/lib/types';
+import { useChat } from '@/stores/chat';
+import { useFriends } from '@/stores/friends';
+import { useCall } from '@/stores/call';
+import { useUi } from '@/stores/ui';
+import { clearUnread } from '@/lib/notify';
 
 interface AuthState {
   me: Me | null;
@@ -97,6 +102,18 @@ export const useAuth = create<AuthState>((set, get) => ({
       /* going anyway */
     }
     setToken(null);
+    /**
+     * Everything user-scoped goes with the session. The stores are module
+     * singletons, so without this the next account to sign in on this tab
+     * inherited the last one's conversations, requests and open sheet until
+     * each happened to be refetched.
+     */
+    if (useCall.getState().phase !== 'idle') useCall.getState().hangUp();
+    useChat.getState().reset();
+    useFriends.setState({ incoming: [], outgoing: [], loaded: false });
+    useUi.setState({ sheet: null, sheetPayload: null, lightbox: null, wallpaperDraft: null });
+    clearUnread();
+    (window as any).__nookMeId = undefined;
     set({ me: null, status: 'out' });
   },
 

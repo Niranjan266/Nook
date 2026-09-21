@@ -153,7 +153,8 @@ export function upload(
   file: File | Blob,
   kind: 'message' | 'avatar' | 'wallpaper' | 'voice' = 'message',
   onProgress?: (pct: number) => void,
-  filename?: string
+  filename?: string,
+  retry = true
 ): Promise<{ media: any; provider: string }> {
   return new Promise((resolve, reject) => {
     const form = new FormData();
@@ -169,6 +170,16 @@ export function upload(
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     };
     xhr.onload = () => {
+      // Same bargain as api(): an access token that expired mid-session gets
+      // one refresh and one replay, instead of failing a photo someone chose.
+      if (xhr.status === 401 && retry) {
+        refresh().then((ok) =>
+          ok
+            ? upload(file, kind, onProgress, filename, false).then(resolve, reject)
+            : reject(new ApiError('Your session expired. Sign in again.', 401))
+        );
+        return;
+      }
       try {
         const data = JSON.parse(xhr.responseText || '{}');
         if (xhr.status >= 200 && xhr.status < 300) resolve(data);
@@ -183,3 +194,4 @@ export function upload(
 }
 
 export const bootstrapSession = refresh;
+export const refreshSession = refresh;

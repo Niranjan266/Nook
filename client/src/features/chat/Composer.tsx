@@ -35,6 +35,9 @@ interface Props {
   conversationId: string;
 }
 
+/** Voice-note formats in order of preference; the first the browser can record wins. */
+const VOICE_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/ogg;codecs=opus'];
+
 export default function Composer({ conversationId }: Props) {
   const { send, replyTo, setReplyTo, editing, setEditing, edit, conversations } = useChat();
   const enterToSend = useAuth((s) => s.me?.settings.enterToSend ?? true);
@@ -71,6 +74,33 @@ export default function Composer({ conversationId }: Props) {
   const transcriber = useRef<ReturnType<typeof transcribe>>(null);
   const typingSent = useRef(0);
   const [liveTranscript, setLiveTranscript] = useState('');
+
+  /**
+   * Leaving the chat mid-recording used to leave the microphone open — the
+   * red dot stayed on, the timer and meter kept running against an unmounted
+   * component, and the AudioContext leaked. Tear all of it down, sending
+   * nothing: a voice note should never go out because someone navigated away.
+   */
+  useEffect(
+    () => () => {
+      window.clearInterval(recTimer.current);
+      if (analyser.current) {
+        cancelAnimationFrame(analyser.current.raf);
+        analyser.current.ctx.close().catch(() => {});
+        analyser.current = null;
+      }
+      transcriber.current?.cancel();
+      transcriber.current = null;
+      const rec = recorder.current;
+      recorder.current = null;
+      if (rec) {
+        rec.onstop = null;
+        if (rec.state !== 'inactive') rec.stop();
+        rec.stream.getTracks().forEach((t) => t.stop());
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     setText(editing ? editing.body : '');
@@ -211,12 +241,13 @@ export default function Composer({ conversationId }: Props) {
   /* ── voice notes ──────────────────────────────────────────────────────── */
 
   async function startRecording() {
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      const rec = new MediaRecorder(stream, { mimeType: mime });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Safari records no webm at all, and asking for it throws — which is
+      // why voice notes failed on every iPhone. mp4/AAC is what it does have.
+      const mime = VOICE_TYPES.find((t) => MediaRecorder.isTypeSupported?.(t));
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       chunks.current = [];
       rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
       rec.start(120);
@@ -246,8 +277,20 @@ export default function Composer({ conversationId }: Props) {
         analyser.current!.raf = requestAnimationFrame(tick);
       };
       analyser.current = { ctx, node, raf: requestAnimationFrame(tick) };
-    } catch {
-      toast('Microphone permission was refused.', true);
+    } catch (err: any) {
+      // Permission may have been granted and something later failed; either
+      // way the mic must not stay open behind a toast saying it was refused.
+      stream?.getTracks().forEach((t) => t.stop());
+      window.clearInterval(recTimer.current);
+      transcriber.current?.cancel();
+      transcriber.current = null;
+      if (recorder.current?.state === 'recording') recorder.current.stop();
+      recorder.current = null;
+      setRecording(false);
+      toast(
+        err?.name === 'NotAllowedError' ? 'Microphone permission was refused.' : 'Could not start recording.',
+        true
+      );
     }
   }
 
@@ -278,10 +321,13 @@ export default function Composer({ conversationId }: Props) {
       if (discard || seconds < 1) return;
 
       const transcript = await pendingTranscript;
-      const blob = new Blob(chunks.current, { type: 'audio/webm' });
+      // Label the file with what was actually recorded, not what we hoped for.
+      const type = (rec.mimeType || 'audio/webm').split(';')[0];
+      const blob = new Blob(chunks.current, { type });
+      const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
       setUploading({ name: 'Voice message', pct: 0 });
       try {
-        const { media } = await upload(blob, 'voice', (pct) => setUploading({ name: 'Voice message', pct }), 'voice.webm');
+        const { media } = await upload(blob, 'voice', (pct) => setUploading({ name: 'Voice message', pct }), `voice.${ext}`);
         await send({
           conversationId,
           type: 'voice',

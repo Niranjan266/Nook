@@ -7,6 +7,7 @@ import { get } from '@/lib/api';
 import { bytes, stamp } from '@/lib/format';
 import type { Message } from '@/lib/types';
 import { IconImage, IconFile, IconMic, IconDownload } from '@/components/Icon';
+import { safeUrl } from '@/lib/config';
 
 type Tab = 'media' | 'files' | 'voice';
 
@@ -128,7 +129,7 @@ export default function MediaSheet() {
             >
               <Blur hash={m.media?.blurhash} />
               <img
-                src={m.media?.thumbUrl || m.media?.url}
+                src={safeUrl(m.media?.thumbUrl || m.media?.url)}
                 alt=""
                 loading="lazy"
                 style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
@@ -143,7 +144,7 @@ export default function MediaSheet() {
           <a
             key={m.id}
             className="list-row"
-            href={m.media?.url}
+            href={safeUrl(m.media?.url) || undefined}
             download={m.media?.name}
             target="_blank"
             rel="noreferrer"

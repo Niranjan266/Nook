@@ -1,4 +1,5 @@
 import { initials, accentFor } from '@/lib/format';
+import { safeUrl } from '@/lib/config';
 
 const TONE: Record<string, string> = {
   terracotta: 'var(--terracotta)',
@@ -31,6 +32,9 @@ export default function Avatar({
 }: Props) {
   const tone = TONE[accent || accentFor(id || name)] || TONE.terracotta;
   const fg = accent === 'ochre' ? '#241D10' : '#FDF8F2';
+  // Every avatar in the app comes through here, so this is the one place to
+  // resolve relative uploads and refuse unsafe schemes.
+  const url = safeUrl(src);
 
   return (
     <span
@@ -42,8 +46,8 @@ export default function Avatar({
         borderRadius: square ? Math.max(10, size * 0.28) : undefined,
       }}
     >
-      {src ? (
-        <img src={src} alt="" style={square ? { borderRadius: Math.max(10, size * 0.28) } : undefined} />
+      {url ? (
+        <img src={url} alt="" style={square ? { borderRadius: Math.max(10, size * 0.28) } : undefined} />
       ) : (
         <span
           className="initials"

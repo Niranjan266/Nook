@@ -6,6 +6,7 @@ import { MOODS, toClock, fromClock, daysUntil } from '@/lib/rooms';
 import { WALLPAPER_PRESETS } from '@/lib/color';
 import { stamp } from '@/lib/format';
 import { IconWall, IconSchedule, IconHistory, IconClose, IconPlus, IconClock } from '@/components/Icon';
+import { cssUrl } from '@/lib/config';
 
 /**
  * Rooms: everything that treats a conversation as a place rather than a list.
@@ -252,7 +253,7 @@ export default function RoomSheet() {
                     height: 84,
                     borderRadius: 12,
                     boxShadow: 'var(--clay-1)',
-                    backgroundImage: h.url ? `url(${h.url})` : undefined,
+                    backgroundImage: h.url ? cssUrl(h.url) : undefined,
                     backgroundSize: 'cover',
                     position: 'relative',
                     display: 'flex',

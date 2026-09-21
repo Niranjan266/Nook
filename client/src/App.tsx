@@ -5,6 +5,8 @@ import { useChat, selectActive } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
 
 import FrontDoor from '@/features/auth/FrontDoor';
+import GuestDoor from '@/features/auth/GuestDoor';
+import { captureLaunchLinks, openLaunchTarget } from '@/lib/links';
 import DockRail from '@/features/shell/DockRail';
 import Shelf from '@/features/shell/Shelf';
 import Conversation from '@/features/chat/Conversation';
@@ -174,6 +176,8 @@ function Nook() {
   const { shelfOpen, sheet } = useUi();
   const isPhone = usePhone();
   const isNarrow = useNarrow();
+  // Read before anything else looks at the address bar; see lib/links.
+  const [guestCode, setGuestCode] = useState(() => captureLaunchLinks().guest);
 
   useEffect(() => {
     /**
@@ -220,7 +224,17 @@ function Nook() {
       document.documentElement.dataset.accent = me.accent || 'terracotta';
       // Scope the offline cache to this account before anything reads it.
       setCacheScope(me.id);
-      hydrate();
+      // A notification tap or an invite link can only be acted on once the
+      // account's conversations are here.
+      hydrate()
+        .catch(() => {})
+        .then(openLaunchTarget);
+      if (guestCode) {
+        // Guest links make a new throwaway account; someone already signed
+        // in wants the group's invite link instead.
+        setGuestCode(null);
+        useUi.getState().toast("You're already signed in — ask for the group's invite link instead.", true);
+      }
       // Requests are not conversations, so they are not in the conversation
       // load. Without this the badge would be zero until the first socket
       // event, which for anyone who was asked while signed out is never.
@@ -299,7 +313,8 @@ function Nook() {
     );
   }
 
-  if (status === 'out' || !me) return <FrontDoor />;
+  if (status === 'out' || !me)
+    return guestCode ? <GuestDoor code={guestCode} onDone={() => setGuestCode(null)} /> : <FrontDoor />;
 
   /**
    * Phone  — one pane at a time: the list, or the conversation.

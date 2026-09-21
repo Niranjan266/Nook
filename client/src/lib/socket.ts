@@ -1,5 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import { getToken } from './api';
+import { getToken, refreshSession } from './api';
 import { API_BASE } from './config';
 
 let socket: Socket | null = null;
@@ -17,21 +17,34 @@ export function connectSocket(): Socket {
    * `withCredentials` matters: the handshake must carry the session cookie for
    * the same-site setup to work.
    */
-  socket = API_BASE
-    ? io(API_BASE, {
-        auth: { token: getToken() },
-        transports: ['websocket', 'polling'],
-        withCredentials: true,
-        reconnectionDelay: 600,
-        reconnectionDelayMax: 6000,
-      })
-    : io({
-        auth: { token: getToken() },
-        transports: ['websocket', 'polling'],
-        withCredentials: true,
-        reconnectionDelay: 600,
-        reconnectionDelayMax: 6000,
-      });
+  const opts = {
+    // A function, not a value: it is re-read on every (re)connect attempt. A
+    // token captured once here is expired by the first reconnect after
+    // fifteen minutes, and the socket would keep presenting it forever.
+    auth: (cb: (data: object) => void) => cb({ token: getToken() }),
+    transports: ['websocket', 'polling'],
+    withCredentials: true,
+    reconnectionDelay: 600,
+    reconnectionDelayMax: 6000,
+  };
+  const s = API_BASE ? io(API_BASE, opts) : io(opts);
+  socket = s;
+
+  /**
+   * A refusal from the auth middleware is final as far as socket.io is
+   * concerned — it does not retry those. An expired access token is the
+   * common cause and is fixable, so refresh once and dial again. Once per
+   * failure streak, so a suspended account cannot spin this in a loop.
+   */
+  let authRetried = false;
+  s.on('connect', () => {
+    authRetried = false;
+  });
+  s.on('connect_error', async (err) => {
+    if (s.active || authRetried || !/token/i.test(err?.message || '')) return;
+    authRetried = true;
+    if ((await refreshSession()) && socket === s) s.connect();
+  });
 
   return socket;
 }

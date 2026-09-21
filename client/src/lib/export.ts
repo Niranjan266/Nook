@@ -1,4 +1,5 @@
 import { get } from './api';
+import { safeUrl } from './config';
 import { clock, dayLabel, sameDay, previewOf } from './format';
 import type { Conversation, Message } from './types';
 
@@ -40,8 +41,8 @@ function renderMessage(m: Message, meId: string) {
 
   let body = '';
   if (m.type === 'text') body = escape(m.body).replace(/\n/g, '<br>');
-  else if (m.media?.url)
-    body = `<a class="file" href="${escape(m.media.url)}">${escape(m.media.name || previewOf(m))}</a>`;
+  else if (safeUrl(m.media?.url))
+    body = `<a class="file" href="${escape(safeUrl(m.media!.url))}">${escape(m.media?.name || previewOf(m))}</a>`;
   else body = `<em>${escape(previewOf(m))}</em>`;
 
   if (m.deletedForAll) body = '<em class="gone">This message was unsent</em>';

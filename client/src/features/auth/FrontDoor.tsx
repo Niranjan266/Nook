@@ -156,7 +156,7 @@ export default function FrontDoor() {
    * session and the app stayed signed out with nothing to explain it.
    */
   useEffect(() => {
-    bindDeepLinks(redeem, explain);
+    return bindDeepLinks(redeem, explain);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

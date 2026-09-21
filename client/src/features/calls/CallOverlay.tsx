@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCall } from '@/stores/call';
 import Avatar from '@/components/Avatar';
@@ -17,19 +17,30 @@ import {
 
 export default function CallOverlay() {
   const call = useCall();
-  const remoteVideo = useRef<HTMLVideoElement>(null);
-  const localVideo = useRef<HTMLVideoElement>(null);
-  const remoteAudio = useRef<HTMLAudioElement>(null);
   const [elapsed, setElapsed] = useState(0);
 
-  useEffect(() => {
-    if (remoteVideo.current && call.remoteStream) remoteVideo.current.srcObject = call.remoteStream;
-    if (remoteAudio.current && call.remoteStream) remoteAudio.current.srcObject = call.remoteStream;
-  }, [call.remoteStream]);
-
-  useEffect(() => {
-    if (localVideo.current && call.localStream) localVideo.current.srcObject = call.localStream;
-  }, [call.localStream, call.minimised, call.phase]);
+  /**
+   * Callback refs rather than effects. The media elements are unmounted and
+   * remounted as the layout changes — minimising swaps in the pill, turning
+   * the camera off and on replaces the preview — and an effect keyed on the
+   * stream alone never saw the new element, which is how a call went silent
+   * or black after being minimised and reopened. A callback ref runs for
+   * every element React mounts, and again whenever the stream changes.
+   */
+  const remoteStream = call.remoteStream;
+  const localStream = call.localStream;
+  const attachRemote = useCallback(
+    (el: HTMLMediaElement | null) => {
+      if (el && remoteStream && el.srcObject !== remoteStream) el.srcObject = remoteStream;
+    },
+    [remoteStream]
+  );
+  const attachLocal = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (el && localStream && el.srcObject !== localStream) el.srcObject = localStream;
+    },
+    [localStream]
+  );
 
   useEffect(() => {
     if (call.phase !== 'live' || !call.startedAt) return setElapsed(0);
@@ -60,7 +71,7 @@ export default function CallOverlay() {
   if (call.minimised && call.phase === 'live') {
     return (
       <>
-        <audio ref={remoteAudio} autoPlay playsInline />
+        <audio ref={attachRemote} autoPlay playsInline />
         <motion.div
           className="call-pill"
           initial={{ y: -60, opacity: 0 }}
@@ -103,7 +114,7 @@ export default function CallOverlay() {
         role="dialog"
         aria-label="Call"
       >
-        <audio ref={remoteAudio} autoPlay playsInline muted={isVideo} />
+        <audio ref={attachRemote} autoPlay playsInline muted={isVideo} />
 
         <header className="call-head">
           {call.phase === 'live' && (
@@ -120,10 +131,10 @@ export default function CallOverlay() {
         <div className="call-stage">
           {isVideo && call.phase === 'live' ? (
             <div className="call-video">
-              <video ref={remoteVideo} autoPlay playsInline />
+              <video ref={attachRemote} autoPlay playsInline />
               <div className="call-self">
                 {call.camOn ? (
-                  <video ref={localVideo} autoPlay playsInline muted />
+                  <video ref={attachLocal} autoPlay playsInline muted />
                 ) : (
                   <div className="call-video-off">
                     <Avatar name="You" size={44} />

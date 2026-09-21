@@ -28,4 +28,27 @@ export function mediaUrl(url?: string | null) {
   return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
+/**
+ * mediaUrl, but only for schemes that cannot run code.
+ *
+ * Media URLs come from other people's messages, and a `javascript:` href on a
+ * download link runs in our origin with the session in memory. Anything that
+ * is not http(s), blob, an image data URI, or a plain path renders as nothing.
+ * The scheme test ignores whitespace and control characters because browsers
+ * do too — `java\tscript:` still runs.
+ */
+export function safeUrl(url?: string | null) {
+  if (!url) return '';
+  const probe = url.replace(/[\u0000-\u0020\u007f]/g, '');
+  if (/^(https?:|blob:)/i.test(probe) || /^data:image\//i.test(probe)) return url.trim();
+  if (/^[a-z][a-z0-9+.-]*:/i.test(probe) || probe.startsWith('//')) return '';
+  return mediaUrl(url.trim());
+}
+
+/** For `url(...)` in inline styles: quoted, so a paren or quote in the URL cannot end it early. */
+export function cssUrl(url?: string | null) {
+  const safe = safeUrl(url);
+  return safe ? `url("${safe.replace(/["\\\n\r]/g, encodeURIComponent)}")` : undefined;
+}
+
 export const isProd = import.meta.env.PROD;

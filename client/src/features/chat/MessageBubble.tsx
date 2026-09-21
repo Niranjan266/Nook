@@ -35,6 +35,7 @@ import {
   IconThread,
   IconDown,
 } from '@/components/Icon';
+import { safeUrl } from '@/lib/config';
 
 
 interface Props {
@@ -177,7 +178,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           >
             <Blur hash={m.media?.blurhash} />
             <img
-              src={m.media?.thumbUrl || m.media?.url}
+              src={safeUrl(m.media?.thumbUrl || m.media?.url)}
               alt={m.body || 'Photo'}
               loading={eager ? 'eager' : 'lazy'}
               decoding="async"
@@ -191,9 +192,9 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         return (
           <button className="media-frame" style={ratioStyle} onClick={() => setLightbox({ messageId: m.id })}>
             {m.media?.thumbUrl ? (
-              <img src={m.media.thumbUrl} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" />
+              <img src={safeUrl(m.media.thumbUrl)} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" />
             ) : (
-              <video src={m.media?.url} preload="metadata" />
+              <video src={safeUrl(m.media?.url)} preload="metadata" />
             )}
             <span className="play">
               <span className="clay-round" style={{ width: 52, height: 52 }}>
@@ -207,7 +208,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         return (
           <VoiceNote
             messageId={m.id}
-            url={m.media?.url || ''}
+            url={safeUrl(m.media?.url)}
             waveform={m.media?.waveform}
             length={m.media?.duration}
             transcript={m.transcript}
@@ -215,13 +216,13 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         );
 
       case 'audio':
-        return <audio controls src={m.media?.url} style={{ maxWidth: 260 }} />;
+        return <audio controls src={safeUrl(m.media?.url)} style={{ maxWidth: 260 }} />;
 
       case 'file':
         return (
           <a
             className="file-card"
-            href={m.media?.url}
+            href={safeUrl(m.media?.url) || undefined}
             download={m.media?.name}
             target="_blank"
             rel="noreferrer"
@@ -427,7 +428,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
 
           {m.replyTo?.senderName && (
             <button className="quote" onClick={() => onJumpTo(m.replyTo!.id)}>
-              {m.replyTo.thumbUrl && <img src={m.replyTo.thumbUrl} alt="" />}
+              {m.replyTo.thumbUrl && <img src={safeUrl(m.replyTo.thumbUrl)} alt="" />}
               <span className="quote-body">
                 <span className="quote-name">{m.replyTo.senderName}</span>
                 <span className="quote-text">{m.replyTo.body || m.replyTo.type}</span>
@@ -442,10 +443,10 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           {/* Link preview — fetched by our server, so this device never touched
               the third-party URL. */}
           {m.linkPreview && (
-            <a className="link-card" href={m.linkPreview.url} target="_blank" rel="noreferrer noopener">
+            <a className="link-card" href={safeUrl(m.linkPreview.url) || undefined} target="_blank" rel="noreferrer noopener">
               {m.linkPreview.image && (
                 <span className="link-card-image">
-                  <img src={m.linkPreview.image} alt="" loading="lazy" />
+                  <img src={safeUrl(m.linkPreview.image)} alt="" loading="lazy" />
                 </span>
               )}
               <span className="link-card-body">

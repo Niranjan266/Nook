@@ -6,6 +6,7 @@ import { post } from '@/lib/api';
 import { clock } from '@/lib/format';
 import { IconClose, IconDownload, IconWarning } from '@/components/Icon';
 import { spring } from '@/lib/motion';
+import { safeUrl } from '@/lib/config';
 
 export default function Lightbox() {
   const { lightbox, setLightbox } = useUi();
@@ -74,7 +75,7 @@ export default function Lightbox() {
             {!isSnap && (
               <a
                 className="clay-round"
-                href={message.media.url}
+                href={safeUrl(message.media.url) || undefined}
                 download={message.media.name || 'nook-media'}
                 target="_blank"
                 rel="noreferrer"
@@ -95,9 +96,9 @@ export default function Lightbox() {
             transition={spring}
           >
             {message.media.mime?.startsWith('video/') ? (
-              <video src={message.media.url} controls autoPlay playsInline />
+              <video src={safeUrl(message.media.url)} controls autoPlay playsInline />
             ) : (
-              <img src={message.media.url} alt={message.body || ''} />
+              <img src={safeUrl(message.media.url)} alt={message.body || ''} />
             )}
           </motion.div>
 

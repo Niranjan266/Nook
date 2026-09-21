@@ -25,6 +25,7 @@ import {
   IconClockSmall,
 } from '@/components/Icon';
 import type { Conversation as Convo } from '@/lib/types';
+import { safeUrl, cssUrl } from '@/lib/config';
 
 const GAP_MINUTES = 6;
 
@@ -182,7 +183,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
   const shownLook = draft ? { ...activeLook, ...draft } : activeLook;
 
   const wallpaperStyle: React.CSSProperties = {
-    ...(shownLook.url ? { backgroundImage: `url(${shownLook.url})` } : {}),
+    ...(shownLook.url ? { backgroundImage: cssUrl(shownLook.url) } : {}),
     ...(shownLook.blur ? { filter: `blur(${shownLook.blur}px)`, transform: 'scale(1.06)' } : {}),
     ['--wp-dim' as any]: shownLook.dim,
   };
@@ -343,7 +344,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
           <div className="wall">
             {conversation.wallObjects.map((o) => (
               <div key={o.id} className={`wall-object ${o.type}`} style={{ left: `${o.x}%`, top: `${o.y}%` }}>
-                {o.type === 'photo' && o.url && <img src={o.url} alt="" />}
+                {o.type === 'photo' && o.url && <img src={safeUrl(o.url)} alt="" />}
                 {o.type === 'countdown' && o.date && (
                   <>
                     <div style={{ fontSize: 20, fontWeight: 700 }}>{daysUntil(o.date)}</div>
@@ -392,7 +393,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
                   height: 42,
                   borderRadius: 12,
                   flex: 'none',
-                  backgroundImage: wp.proposal.url ? `url(${wp.proposal.url})` : undefined,
+                  backgroundImage: wp.proposal.url ? cssUrl(wp.proposal.url) : undefined,
                   backgroundSize: 'cover',
                   boxShadow: 'var(--clay-in)',
                 }}

@@ -283,59 +283,83 @@ export async function startGoogleSignIn(apiBase: string, admin = false): Promise
 }
 
 /**
+ * The launch intent never changes for the life of the process, so it is
+ * handled once. FrontDoor mounts again after every sign-out, and re-reading it
+ * each time replayed a long-spent Google code into a fresh error message.
+ */
+let launchHandled = false;
+
+/**
  * Everything Android hands to the app as a link.
  *
  * Right now that is the end of a Google sign-in, but the shape is general: a
  * scheme, a path, and a query. Anything added later (an invite link, a shared
  * conversation) arrives through the same door.
+ *
+ * Returns a cleanup that removes the listener, for the effect that bound it.
  */
-export async function bindDeepLinks(onCode: (code: string) => void, onError: (why: string) => void) {
-  if (!isNativeApp()) return;
+export function bindDeepLinks(onCode: (code: string) => void, onError: (why: string) => void): () => void {
+  if (!isNativeApp()) return () => {};
 
-  try {
-    const { App } = await import('@capacitor/app');
+  let removed = false;
+  let remove: (() => void) | null = null;
 
-    const handle = async (url?: string | null) => {
-      if (!url?.startsWith('nook://')) return;
+  (async () => {
+    try {
+      const { App } = await import('@capacitor/app');
 
-      // `new URL` on a custom scheme is unreliable across engines; the query
-      // is the only part that matters and splitting on '?' cannot misparse.
-      const query = new URLSearchParams(url.split('?')[1] || '');
-      const code = query.get('g');
-      const failed = query.get('google_error');
+      const handle = async (url?: string | null) => {
+        if (!url?.startsWith('nook://')) return;
 
-      // Close the Custom Tab first, so the app is what the person is looking
-      // at when the result lands rather than a browser that lingers on top.
-      try {
-        const { Browser } = await import('@capacitor/browser');
-        await Browser.close();
-      } catch {
-        /* nothing open, or already gone */
-      }
+        // `new URL` on a custom scheme is unreliable across engines; the query
+        // is the only part that matters and splitting on '?' cannot misparse.
+        const query = new URLSearchParams(url.split('?')[1] || '');
+        const code = query.get('g');
+        const failed = query.get('google_error');
 
-      if (code) onCode(code);
-      else if (failed) onError(failed);
-    };
+        // Close the Custom Tab first, so the app is what the person is looking
+        // at when the result lands rather than a browser that lingers on top.
+        try {
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.close();
+        } catch {
+          /* nothing open, or already gone */
+        }
 
-    await App.addListener('appUrlOpen', ({ url }) => handle(url));
+        if (code) onCode(code);
+        else if (failed) onError(failed);
+      };
 
-    /**
-     * The same link, but for a launch rather than a resume.
-     *
-     * `appUrlOpen` only fires at an app that is already running. Android is
-     * free to kill Nook while the person is off in the browser signing in —
-     * it is a backgrounded app and the browser wants the memory — and then
-     * the deep link *starts* the app instead of resuming it. In that case the
-     * event fired long before this listener existed, and waiting for it means
-     * waiting forever: the person signs in successfully, lands back in Nook,
-     * and finds the front door.
-     *
-     * `getLaunchUrl` is the intent the app was started with, so it catches
-     * exactly the case the listener cannot. Both routes run the same handler.
-     */
-    const launch = await App.getLaunchUrl();
-    await handle(launch?.url);
-  } catch {
-    /* not native */
-  }
+      const handleListener = await App.addListener('appUrlOpen', ({ url }) => handle(url));
+      remove = () => handleListener.remove();
+      // Unmounted while the listener was still being added.
+      if (removed) return remove();
+
+      /**
+       * The same link, but for a launch rather than a resume.
+       *
+       * `appUrlOpen` only fires at an app that is already running. Android is
+       * free to kill Nook while the person is off in the browser signing in —
+       * it is a backgrounded app and the browser wants the memory — and then
+       * the deep link *starts* the app instead of resuming it. In that case the
+       * event fired long before this listener existed, and waiting for it means
+       * waiting forever: the person signs in successfully, lands back in Nook,
+       * and finds the front door.
+       *
+       * `getLaunchUrl` is the intent the app was started with, so it catches
+       * exactly the case the listener cannot. Both routes run the same handler.
+       */
+      if (launchHandled) return;
+      launchHandled = true;
+      const launch = await App.getLaunchUrl();
+      await handle(launch?.url);
+    } catch {
+      /* not native */
+    }
+  })();
+
+  return () => {
+    removed = true;
+    remove?.();
+  };
 }
