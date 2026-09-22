@@ -1,97 +1,76 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Nook — design tokens
-   "Soft Clay, Hard Edges"
+   "Midnight Pebble"
 
-   Two materials, never blended:
-     CLAY  — puffy, rounded, dual shadow, no border. The world.
-     SLAB  — flat fill, 2px ink border, hard offset shadow. The things you press.
+   Dark-first and high-contrast, but soft: everything is rounded like a stone
+   worn smooth, and nothing has a hard edge or a heavy border.
+     SURFACES — flat fill, one soft shadow (plus a 1px line in dark, where a
+                shadow alone vanishes against the night).
+     CONTROLS — pills. Primary is volt in the dark, iris in the light.
+     MY BUBBLE — volt in both modes: the one colour that means "you".
 
-   No neon. No purple-cyan gradients. No glass.
+   Fonts are loaded by <link> in index.html (earlier than a CSS @import).
+   The theme is always set on <html> as data-theme (index.html inline script
+   and stores/ui.ts), so :root carries dark and [data-theme='light'] overrides.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
-
 :root {
-  /* ── surface ───────────────────────────────────────────────────────────── */
-  --clay-bg: #e9e1d6;
-  --clay-surface: #f4eee6;
-  --clay-raised: #faf6f0;
-  --clay-sunk: #ded4c6;
-  --clay-edge: #cfc2b1;
-
-  /* ── ink ───────────────────────────────────────────────────────────────── */
-  --ink: #1e1a17;
-  --ink-soft: #5c5349;
-  --ink-faint: #8b8073;
-  --ink-invert: #f7f2ea;
-
-  /* ── accents ───────────────────────────────────────────────────────────── */
-  --terracotta: #c0603c;
-  --terracotta-deep: #a9502f;
-  --moss: #57694a;
-  --moss-deep: #46563b;
-  --ochre: #ce9535;
-  --ochre-deep: #b07f27;
-  --clay-blue: #47606f;
-  --clay-blue-deep: #3a4f5c;
-  --rust: #a33f2f;
-  --rust-deep: #8c3427;
-
-  --accent: var(--terracotta);
-  --accent-deep: var(--terracotta-deep);
-  --on-accent: #fdf8f2;
-
-  /* ── clay shadows: light from top-left, always a pair ──────────────────── */
-  --clay-1: 4px 4px 10px rgba(30, 26, 23, 0.11), -3px -3px 8px rgba(255, 255, 255, 0.85);
-  --clay-2: 8px 8px 20px rgba(30, 26, 23, 0.13), -5px -5px 14px rgba(255, 255, 255, 0.9);
-  --clay-3: 16px 18px 38px rgba(30, 26, 23, 0.16), -8px -8px 22px rgba(255, 255, 255, 0.92);
-  --clay-in: inset 3px 3px 7px rgba(30, 26, 23, 0.13), inset -2px -2px 6px rgba(255, 255, 255, 0.8);
-  --clay-in-deep: inset 5px 5px 12px rgba(30, 26, 23, 0.16), inset -3px -3px 8px rgba(255, 255, 255, 0.75);
-
-  /* ── slab: hard, offset, never blurred ─────────────────────────────────── */
-  --slab-border: 2px solid var(--ink);
-  --slab-shadow: 4px 4px 0 var(--ink);
-  --slab-shadow-sm: 3px 3px 0 var(--ink);
-  --slab-shadow-lg: 6px 6px 0 var(--ink);
-
-  /* ── radii: clay is round, slab is nearly square ───────────────────────── */
-  --r-clay-sm: 14px;
-  --r-clay: 22px;
-  --r-clay-lg: 30px;
-  --r-clay-xl: 38px;
-  --r-slab: 6px;
-  --r-pill: 999px;
+  /* ── palette: fixed hues, identical in both modes ──────────────────────── */
+  --volt: #c8f545;
+  --mint: #3dd6a8;
+  --sky: #6aa8ff;
+  --rose: #ff8fa3;
+  --peach: #ffb36b;
+  --night: #0e0d14;
 
   /* ── type ──────────────────────────────────────────────────────────────── */
-  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
-  --font-body: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Fredoka', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+  --font-body: 'Nunito', ui-rounded, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
 
+  /* 12 caption · 13 small · 15 body · 17 title · 20 · 26 · 34 display */
   --t-xs: 0.75rem;
   --t-sm: 0.8125rem;
   --t-base: 0.9375rem;
-  --t-md: 1rem;
+  --t-title: 1.0625rem;
+  --t-md: var(--t-title);
   --t-lg: 1.25rem;
   --t-xl: 1.625rem;
   --t-2xl: 2.125rem;
   --t-3xl: 3rem;
 
-  /* ── spacing ───────────────────────────────────────────────────────────── */
+  /* ── spacing: a 4px grid ───────────────────────────────────────────────── */
   --s-1: 4px;
   --s-2: 8px;
   --s-3: 12px;
   --s-4: 16px;
-  --s-5: 22px;
-  --s-6: 30px;
-  --s-7: 42px;
-  --s-8: 60px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 48px;
+  --tap: 44px; /* the smallest thing a thumb should have to hit */
 
-  /* ── motion: one spring, everywhere ────────────────────────────────────── */
-  --ease-clay: cubic-bezier(0.34, 1.32, 0.48, 1);
-  --ease-out: cubic-bezier(0.22, 0.9, 0.3, 1);
-  --dur-fast: 140ms;
-  --dur: 220ms;
-  --dur-slow: 380ms;
+  /* ── shape: pebbles, not boxes ─────────────────────────────────────────── */
+  --r-sm: 12px;
+  --r-card: 22px;
+  --r-sheet: 28px;
+  --r-bubble: 24px;
+  --r-bubble-tail: 6px; /* the corner nearest the sender */
+  --r-pill: 999px;
+
+  /* ── motion (mirrored in lib/motion.ts so CSS and Framer move alike) ──── */
+  --dur-press: 90ms;
+  --dur-fast: 160ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
+  --dur-theme: 280ms;
+  --ease-out: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* CSS stand-in for the "pop" spring: one small overshoot, then rest. */
+  --ease-spring: cubic-bezier(0.3, 1.35, 0.5, 1);
+  --press-scale: 0.96;
 
   /* ── layout ────────────────────────────────────────────────────────────── */
   --rail-w: 76px;
@@ -100,66 +79,387 @@
   --z-call: 90;
   --z-toast: 120;
 
-  color-scheme: light;
-}
+  /* ═════════════════════════════════════════════════════════════════════════
+     DARK — the default. Night, not black: #0E0D14 has a violet cast so volt
+     and iris sit on it without buzzing.
+     ═════════════════════════════════════════════════════════════════════════ */
+  --bg: #0e0d14;
+  --surface: #18161f;
+  --surface-2: #22202c; /* raised, inputs, their bubbles */
+  --line: #2a2735;
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Dark — warm charcoal, never blue-black. Clay still catches light top-left.
-   ═══════════════════════════════════════════════════════════════════════════ */
+  --ink: #f4f2fa;
+  --ink-2: #a9a4ba; /* secondary text — 8:1 on bg */
+  --ink-3: #7d7890; /* icons and decoration only, never body text */
 
-:root[data-theme='dark'] {
-  --clay-bg: #201d1a;
-  --clay-surface: #2b2724;
-  --clay-raised: #35302b;
-  --clay-sunk: #171412;
-  --clay-edge: #423b34;
+  --primary: var(--volt);
+  --on-primary: #0e0d14;
+  --primary-ink: var(--volt); /* the primary colour used AS text, on bg */
+  --primary-soft: #2a3218;
 
-  --ink: #efe6da;
-  --ink-soft: #a79c8e;
-  --ink-faint: #7d7367;
-  --ink-invert: #1a1715;
+  --iris: #8b7cff;
+  --danger: #ff7a66;
+  --danger-ink: #ff7a66;
+  --success: #3dd6a8;
+  --success-ink: #3dd6a8;
+  --peach-ink: #ffb36b;
 
-  --terracotta: #d97a53;
-  --terracotta-deep: #c0603c;
-  --moss: #7f9268;
-  --moss-deep: #64764f;
-  --ochre: #e0ad55;
-  --ochre-deep: #c4913a;
-  --clay-blue: #6b8598;
-  --clay-blue-deep: #547083;
-  --rust: #c85a45;
-  --rust-deep: #a33f2f;
+  --bubble-mine: var(--volt);
+  --bubble-mine-ink: #0e0d14;
+  --bubble-theirs: #22202c;
+  --bubble-theirs-ink: var(--ink);
+  --bubble-theirs-shadow: 0 0 0 0 transparent;
 
-  --accent: var(--terracotta);
-  --accent-deep: var(--terracotta-deep);
-  --on-accent: #201d1a;
+  /* A shadow alone disappears on night, so dark surfaces also get a hairline. */
+  --edge: inset 0 0 0 1px var(--line);
+  --shadow-1: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --lift: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
 
-  --clay-1: 4px 4px 10px rgba(0, 0, 0, 0.42), -3px -3px 8px rgba(255, 240, 220, 0.045);
-  --clay-2: 8px 8px 20px rgba(0, 0, 0, 0.48), -5px -5px 14px rgba(255, 240, 220, 0.055);
-  --clay-3: 16px 18px 38px rgba(0, 0, 0, 0.55), -8px -8px 22px rgba(255, 240, 220, 0.06);
-  --clay-in: inset 3px 3px 8px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(255, 240, 220, 0.05);
-  --clay-in-deep: inset 5px 5px 13px rgba(0, 0, 0, 0.58), inset -3px -3px 8px rgba(255, 240, 220, 0.05);
+  --ring-color: rgba(139, 124, 255, 0.35);
+  --ring: 0 0 0 3px var(--ring-color);
+  --scrim: rgba(6, 5, 10, 0.62);
 
-  --slab-shadow: 4px 4px 0 var(--ink);
+  --swatch-default: var(--volt); /* the Settings chip for the default accent */
+  --swatch-default-ink: #0e0d14;
 
   color-scheme: dark;
 }
 
-/* Accent switching — each person picks one, it colours their own UI */
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT — lavender paper. Iris does the work volt does at night, because
+   volt fails contrast as text or as a button fill on white.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root[data-theme='light'] {
+  --bg: #f4f2fb;
+  --surface: #ffffff;
+  --surface-2: #ece9f8;
+  --line: #e4e0f3;
+
+  --ink: #1f1b2e;
+  --ink-2: #5e5875;
+  --ink-3: #8e88a4;
+
+  --primary: #5443d6;
+  --on-primary: #ffffff;
+  --primary-ink: #5443d6;
+  --primary-soft: #e6e2ff;
+
+  --iris: #5443d6;
+  --danger: #d6452f;
+  --danger-ink: #b23a26; /* #D6452F is 4:1 on bg; this clears 4.5 for text */
+  --success: #12a150;
+  --success-ink: #0b7a3b;
+  --peach-ink: #a8560f;
+
+  --bubble-mine: var(--volt);
+  --bubble-mine-ink: #1f1b2e;
+  --bubble-theirs: #ffffff;
+  --bubble-theirs-ink: var(--ink);
+  --bubble-theirs-shadow: var(--shadow-1);
+
+  --edge: 0 0 0 0 transparent;
+  --shadow-1: 0 6px 20px rgba(84, 67, 214, 0.08);
+  --shadow-2: 0 10px 28px rgba(84, 67, 214, 0.12);
+  --lift: 0 10px 34px rgba(84, 67, 214, 0.18);
+
+  --ring-color: rgba(84, 67, 214, 0.35);
+  --scrim: rgba(31, 27, 46, 0.4);
+
+  --swatch-default: #5443d6;
+  --swatch-default-ink: #ffffff;
+
+  color-scheme: light;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGNS — the admin picks one for everyone (/nookcontrol → lib/design.ts →
+   data-design on <html>). Midnight Pebble is the base above; the others only
+   restate what differs.
+
+   Specificity is deliberate. :where() keeps each block at the weight of the
+   base theme block it replaces (it wins by coming later), and below the
+   accent blocks that follow — so a person's own accent still beats the
+   design's default colour, in every design.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Calm: quiet, editorial, lots of air ──────────────────────────────────── */
+:root:where([data-design='calm']) {
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --r-sm: 10px;
+  --r-card: 16px;
+  --r-sheet: 24px;
+  --r-bubble: 20px;
+  --r-bubble-tail: 6px;
+  --ease-spring: cubic-bezier(0.25, 1, 0.5, 1); /* settles, never bounces */
+}
+:root[data-theme='dark']:where([data-design='calm']) {
+  --bg: #141317;
+  --surface: #1c1b20;
+  --surface-2: #26242b;
+  --line: #302e36;
+  --ink: #f3f1ee;
+  --ink-2: #aba6b2;
+  --ink-3: #7f7a87;
+  --primary: #f0754e;
+  --on-primary: #141317;
+  --primary-ink: #f0754e;
+  --primary-soft: #3a221b;
+  --iris: #8fa6e0;
+  --danger: #ff7a66;
+  --danger-ink: #ff7a66;
+  --success: #4cc38a;
+  --success-ink: #4cc38a;
+  --bubble-mine: #f0754e;
+  --bubble-mine-ink: #141317;
+  --bubble-theirs: #26242b;
+  --ring-color: rgba(240, 117, 78, 0.35);
+  --scrim: rgba(6, 5, 8, 0.6);
+  --swatch-default: #f0754e;
+  --swatch-default-ink: #141317;
+}
+:root[data-theme='light']:where([data-design='calm']) {
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-2: #f1eee9;
+  --line: #e7e2db;
+  --ink: #18171c;
+  --ink-2: #5b5764;
+  --ink-3: #8e8994;
+  --primary: #c4421d;
+  --on-primary: #ffffff;
+  --primary-ink: #b03a18;
+  --primary-soft: #fbe7df;
+  --iris: #3d5a99;
+  --danger: #c23b22;
+  --danger-ink: #a8321c;
+  --success: #1f8a5b;
+  --success-ink: #17704a;
+  --bubble-mine: #c4421d;
+  --bubble-mine-ink: #ffffff;
+  --bubble-theirs: #f1eee9;
+  --bubble-theirs-shadow: 0 0 0 0 transparent;
+  --shadow-1: 0 1px 2px rgba(24, 23, 28, 0.06), 0 4px 14px rgba(24, 23, 28, 0.06);
+  --shadow-2: 0 2px 6px rgba(24, 23, 28, 0.07), 0 10px 24px rgba(24, 23, 28, 0.08);
+  --lift: 0 12px 32px rgba(24, 23, 28, 0.14);
+  --ring-color: rgba(196, 66, 29, 0.3);
+  --scrim: rgba(24, 23, 28, 0.32);
+  --swatch-default: #c4421d;
+  --swatch-default-ink: #ffffff;
+}
+
+/* ── Midnight: bold, high-contrast, dark first ────────────────────────────── */
+:root:where([data-design='midnight']) {
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --r-sm: 10px;
+  --r-card: 14px;
+  --r-sheet: 22px;
+  --r-bubble: 16px;
+  --r-bubble-tail: 4px;
+  --ease-spring: cubic-bezier(0.2, 1.2, 0.4, 1); /* quick, a little punch */
+}
+:root[data-theme='dark']:where([data-design='midnight']) {
+  --bg: #0d0e11;
+  --surface: #15171c;
+  --surface-2: #1f2229;
+  --line: #262a32;
+  --ink: #f3f4f6;
+  --ink-2: #a1a6b1;
+  --ink-3: #6e7480;
+  --primary-soft: #2a3314;
+  --iris: #7c8cff;
+  --danger: #ff6b5a;
+  --danger-ink: #ff6b5a;
+  --bubble-theirs: #1f2229;
+  --ring-color: rgba(200, 245, 69, 0.3);
+  --scrim: rgba(0, 0, 0, 0.62);
+}
+:root[data-theme='light']:where([data-design='midnight']) {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eceef2;
+  --line: #e1e4ea;
+  --ink: #0d0e11;
+  --ink-2: #4e5563;
+  --ink-3: #8a909c;
+  /* Black buttons with volt type: Midnight keeps its edge in daylight. */
+  --primary: #0d0e11;
+  --on-primary: #c8f545;
+  --primary-ink: #0d0e11;
+  --primary-soft: #eaf8c4;
+  --iris: #4455e0;
+  --danger: #d23b26;
+  --danger-ink: #b0301e;
+  --success: #0e8a4e;
+  --success-ink: #0b6e3e;
+  --bubble-mine: var(--volt);
+  --bubble-mine-ink: #0d0e11;
+  --bubble-theirs: #ffffff;
+  --shadow-1: 0 1px 2px rgba(13, 14, 17, 0.06), 0 6px 18px rgba(13, 14, 17, 0.07);
+  --shadow-2: 0 10px 26px rgba(13, 14, 17, 0.1);
+  --lift: 0 14px 36px rgba(13, 14, 17, 0.16);
+  --ring-color: rgba(68, 85, 224, 0.35);
+  --scrim: rgba(13, 14, 17, 0.4);
+  --swatch-default: #0d0e11;
+  --swatch-default-ink: #c8f545;
+}
+
+/* ── Pebble: soft, rounded, friendly (light first) ────────────────────────── */
+:root[data-theme='light']:where([data-design='pebble']) {
+  --bubble-mine: #5443d6;
+  --bubble-mine-ink: #ffffff;
+}
+:root[data-theme='dark']:where([data-design='pebble']) {
+  --bg: #16131f;
+  --surface: #1e1a2a;
+  --surface-2: #28233a;
+  --line: #332d47;
+  --ink: #f3f0ff;
+  --ink-2: #b0a9cc;
+  --ink-3: #807a99;
+  --primary: #8b7cff;
+  --on-primary: #16131f;
+  --primary-ink: #a99dff;
+  --primary-soft: #2b2547;
+  --iris: #8b7cff;
+  --bubble-mine: #8b7cff;
+  --bubble-mine-ink: #16131f;
+  --bubble-theirs: #28233a;
+  --ring-color: rgba(139, 124, 255, 0.4);
+  --scrim: rgba(10, 8, 18, 0.6);
+  --swatch-default: #8b7cff;
+  --swatch-default-ink: #16131f;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Accents — each person picks one, it colours their own UI (buttons, active
+   tab, links, unread). The stored ids predate this palette and the server
+   validates them, so they stay; only what they mean changed:
+
+     terracotta → default (volt at night, iris by day)   — the old default
+     moss       → mint  #3DD6A8
+     ochre      → peach #FFB36B
+     clay-blue  → sky   #6AA8FF
+     rust       → rose  #FF8FA3
+
+   Every one is a light hue, so text on it is always dark (≥7:1). In light
+   mode --primary-ink is a deeper shade of the same hue, because the bright
+   fill itself is too pale to read as text on lavender.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 :root[data-accent='moss'] {
-  --accent: var(--moss);
-  --accent-deep: var(--moss-deep);
+  --primary: var(--mint);
+  --primary-ink: var(--mint);
+  --on-primary: #0e0d14;
+  --primary-soft: color-mix(in srgb, var(--mint) 16%, var(--bg));
 }
 :root[data-accent='ochre'] {
-  --accent: var(--ochre);
-  --accent-deep: var(--ochre-deep);
-  --on-accent: #241d10;
+  --primary: var(--peach);
+  --primary-ink: var(--peach);
+  --on-primary: #0e0d14;
+  --primary-soft: color-mix(in srgb, var(--peach) 16%, var(--bg));
 }
 :root[data-accent='clay-blue'] {
-  --accent: var(--clay-blue);
-  --accent-deep: var(--clay-blue-deep);
+  --primary: var(--sky);
+  --primary-ink: var(--sky);
+  --on-primary: #0e0d14;
+  --primary-soft: color-mix(in srgb, var(--sky) 16%, var(--bg));
 }
 :root[data-accent='rust'] {
-  --accent: var(--rust);
-  --accent-deep: #8c3427;
+  --primary: var(--rose);
+  --primary-ink: var(--rose);
+  --on-primary: #0e0d14;
+  --primary-soft: color-mix(in srgb, var(--rose) 16%, var(--bg));
+}
+
+:root[data-theme='light'][data-accent='moss'] {
+  --on-primary: #1f1b2e;
+  --primary-ink: #0a7a5e;
+  --primary-soft: color-mix(in srgb, var(--mint) 20%, #fff);
+}
+:root[data-theme='light'][data-accent='ochre'] {
+  --on-primary: #1f1b2e;
+  --primary-ink: #a8560f;
+  --primary-soft: color-mix(in srgb, var(--peach) 22%, #fff);
+}
+:root[data-theme='light'][data-accent='clay-blue'] {
+  --on-primary: #1f1b2e;
+  --primary-ink: #2f66c4;
+  --primary-soft: color-mix(in srgb, var(--sky) 20%, #fff);
+}
+:root[data-theme='light'][data-accent='rust'] {
+  --on-primary: #1f1b2e;
+  --primary-ink: #c23a5a;
+  --primary-soft: color-mix(in srgb, var(--rose) 20%, #fff);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEGACY ALIASES — being migrated. Do not use in new code.
+
+   The "Soft Clay, Hard Edges" names, each pointed at the nearest Midnight
+   Pebble token so every existing screen wears the new palette without an
+   edit. As screens are restyled they should switch to the names above; once
+   nothing references a line here it can go.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* surfaces */
+  --clay-bg: var(--bg);
+  --clay-surface: var(--surface);
+  --clay-raised: var(--surface);
+  --clay-sunk: var(--surface-2);
+  --clay-edge: var(--line);
+
+  /* ink */
+  --ink-soft: var(--ink-2);
+  --ink-faint: var(--ink-3);
+  --ink-invert: var(--bg); /* text on an ink-filled chip */
+  --muted: var(--ink-2); /* was never defined; used as if it were --ink-soft */
+
+  /* accent */
+  --accent: var(--primary);
+  --accent-deep: var(--primary-ink);
+  --on-accent: var(--on-primary);
+
+  /* old named hues → the new palette, by role rather than by look */
+  --terracotta: var(--peach);
+  --terracotta-deep: var(--peach-ink);
+  --ochre: var(--peach);
+  --ochre-deep: var(--peach-ink);
+  --moss: var(--success-ink); /* online, sent, success */
+  --moss-deep: var(--success-ink);
+  --clay-blue: var(--iris); /* read receipts, info */
+  --clay-blue-deep: var(--iris);
+  --rust: var(--danger-ink); /* errors, destructive */
+  --rust-deep: var(--danger-ink);
+
+  /* the dual clay shadows → one soft shadow (+ hairline in dark) */
+  --clay-1: var(--edge), var(--shadow-1);
+  --clay-2: var(--edge), var(--shadow-2);
+  --clay-3: var(--lift);
+  /* the inset "pressed into clay" look is gone: a hairline, nothing more */
+  --clay-in: inset 0 0 0 1px var(--line);
+  --clay-in-deep: inset 0 0 0 1px var(--line);
+
+  /* the slab's hard border and offset shadow are gone. Kept list-safe
+     (a zero shadow, a transparent border) so `box-shadow: var(--x), …`
+     still parses where a screen combines them. */
+  --slab-border: 1px solid transparent;
+  --slab-shadow: 0 0 0 0 transparent;
+  --slab-shadow-sm: 0 0 0 0 transparent;
+  --slab-shadow-lg: 0 0 0 0 transparent;
+
+  /* radii */
+  --r-clay-sm: var(--r-sm);
+  --r-clay: var(--r-card);
+  --r-clay-lg: var(--r-sheet);
+  --r-clay-xl: var(--r-sheet);
+  --r-slab: var(--r-pill); /* buttons, chips, tags and day marks are pills now */
+
+  /* motion */
+  --dur: var(--dur-base);
+  --ease-clay: var(--ease-spring);
 }

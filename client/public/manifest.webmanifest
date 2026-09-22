@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#E9E1D6",
-  "theme_color": "#E9E1D6",
+  "background_color": "#0E0D14",
+  "theme_color": "#0E0D14",
   "categories": ["social", "communication"],
   "icons": [
     { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },

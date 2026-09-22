@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Get Nook for Android</title>
     <meta name="description" content="Nook for Android — the same Nook, with notifications that reach a locked phone." />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="/logo.svg" />
 
     <meta property="og:title" content="Nook for Android" />
@@ -19,15 +19,36 @@
         by someone who has not used Nook yet — every kilobyte before the
         download button is a kilobyte in the way.
       */
+      /* tokens.css's values, copied: this page loads none of the app's CSS.
+         Light by day, night by night — the same rule as the app. */
       :root {
-        --bisque: #e9e1d6;
-        --surface: #f4eee6;
-        --raised: #fbf7f1;
-        --ink: #1e1a17;
-        --muted: #5c5349;
-        --terracotta: #c0603c;
-        --moss: #57694a;
-        --hairline: #ded5c8;
+        --bg: #f4f2fb;
+        --surface: #ffffff;
+        --raised: #ece9f8;
+        --ink: #1f1b2e;
+        --muted: #5e5875;
+        --primary: #5443d6;
+        --on-primary: #ffffff;
+        --success: #0b7a3b;
+        --hairline: #e4e0f3;
+        --shadow: 0 6px 20px rgba(84, 67, 214, 0.08);
+        /* No web font is fetched, so these are the faces already on the phone. */
+        --display: 'Fredoka', 'Nunito', ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', system-ui, sans-serif;
+        --body: 'Nunito', ui-rounded, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e0d14;
+          --surface: #18161f;
+          --raised: #22202c;
+          --ink: #f4f2fa;
+          --muted: #a9a4ba;
+          --primary: #c8f545;
+          --on-primary: #0e0d14;
+          --success: #3dd6a8;
+          --hairline: #2a2735;
+          --shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 0 0 1px #2a2735;
+        }
       }
 
       * { box-sizing: border-box; }
@@ -35,9 +56,9 @@
       body {
         margin: 0;
         padding: 32px 20px calc(48px + env(safe-area-inset-bottom, 0px));
-        background: var(--bisque);
+        background: var(--bg);
         color: var(--ink);
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-family: var(--body);
         line-height: 1.6;
         display: flex;
         justify-content: center;
@@ -53,50 +74,49 @@
       }
       .brand img { width: 40px; height: 40px; }
       .brand span {
-        font-size: 12px;
-        letter-spacing: 0.22em;
-        text-transform: uppercase;
-        color: var(--muted);
+        font-family: var(--display);
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--ink);
       }
 
       h1 {
-        margin: 0 0 10px;
-        font-size: 30px;
+        margin: 0 0 8px;
+        font-family: var(--display);
+        font-size: 32px;
+        font-weight: 600;
         line-height: 1.15;
-        letter-spacing: -0.02em;
       }
       .lede { margin: 0 0 28px; color: var(--muted); }
 
       .card {
         background: var(--surface);
-        border-radius: 26px;
+        border-radius: 22px;
         padding: 24px;
-        box-shadow: 0 12px 30px rgba(30, 26, 23, 0.09);
+        box-shadow: var(--shadow);
         margin-bottom: 20px;
       }
 
-      /* The Slab: flat fill, hard offset shadow, near-square corners. */
+      /* The primary button: a pill, squeezed a little on press. */
       .slab {
         display: block;
         width: 100%;
         padding: 16px 20px;
-        border: 2px solid var(--ink);
-        border-radius: 6px;
-        background: var(--terracotta);
-        color: #fdf8f2;
+        border: none;
+        border-radius: 999px;
+        background: var(--primary);
+        color: var(--on-primary);
         font: inherit;
         font-size: 17px;
-        font-weight: 600;
+        font-weight: 800;
         text-align: center;
         text-decoration: none;
-        box-shadow: 4px 4px 0 var(--ink);
-        transition: transform 0.12s ease, box-shadow 0.12s ease;
+        transition: transform 90ms cubic-bezier(0.2, 0.9, 0.3, 1);
       }
       .slab:active {
-        transform: translate(4px, 4px);
-        box-shadow: 0 0 0 var(--ink);
+        transform: scale(0.96);
       }
-      .slab.secondary { background: var(--surface); color: var(--ink); }
+      .slab.secondary { background: var(--raised); color: var(--ink); }
 
       .meta {
         margin: 12px 0 0;
@@ -109,13 +129,13 @@
       li {
         display: flex;
         gap: 12px;
-        padding: 11px 0;
+        padding: 12px 0;
         border-bottom: 1px solid var(--hairline);
       }
       li:last-child { border-bottom: 0; }
       li b { display: block; font-weight: 600; }
       li span { color: var(--muted); font-size: 14px; }
-      .tick { color: var(--moss); flex: none; font-weight: 700; }
+      .tick { color: var(--success); flex: none; font-weight: 700; }
 
       h2 {
         margin: 0 0 12px;
@@ -130,9 +150,8 @@
 
       .note {
         background: var(--raised);
-        border-left: 3px solid var(--terracotta);
-        border-radius: 0 12px 12px 0;
-        padding: 12px 14px;
+        border-radius: 16px;
+        padding: 12px 16px;
         font-size: 14px;
         color: var(--muted);
       }
@@ -143,7 +162,7 @@
         font-size: 13px;
         color: var(--muted);
       }
-      footer a { color: var(--terracotta); }
+      footer a { color: var(--primary); font-weight: 700; }
     </style>
   </head>
 

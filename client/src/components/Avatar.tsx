@@ -1,12 +1,16 @@
 import { initials, accentFor } from '@/lib/format';
 import { safeUrl } from '@/lib/config';
 
+/*
+ * Keyed by the stored accent ids; the colours are the fixed Midnight Pebble
+ * hues (the same in both modes), all light enough to carry night-ink initials.
+ */
 const TONE: Record<string, string> = {
-  terracotta: 'var(--terracotta)',
-  moss: 'var(--moss)',
-  ochre: 'var(--ochre)',
-  'clay-blue': 'var(--clay-blue)',
-  rust: 'var(--rust)',
+  terracotta: 'var(--volt)',
+  moss: 'var(--mint)',
+  ochre: 'var(--peach)',
+  'clay-blue': 'var(--sky)',
+  rust: 'var(--rose)',
 };
 
 interface Props {
@@ -31,7 +35,8 @@ export default function Avatar({
   square = false,
 }: Props) {
   const tone = TONE[accent || accentFor(id || name)] || TONE.terracotta;
-  const fg = accent === 'ochre' ? '#241D10' : '#FDF8F2';
+  // Every tone is a light hue, so the initials are always night-ink.
+  const fg = 'var(--night)';
   // Every avatar in the app comes through here, so this is the one place to
   // resolve relative uploads and refuse unsafe schemes.
   const url = safeUrl(src);

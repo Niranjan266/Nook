@@ -1,7 +1,11 @@
 <!--
   The status bar icon. Android masks these to a single colour, so only the
-  silhouette matters — anything with detail or colour comes out as a blob.
-  A simple filled speech bubble reads clearly at 24dp.
+  silhouette matters — colour and fine detail come out as a blob.
+
+  The two pebbles, one colour: the back one cut away where it meets the
+  front, the eyes as holes, both slightly larger than in the logo so they
+  survive 24dp. The 48-unit logo geometry, scaled 0.55 and centred:
+  12 - 24 x 0.55 = -1.2,  12 - 25 x 0.55 = -1.75.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
@@ -9,7 +13,17 @@
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="#FFFFFF">
-  <path
-      android:fillColor="#FFFFFF"
-      android:pathData="M12,3C7.03,3 3,6.58 3,11c0,2.35 1.15,4.46 2.97,5.9L5,21l4.35,-1.74C10.19,19.42 11.08,19.5 12,19.5c4.97,0 9,-3.58 9,-8S16.97,3 12,3z" />
+  <group
+      android:scaleX="0.55"
+      android:scaleY="0.55"
+      android:translateX="-1.2"
+      android:translateY="-1.75">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M25.37,10.83 A11,13 0 1 1 31.5,34.99 A14.8,16.8 0 0 0 25.37,10.83 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M6,26 a13,15 0 1 0 26,0 a13,15 0 1 0 -26,0 Z M13.6,25 a2.4,2.4 0 1 0 4.8,0 a2.4,2.4 0 1 0 -4.8,0 Z M19.6,25 a2.4,2.4 0 1 0 4.8,0 a2.4,2.4 0 1 0 -4.8,0 Z" />
+  </group>
 </vector>

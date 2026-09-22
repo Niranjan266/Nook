@@ -52,7 +52,7 @@ const config: CapacitorConfig = {
   android: {
     // The web app already draws its own background; a white flash between the
     // splash screen and the first paint is more noticeable than the wait.
-    backgroundColor: '#E9E1D6',
+    backgroundColor: '#0E0D14',
 
     /**
      * `webContentsDebuggingEnabled` is deliberately absent.

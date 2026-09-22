@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark" data-design="midnight-pebble">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -14,8 +14,8 @@
     <link rel="apple-touch-icon" href="/logo.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
-    <meta name="theme-color" content="#E9E1D6" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#201D1A" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F4F2FB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0E0D14" media="(prefers-color-scheme: dark)" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Nook — your corner of the internet" />
@@ -28,18 +28,37 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Here rather than as an @import in tokens.css: a CSS @import is only
+         found once the stylesheet has downloaded, a <link> is found at once. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
 
     <script>
       // Set the theme before first paint so there is no light flash.
+      // Storage is read in its own try: if it is blocked the phone's own
+      // light/dark setting still decides, rather than a hardcoded default.
       (function () {
+        var saved = {};
         try {
-          var saved = JSON.parse(localStorage.getItem('nook.ui') || '{}');
+          saved = JSON.parse(localStorage.getItem('nook.ui') || '{}') || {};
+        } catch (e) {}
+        try {
           var theme = saved.theme || 'system';
           var dark =
             theme === 'dark' ||
             (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           document.documentElement.dataset.theme = dark ? 'dark' : 'light';
           if (saved.accent) document.documentElement.dataset.accent = saved.accent;
+        } catch (e) {}
+        // The design everyone is on, as last seen: painted now, confirmed by
+        // the server once the app boots (lib/design.ts).
+        try {
+          var design = localStorage.getItem('nook.design');
+          if (/^(midnight-pebble|calm|midnight|pebble)$/.test(design || '')) {
+            document.documentElement.dataset.design = design;
+          }
         } catch (e) {}
       })();
 

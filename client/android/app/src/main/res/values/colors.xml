@@ -1,5 +1,12 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <!-- Terracotta, the app's accent. Used to tint the status bar icon. -->
-    <color name="nook_accent">#C0603C</color>
+    <!--
+      Tints the notification icon. Iris rather than volt: this colour sits on
+      the light shade of the notification drawer as often as the dark one,
+      and volt vanishes on white.
+    -->
+    <color name="nook_accent">#8B7CFF</color>
+
+    <!-- Night, the app's dark background: the splash and the launch window. -->
+    <color name="nook_night">#0E0D14</color>
 </resources>

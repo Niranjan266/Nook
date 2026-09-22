@@ -1,38 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The room the nook is cut into.
+  The night behind the pebbles.
 
   Adaptive icons are 108x108, of which only the middle 72x72 is guaranteed to
   be visible — the launcher masks the rest into whatever shape it likes, and
   shifts the two layers against each other when the icon moves. So the
-  background carries no detail at all: it is the clay face from logo.svg and
-  nothing else, and it reads the same whether the launcher crops it to a
+  background carries no detail at all: flat night (#0E0D14, the app's dark
+  background), which reads the same whether the launcher crops it to a
   circle, a squircle or a teardrop.
-
-  The gradient is the one the web mark uses (#F6F1E9 to #DCCDB9), top-left to
-  bottom-right. Flat bisque would have been safer, but the whole design leans
-  on light falling across a soft surface, and a flat icon next to a shaded app
-  looks like a placeholder.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <path android:pathData="M0,0 h108 v108 h-108 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="0"
-                android:startY="0"
-                android:endX="43"
-                android:endY="108">
-                <item android:offset="0" android:color="#FFF6F1E9" />
-                <item android:offset="0.55" android:color="#FFEDE3D6" />
-                <item android:offset="1" android:color="#FFDCCDB9" />
-            </gradient>
-        </aapt:attr>
-    </path>
+    <path
+        android:pathData="M0,0 h108 v108 h-108 Z"
+        android:fillColor="#FF0E0D14" />
 </vector>

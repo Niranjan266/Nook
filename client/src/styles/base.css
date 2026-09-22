@@ -25,7 +25,7 @@ body {
   font-size: var(--t-base);
   line-height: 1.55;
   color: var(--ink);
-  background: var(--clay-bg);
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overscroll-behavior: none;
@@ -37,8 +37,8 @@ h3,
 h4 {
   font-family: var(--font-display);
   font-weight: 600;
-  line-height: 1.14;
-  letter-spacing: -0.018em;
+  line-height: 1.18;
+  letter-spacing: -0.005em; /* Fredoka is already round and wide; don't squeeze it */
 }
 
 h1 {
@@ -67,7 +67,7 @@ button {
 }
 
 a {
-  color: var(--accent-deep);
+  color: var(--primary-ink);
   text-underline-offset: 3px;
   text-decoration-thickness: 1.5px;
 }
@@ -85,30 +85,20 @@ ol {
   padding: 0;
 }
 
+/* Times and counts in the body face with fixed-width digits, so a column of
+   them lines up and a ticking clock doesn't jitter. Mono is for code only. */
 time,
 .tabular {
-  font-family: var(--font-mono);
-  font-size: 0.86em;
-  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
-/* ── motion tokens beyond tokens.css ─────────────────────────────────────
-   Mirrored in lib/motion.ts (`ease`) so CSS and Framer move alike. Leaving
-   is quicker and accelerates away; arriving decelerates in.               */
+/* Motion tokens (durations, easings, press scale) live in tokens.css. */
 
-:root {
-  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-press: 90ms;
-  --dur-theme: 280ms;
-}
-
-/* ── focus: a hard slab ring, visible on clay and on wallpaper ──────────── */
+/* ── focus: an iris ring, offset so it never sits on the control's edge ─── */
 
 :focus-visible {
-  outline: 2.5px solid var(--ink);
+  outline: 2px solid var(--iris);
   outline-offset: 3px;
-  border-radius: var(--r-slab);
 }
 
 /* A mouse click or a tap never shows the ring; only the keyboard does. */
@@ -119,7 +109,7 @@ time,
 /* Over the near-black media viewers the ink ring would vanish. */
 .lightbox :focus-visible,
 .snap-view :focus-visible {
-  outline-color: #f7f2ea;
+  outline-color: #f4f2fa;
 }
 
 /* ── theme switching ─────────────────────────────────────────────────────
@@ -145,15 +135,15 @@ time,
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: color-mix(in srgb, var(--iris) 40%, transparent);
+  color: var(--ink);
 }
 
-/* ── scrollbars: thin, clay ─────────────────────────────────────────────── */
+/* ── scrollbars: thin, quiet ────────────────────────────────────────────── */
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--clay-edge) transparent;
+  scrollbar-color: color-mix(in srgb, var(--ink-3) 55%, transparent) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -164,13 +154,13 @@ time,
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--clay-edge);
+  background: color-mix(in srgb, var(--ink-3) 55%, transparent);
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-faint);
+  background: var(--ink-3);
   background-clip: padding-box;
   border: 3px solid transparent;
 }
@@ -206,10 +196,10 @@ time,
   white-space: nowrap;
 }
 .muted {
-  color: var(--ink-soft);
+  color: var(--ink-2);
 }
 .faint {
-  color: var(--ink-faint);
+  color: var(--ink-3);
 }
 .tiny {
   font-size: var(--t-xs);
@@ -224,10 +214,10 @@ time,
 
 .eyebrow {
   font-size: var(--t-xs);
-  letter-spacing: 0.19em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-faint);
-  font-weight: 500;
+  color: var(--ink-2);
+  font-weight: 800;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -244,7 +234,7 @@ time,
 /* Text that reports a problem. Colour alone never carries the meaning — the
    wording always says what went wrong too. */
 .bad {
-  color: var(--rust);
+  color: var(--danger-ink);
 }
 
 /* ── touch ────────────────────────────────────────────────────────────────
@@ -257,7 +247,7 @@ time,
  * Android paints a grey rectangle over anything tappable, on every tap, in a
  * shape that ignores border-radius. It is the loudest tell that something is
  * a web page — and it is redundant here, because every control already has an
- * :active state that presses it into the clay.
+ * :active state that squeezes it.
  */
 * {
   -webkit-tap-highlight-color: transparent;
@@ -340,7 +330,7 @@ textarea,
   button:active,
   .list-row:active,
   .tile:active {
-    transform: scale(0.97);
+    transform: scale(var(--press-scale));
   }
 
   /*
@@ -349,7 +339,7 @@ textarea,
    * specificity: controls that declare their own transition keep it.
    */
   :where(button, .list-row) {
-    transition: transform 160ms var(--ease-out);
+    transition: transform var(--dur-fast) var(--ease-out);
   }
   :where(button, .list-row):active {
     transition-duration: var(--dur-press);

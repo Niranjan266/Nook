@@ -4,14 +4,13 @@
 
   When someone turns on themed icons the launcher throws away both colour
   layers and tints this silhouette to match their wallpaper. An app with no
-  monochrome layer gets a washed-out, auto-generated approximation instead —
-  usually the foreground flattened to one colour, which for Nook would be a
-  terracotta arch with a white highlight and a dark floor all collapsing into
-  a single flat block.
+  monochrome layer gets an auto-generated approximation instead — for Nook,
+  the two pebbles would melt into a single blob and stop meaning "two".
 
-  So it is drawn deliberately: the alcove alone, solid, with the highlight and
-  the floor dropped because tinting makes them meaningless. Colour is ignored
-  here; only the shape survives.
+  So it is drawn deliberately: the back pebble has a sliver cut away where it
+  meets the front one, and the eyes are holes (evenOdd), so the pair survives
+  being one colour. Same group transform as ic_launcher_foreground.xml; the
+  gap path comes from tools/android-icons.py.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -19,7 +18,19 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <path
-        android:pathData="M35,70.625 V37.375 a19,19 0 0 1 38,0 V70.625 Z"
-        android:fillColor="#000000" />
+    <group
+        android:scaleX="1.45"
+        android:scaleY="1.45"
+        android:translateX="19.2"
+        android:translateY="17.75">
+
+        <path
+            android:pathData="M25.37,10.83 A11,13 0 1 1 31.5,34.99 A14.8,16.8 0 0 0 25.37,10.83 Z"
+            android:fillColor="#000000" />
+
+        <path
+            android:pathData="M6,26 a13,15 0 1 0 26,0 a13,15 0 1 0 -26,0 Z M14,25 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 Z M20,25 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 Z"
+            android:fillColor="#000000"
+            android:fillType="evenOdd" />
+    </group>
 </vector>

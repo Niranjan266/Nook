@@ -69,7 +69,7 @@ async function ensureChannels(): Promise<1 | 2> {
     sound: 'nook_message',
     vibration: true,
     lights: true,
-    lightColor: '#C0603C',
+    lightColor: '#8B7CFF',
   });
 
   await PushNotifications.createChannel({
@@ -81,7 +81,7 @@ async function ensureChannels(): Promise<1 | 2> {
     sound: 'nook_call',
     vibration: true,
     lights: true,
-    lightColor: '#C0603C',
+    lightColor: '#8B7CFF',
   });
   return 1;
 }
@@ -244,14 +244,17 @@ export async function bindBackButton(goBack: () => boolean) {
  * Match the status bar to the app rather than leaving it black.
  *
  * The WebView has no say over the status bar, so the `theme-color` meta tag
- * the browser honours does nothing here — an app that is otherwise warm bisque
- * sits under a black strip until this runs.
+ * the browser honours does nothing here — an app that is otherwise lavender
+ * by day sits under a black strip until this runs.
  */
 export async function styleStatusBar(dark: boolean) {
   if (!isNativeApp()) return;
   try {
     const { StatusBar, Style } = await import('@capacitor/status-bar');
-    await StatusBar.setBackgroundColor({ color: dark ? '#201D1A' : '#E9E1D6' });
+    // The page's own --bg, read live: it differs per theme AND per the
+    // admin's design, and the bar should melt into whichever is showing.
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    await StatusBar.setBackgroundColor({ color: /^#[0-9a-f]{6}$/i.test(bg) ? bg : dark ? '#0E0D14' : '#F4F2FB' });
     // Dark *content* on a light bar, and the reverse — the naming is the
     // opposite of what it reads like, which is worth stating once here.
     await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
