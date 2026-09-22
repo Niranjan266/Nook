@@ -1,0 +1,145 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Guided tour — a dimmed room with one lamp on, and a slab card to read by
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Above sheets and calls, below toasts — a toast mid-tour should still be read. */
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  --tour-dim: rgba(24, 19, 15, 0.62);
+}
+:root[data-theme='dark'] .tour {
+  --tour-dim: rgba(0, 0, 0, 0.7);
+}
+
+/* The cut-out: an empty box whose enormous shadow is the dim. One element,
+   so the hole and the darkness can never drift apart mid-spring. */
+.tour-spot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  box-shadow: 0 0 0 200vmax var(--tour-dim);
+  will-change: transform;
+}
+
+.tour-ring {
+  position: absolute;
+  inset: -3px;
+  border: 3px solid var(--accent);
+  border-radius: inherit;
+}
+.tour-ring.pulse::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 2px solid var(--accent);
+  border-radius: inherit;
+  animation: tour-pulse 1.8s var(--ease-out) infinite;
+}
+@keyframes tour-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.14);
+    opacity: 0;
+  }
+}
+
+/* A slab, not clay: this is something you press through, not part of the room. */
+.tour-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: min(320px, calc(100vw - 24px));
+  padding: 14px 16px 14px;
+  background: var(--clay-raised);
+  color: var(--ink);
+  border: var(--slab-border);
+  border-radius: var(--r-clay-sm);
+  box-shadow: var(--slab-shadow-lg);
+  outline: none;
+  will-change: transform;
+}
+
+.tour-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+.tour-top .eyebrow {
+  color: var(--ink-faint);
+}
+
+.tour-dots {
+  display: flex;
+  gap: 6px;
+}
+.tour-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--clay-edge);
+  transition:
+    transform var(--dur) var(--ease-clay),
+    background-color var(--dur) var(--ease-out);
+}
+.tour-dot.done {
+  background: var(--ink-faint);
+}
+.tour-dot.on {
+  background: var(--accent);
+  transform: scale(1.45);
+}
+
+.tour-title {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.tour-body {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--t-base);
+  line-height: 1.45;
+}
+
+.tour-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+}
+.tour-spacer {
+  flex: 1;
+}
+.tour-skip {
+  padding: 6px 4px;
+  color: var(--ink-soft);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+.tour-skip:hover {
+  color: var(--ink);
+}
+.tour-skip:focus-visible,
+.tour-card .slab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring.pulse::after {
+    display: none;
+  }
+  .tour-dot {
+    transition: background-color var(--dur) var(--ease-out);
+  }
+}

@@ -1,12 +1,74 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useChat } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
 import { useFriends, selectPendingCount } from '@/stores/friends';
 import Avatar from '@/components/Avatar';
 import { spring, popIn } from '@/lib/motion';
-import { IconMenu, IconPlus, IconSettings, IconPhone, IconSearch, IconUser } from '@/components/Icon';
+import { usePhone, useMediaQuery } from '@/lib/useMediaQuery';
+import {
+  IconMenu,
+  IconPlus,
+  IconSettings,
+  IconPhone,
+  IconSearch,
+  IconUser,
+  IconSun,
+  IconMoon,
+} from '@/components/Icon';
+
+/**
+ * One tap between light and dark.
+ *
+ * 'system' resolves to the opposite of whatever is showing, so the tap always
+ * visibly does something — a button that flips 'system' to 'system' would
+ * appear to work only half the time. It shows where you are going, not where
+ * you are: a moon in the daylight, a sun at night.
+ */
+export function ThemeToggle() {
+  const theme = useUi((s) => s.theme);
+  const setTheme = useUi((s) => s.setTheme);
+  const me = useAuth((s) => s.me);
+  const patchMe = useAuth((s) => s.patchMe);
+  const systemDark = useMediaQuery('(prefers-color-scheme: dark)');
+  const reduced = useReducedMotion();
+  const dark = theme === 'dark' || (theme === 'system' && systemDark);
+  const label = dark ? 'Switch to light theme' : 'Switch to dark theme';
+
+  const flip = () => {
+    const next = dark ? 'light' : 'dark';
+    setTheme(next);
+    // Same write the Settings sheet makes, so the two never disagree.
+    if (me) patchMe({ settings: { ...me.settings, theme: next } }).catch(() => {});
+  };
+
+  return (
+    <button
+      className="clay-round"
+      onClick={flip}
+      aria-label={label}
+      title={label}
+      data-tour="theme"
+      // Clips the outgoing icon's spin; the button's own shadow is untouched.
+      style={{ overflow: 'hidden' }}
+    >
+      <AnimatePresence initial={false}>
+        <motion.span
+          key={dark ? 'sun' : 'moon'}
+          // Both icons share one grid cell, so the swap is a true cross-fade.
+          style={{ gridArea: '1 / 1', display: 'grid', placeItems: 'center' }}
+          initial={reduced ? { opacity: 0 } : { opacity: 0, rotate: -120, scale: 0.4 }}
+          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+          exit={reduced ? { opacity: 0 } : { opacity: 0, rotate: 120, scale: 0.4 }}
+          transition={reduced ? { duration: 0.15 } : spring}
+        >
+          {dark ? <IconSun /> : <IconMoon />}
+        </motion.span>
+      </AnimatePresence>
+    </button>
+  );
+}
 
 export default function DockRail() {
   const { conversations, order, activeId, setActive, presence } = useChat();
@@ -14,6 +76,7 @@ export default function DockRail() {
   const me = useAuth((s) => s.me);
   const pendingRequests = useFriends(selectPendingCount);
   const [hover, setHover] = useState<string | null>(null);
+  const isPhone = usePhone();
 
   const pinned = order.map((id) => conversations[id]).filter((c) => c && (c.pinned || c.unread > 0)).slice(0, 8);
 
@@ -80,7 +143,7 @@ export default function DockRail() {
       </div>
 
       <div className="rail-foot">
-        <button className="clay-round" onClick={() => openSheet('search')} aria-label="Search messages">
+        <button className="clay-round" onClick={() => openSheet('search')} aria-label="Search messages" data-tour="search">
           <IconSearch />
         </button>
         <button className="clay-round" onClick={() => openSheet('calls')} aria-label="Call history">
@@ -100,10 +163,23 @@ export default function DockRail() {
             <span className="chip">{pendingRequests > 9 ? '9+' : pendingRequests}</span>
           </div>
         )}
-        <button className="clay-round" onClick={() => openSheet('new-chat')} aria-label="New conversation">
+        <button
+          className="clay-round"
+          onClick={() => openSheet('new-chat')}
+          aria-label="New conversation"
+          data-tour="new-chat"
+        >
           <IconPlus />
         </button>
-        <button className="clay-round" onClick={() => openSheet('settings')} aria-label="Settings and profile">
+        {/* The phone dock is already five across at 360px; there the toggle
+            lives in the Shelf header instead. */}
+        {!isPhone && <ThemeToggle />}
+        <button
+          className="clay-round"
+          onClick={() => openSheet('settings')}
+          aria-label="Settings and profile"
+          data-tour="settings"
+        >
           {me ? <Avatar name={me.displayName} src={me.avatarUrl} id={me.id} accent={me.accent} size={34} /> : <IconSettings />}
         </button>
       </div>

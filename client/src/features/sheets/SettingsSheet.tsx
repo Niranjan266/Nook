@@ -11,7 +11,7 @@ import { enablePush, disablePush, pushState } from '@/lib/push';
 import { askToNotify } from '@/lib/notify';
 import { toClock, fromClock, isQuietNow } from '@/lib/rooms';
 import { SOUNDS, previewSound } from '@/lib/sounds';
-import { isNativeApp } from '@/lib/native';
+import { isNativeApp, buzz } from '@/lib/native';
 import type { QuietHours } from '@/lib/types';
 import {
   IconSun,
@@ -37,7 +37,9 @@ import {
   IconChat,
   IconUsers,
   IconDownload,
+  IconPlay,
 } from '@/components/Icon';
+import { startTour } from '@/components/Tour';
 
 const ACCENTS = [
   { id: 'terracotta', label: 'Terracotta', hex: '#C0603C' },
@@ -624,6 +626,22 @@ export default function SettingsSheet() {
             </button>
           ))}
         </div>
+
+        {/* The sheet leaves first — the tour points at the shell behind it. */}
+        <button
+          className="list-row"
+          style={{ marginTop: 6 }}
+          onClick={() => {
+            closeSheet();
+            startTour(260);
+          }}
+        >
+          <IconPlay size={19} />
+          <span className="grow">
+            <span className="list-row-label">Take the tour</span>
+            <span className="list-row-sub">A one-minute walk around Nook</span>
+          </span>
+        </button>
       </div>
 
       <div className="sheet-section">
@@ -759,7 +777,7 @@ export default function SettingsSheet() {
                 patchMe({ settings: { ...me.settings, notifyVibrate: next } });
                 // Feel it the moment you turn it on — a vibration setting you
                 // cannot test is a setting you have to take on faith.
-                if (next) navigator.vibrate?.([60, 45, 60]);
+                if (next) void buzz('message');
               }}
             >
               <IconMic size={19} />

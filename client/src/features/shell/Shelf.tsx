@@ -6,6 +6,8 @@ import { useAuth } from '@/stores/auth';
 import Avatar from '@/components/Avatar';
 import { stamp, previewOf } from '@/lib/format';
 import { listStagger, listItem, spring } from '@/lib/motion';
+import { usePhone } from '@/lib/useMediaQuery';
+import { ThemeToggle } from './DockRail';
 import {
   IconPlus,
   IconSearch,
@@ -35,6 +37,7 @@ export default function Shelf() {
   const folders = useAuth((s) => s.me?.folders ?? []);
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
+  const isPhone = usePhone();
 
   const meId = (window as any).__nookMeId as string;
 
@@ -75,7 +78,14 @@ export default function Shelf() {
     >
       <div className="shelf-head">
         <h1 className="shelf-title">Nook</h1>
-        <button className="clay-round" onClick={() => openSheet('new-chat')} aria-label="New conversation">
+        {/* On a desk the rail carries it; the phone dock has no room left. */}
+        {isPhone && <ThemeToggle />}
+        <button
+          className="clay-round"
+          onClick={() => openSheet('new-chat')}
+          aria-label="New conversation"
+          data-tour="new-chat"
+        >
           <IconPlus />
         </button>
       </div>
@@ -97,7 +107,7 @@ export default function Shelf() {
         </label>
       </div>
 
-      <div className="shelf-tabs" role="tablist">
+      <div className="shelf-tabs" role="tablist" data-tour="chats">
         {BUILT_IN.map((t) => (
           <button
             key={t.id}
