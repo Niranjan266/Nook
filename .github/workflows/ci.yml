@@ -1,0 +1,78 @@
+# Checks on every push and pull request.
+#
+# Render and Vercel deploy whatever lands on main, so a push that breaks the
+# build or the server is a push that breaks the live app. This runs the same
+# checks locally run before shipping — the server suites against a real
+# server on a throwaway database, and a typecheck plus production build of
+# the web app — so a red cross shows up on GitHub before anyone notices on
+# their phone.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # matches server/Dockerfile
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+      - run: npm ci
+        working-directory: server
+      # The socket suites borrow socket.io-client from the web app rather than
+      # adding a second copy to the server's dependencies.
+      - run: npm ci --ignore-scripts
+        working-directory: client
+      - run: bash test/run.sh
+        working-directory: server
+      - name: Server log on failure
+        if: failure()
+        run: tail -100 /tmp/nook-test-server.log || true
+
+  web:
+    name: Web typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+        working-directory: client
+      - run: npm run build
+        working-directory: client
+
+  mobile:
+    name: Mobile typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+        working-directory: mobile
+      - run: npm run typecheck
+        working-directory: mobile

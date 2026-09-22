@@ -30,6 +30,11 @@ export ADMIN_EMAILS=''
 # dotenv fills in anything not set here from server/.env, which holds real
 # mail credentials. Tests must never send real email.
 export MAIL_PROVIDER=console
+# Google sign-in has to be "configured" for its suite to exercise the
+# redirects, but never with the real client: fixed dummies behave the same
+# locally and on GitHub, where there is no server/.env at all.
+export GOOGLE_CLIENT_ID=test-client.apps.googleusercontent.com
+export GOOGLE_CLIENT_SECRET=test-google-secret
 # Same for calls: the route must serve plain STUN here, and must never mint
 # real Cloudflare credentials. Empty still counts as set, so dotenv leaves it.
 export CLOUDFLARE_TURN_KEY_ID=

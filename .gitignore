@@ -85,3 +85,6 @@ client/android/keystore.properties
 # backed up. The keystore and keystore.properties are already ignored above;
 # this is the third copy of the same secret and it must never be committed.
 NOOK-SIGNING-PASSWORD.txt
+
+# Claude Code agent worktrees: temporary checkouts, never part of the repo.
+.claude/worktrees/
