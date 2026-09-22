@@ -16,7 +16,7 @@ import {
 import { useUi } from '@/stores/ui';
 import { watchConversation } from '@/lib/focus';
 import type { Conversation, Message, Person, Reminder, ReminderDue, PollState, ListState } from '@/lib/types';
-import { reveal, revealAll, seal, keepSent, myDeviceId, startSecretChat, resetSecretState } from '@/lib/e2ee/secret';
+import { reveal, revealAll, seal, keepSent, myDeviceId, startSecretChat, resetSecretState, devicesOf } from '@/lib/e2ee/secret';
 import { forgetDecrypted } from '@/lib/e2ee/media';
 import type { SecretInner } from '@/lib/e2ee/localHistory';
 
@@ -989,6 +989,28 @@ export const useChat = create<ChatState>((set, get) => ({
   },
 
   async openSecret(userId, partnerDeviceId) {
+    /**
+     * Reopen, don't duplicate. Tapping "New secret chat" on someone twice used
+     * to make a second empty chat beside the first. Reuse is only right while
+     * the old one still points at this device and at the partner's current
+     * one — if they have moved phones, the old chat is bound to a device they
+     * no longer read, and a fresh one is what they need.
+     */
+    const [mine, theirs] = await Promise.all([
+      myDeviceId(),
+      partnerDeviceId ? Promise.resolve(partnerDeviceId) : devicesOf(userId).then((d) => d[0]?.deviceId || null).catch(() => null),
+    ]);
+    if (mine && theirs) {
+      const meId = meIdNow();
+      const existing = Object.values(get().conversations).find((c) => {
+        if (c.type !== 'secret' || !c.secret) return false;
+        const ends = [c.secret.initiator, c.secret.responder];
+        const me = ends.find((e) => e.userId === meId);
+        const peer = ends.find((e) => e.userId === userId);
+        return me?.deviceId === mine && peer?.deviceId === theirs;
+      });
+      if (existing) return existing.id;
+    }
     const conversation = await startSecretChat(userId, partnerDeviceId);
     get().onConversation(conversation);
     return conversation.id;
