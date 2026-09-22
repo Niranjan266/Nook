@@ -81,19 +81,37 @@ function parseBody(text: string, status: number, contentType: string | null) {
   }
 }
 
+/**
+ * Why the last refresh failed. 'rejected' is the server saying the session is
+ * over; 'unreachable' is a server that could not answer — asleep, booting, or
+ * no network. Only the first means signed out. Treating a 502 from a waking
+ * host as a rejection used to throw away a perfectly good session.
+ */
+let refreshFailure: 'rejected' | 'unreachable' | null = null;
+export const lastRefreshFailure = () => refreshFailure;
+
 async function refresh(): Promise<boolean> {
   if (!refreshing) {
     refreshing = fetch(apiUrl('/auth/refresh'), { method: 'POST', credentials: 'include' })
       .then(async (res) => {
         if (!res.ok) {
+          if (res.status >= 500) {
+            refreshFailure = 'unreachable';
+            return false;
+          }
+          refreshFailure = 'rejected';
           setToken(null);
           return false;
         }
         const data = await res.json();
         setToken(data.accessToken);
+        refreshFailure = null;
         return true;
       })
-      .catch(() => false)
+      .catch(() => {
+        refreshFailure = 'unreachable';
+        return false;
+      })
       .finally(() => {
         refreshing = null;
       });

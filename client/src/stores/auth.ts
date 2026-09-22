@@ -1,11 +1,52 @@
 import { create } from 'zustand';
-import { get as apiGet, post, patch, setToken, getToken, bootstrapSession } from '@/lib/api';
+import {
+  get as apiGet,
+  post,
+  patch,
+  setToken,
+  getToken,
+  bootstrapSession,
+  lastRefreshFailure,
+  ApiError,
+} from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import type { Me } from '@/lib/types';
 import { useChat } from '@/stores/chat';
 import { useFriends } from '@/stores/friends';
 import { useCall } from '@/stores/call';
 import { useUi } from '@/stores/ui';
 import { clearUnread } from '@/lib/notify';
+
+/**
+ * The signed-in profile, remembered on this device.
+ *
+ * Boot used to wait on the server before drawing anything: a refresh, then
+ * /auth/me, then the conversations. On a host that sleeps that is a minute
+ * and more of a pulsing logo. With the profile remembered, the app opens at
+ * once on the cached chats and the session is restored behind it. Only the
+ * profile — the access token never touches storage.
+ */
+const ME_KEY = 'nook.me';
+
+function rememberedMe(): Me | null {
+  try {
+    const raw = localStorage.getItem(ME_KEY);
+    return raw ? (JSON.parse(raw) as Me) : null;
+  } catch {
+    return null;
+  }
+}
+
+function remember(me: Me | null) {
+  try {
+    if (me) localStorage.setItem(ME_KEY, JSON.stringify(me));
+    else localStorage.removeItem(ME_KEY);
+  } catch {
+    /* storage blocked — boot simply waits for the server, as it used to */
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface AuthState {
   me: Me | null;
@@ -16,6 +57,8 @@ interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   signup: (input: { username: string; displayName: string; password: string; email?: string }) => Promise<void>;
   logout: () => Promise<void>;
+  /** Clear every trace of the session locally, without asking the server. */
+  signedOut: () => void;
   patchMe: (patchBody: Partial<Me> | Record<string, unknown>) => Promise<void>;
   setMe: (me: Me) => void;
 }
@@ -60,16 +103,48 @@ export const useAuth = create<AuthState>((set, get) => ({
       }
     }
 
-    const refreshed = await bootstrapSession();
+    // Open now on the remembered profile; the session catches up behind it.
+    const cached = rememberedMe();
+    if (cached) set({ me: cached, status: 'in' });
 
-    if (!refreshed && !getToken()) return set({ status: 'out', me: null });
+    /**
+     * Keep trying while the server is merely unreachable — a sleeping host
+     * answers eventually, and giving up would sign out someone whose session
+     * is fine. Only a refusal means signed out. Without a remembered profile
+     * the loading screen stays up meanwhile and says what it is waiting for.
+     */
+    let waited = false;
+    for (let delay = 2000; ; delay = Math.min(delay * 2, 20000)) {
+      const refreshed = await bootstrapSession();
+      if (!refreshed && !getToken()) {
+        if (lastRefreshFailure() === 'unreachable') {
+          waited = true;
+          await sleep(delay);
+          continue;
+        }
+        return get().signedOut();
+      }
 
-    try {
-      const { user } = await apiGet<{ user: Me }>('/auth/me');
-      set({ me: user, status: 'in' });
-    } catch {
-      setToken(null);
-      set({ status: 'out', me: null });
+      try {
+        const { user } = await apiGet<{ user: Me }>('/auth/me');
+        set({ me: user, status: 'in' });
+        break;
+      } catch (err) {
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          setToken(null);
+          return get().signedOut();
+        }
+        waited = true;
+        await sleep(delay);
+      }
+    }
+
+    // Anything that ran before the session was back failed quietly; now that
+    // it is, fetch fresh and get the socket dialling with the new token.
+    if (waited) {
+      useChat.getState().loadConversations().catch(() => {});
+      const socket = getSocket();
+      if (socket && !socket.connected) socket.connect();
     }
   },
 
@@ -102,6 +177,11 @@ export const useAuth = create<AuthState>((set, get) => ({
       /* going anyway */
     }
     setToken(null);
+    get().signedOut();
+  },
+
+  signedOut() {
+    remember(null);
     /**
      * Everything user-scoped goes with the session. The stores are module
      * singletons, so without this the next account to sign in on this tab
@@ -124,3 +204,8 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   setMe: (me) => set({ me }),
 }));
+
+// Whatever sets `me` — sign-in, Google, a profile edit — the device copy follows.
+useAuth.subscribe((state, prev) => {
+  if (state.me && state.me !== prev.me) remember(state.me);
+});

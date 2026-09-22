@@ -77,14 +77,17 @@ export default function FrontDoor() {
   const [code, setCode] = useState('');
   const [notice, setNotice] = useState('');
   const [avail, setAvail] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [googleOn, setGoogleOn] = useState(false);
+  const [googleOn, setGoogleOn] = useState(true);
 
-  /* Only offer the button if the server can actually honour it — otherwise it
-     is a control that leads to a 503, which is worse than no control. */
+  /* Shown straight away and hidden only when the server says it is not set up.
+     Waiting for the answer first meant a sleeping server — a minute and more
+     to wake — hid the button, and a timed-out check hid it for good. */
   useEffect(() => {
     get<{ available: boolean }>('/auth/google/available')
-      .then((r) => setGoogleOn(r.available))
-      .catch(() => setGoogleOn(false));
+      .then((r) => setGoogleOn(r.available !== false))
+      .catch(() => {
+        /* unreachable is not "not configured" — keep offering it */
+      });
   }, []);
 
   /**

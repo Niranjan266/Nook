@@ -169,6 +169,42 @@ export default function App() {
   return <Nook />;
 }
 
+/**
+ * Only seen on a device with no remembered profile — otherwise the app opens
+ * straight away. If it lasts, say why: a server that was asleep takes a while
+ * to wake, and a silent pulsing logo reads as broken.
+ */
+function Booting() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="center" style={{ height: '100dvh', flexDirection: 'column', gap: 18 }}>
+      <motion.img
+        src="/logo.svg"
+        alt="Nook"
+        width={72}
+        height={72}
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: [0.5, 1, 0.5], scale: 1 }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      {slow && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14, textAlign: 'center', maxWidth: 280 }}
+          role="status"
+        >
+          Waking Nook up — the first open after a quiet spell can take a moment.
+        </motion.p>
+      )}
+    </div>
+  );
+}
+
 function Nook() {
   const { me, status, init } = useAuth();
   const conversation = useChat(selectActive);
@@ -297,21 +333,7 @@ function Nook() {
 
   useSocketBridge(Boolean(me));
 
-  if (status === 'loading') {
-    return (
-      <div className="center" style={{ height: '100dvh' }}>
-        <motion.img
-          src="/logo.svg"
-          alt="Nook"
-          width={72}
-          height={72}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: [0.5, 1, 0.5], scale: 1 }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </div>
-    );
-  }
+  if (status === 'loading') return <Booting />;
 
   if (status === 'out' || !me)
     return guestCode ? <GuestDoor code={guestCode} onDone={() => setGuestCode(null)} /> : <FrontDoor />;

@@ -42,6 +42,19 @@
           if (saved.accent) document.documentElement.dataset.accent = saved.accent;
         } catch (e) {}
       })();
+
+      // Knock on the API before the app's code has even downloaded. If the
+      // server was asleep it starts waking now, a second or two sooner, and
+      // on the sign-in page it gets the whole time someone spends typing.
+      (function () {
+        var api = '%VITE_API_URL%';
+        if (api.charAt(0) === '%') api = ''; // unset: dev, same-origin proxy
+        try {
+          fetch(api.replace(/\/+$/, '') + '/api/health', { mode: 'no-cors', keepalive: true }).catch(
+            function () {}
+          );
+        } catch (e) {}
+      })();
     </script>
   </head>
   <body>
