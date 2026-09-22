@@ -1,5 +1,5 @@
 /**
- * Transactional email via Brevo. Only used for optional account recovery —
+ * Transactional email — Resend first, with Gmail and Brevo kept as fallbacks.
  * Nook works entirely without an email address.
  *
  * No API key? Codes are printed to the server console so dev still works.
@@ -9,6 +9,7 @@ import { sendViaGmail, gmailReady } from './gmail.js';
 import { TEMPLATES } from './templates.js';
 
 const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
+const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
 /**
  * Which transport is in play.
@@ -20,10 +21,13 @@ const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
  */
 export function resolveProvider() {
   const pinned = env.mailProvider;
+  if (pinned === 'resend') return env.resend.enabled ? 'resend' : 'console';
   if (pinned === 'gmail') return gmailReady() ? 'gmail' : 'console';
   if (pinned === 'brevo') return env.brevo.enabled ? 'brevo' : 'console';
   if (pinned === 'console') return 'console';
 
+  // Resend is the provider now; the others only answer when it is not set.
+  if (env.resend.enabled) return 'resend';
   if (gmailReady()) return 'gmail';
   if (env.brevo.enabled) return 'brevo';
   return 'console';
@@ -36,6 +40,27 @@ function toConsole({ to, subject, text, why }) {
   console.log(`  │ ${text.replace(/\n/g, '\n  │ ')}`);
   console.log('  └────────────────────────────────────────────────────────────\n');
   return { delivered: false, channel: 'console' };
+}
+
+async function sendViaResend({ to, subject, html, text }) {
+  const res = await fetch(RESEND_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${env.resend.apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ from: env.resend.from, to: [to], subject, html, text }),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!res.ok) {
+    // Resend explains itself in the body — an unverified sender domain is
+    // the usual one, and worth seeing in the log verbatim.
+    const detail = await res.text();
+    console.error(`  email     resend rejected (${res.status}) ${detail}`);
+    return { delivered: false, channel: 'resend', error: detail };
+  }
+  return { delivered: true, channel: 'resend' };
 }
 
 async function sendViaBrevo({ to, subject, html, text }) {
@@ -70,11 +95,12 @@ async function send({ to, subject, html, text }) {
     const why =
       env.mailProvider === 'console'
         ? 'MAIL_PROVIDER=console'
-        : 'no Gmail or Brevo credentials configured';
+        : 'no Resend, Gmail or Brevo credentials configured';
     return toConsole({ to, subject, text, why });
   }
 
   try {
+    if (provider === 'resend') return await sendViaResend({ to, subject, html, text });
     if (provider === 'gmail') {
       await sendViaGmail({ to, subject, html, text });
       return { delivered: true, channel: 'gmail' };
@@ -207,7 +233,29 @@ const row = (label, value) => `
   </td>
 </tr>`;
 
+/**
+ * One "try this first" line: a numbered clay token beside a short title and
+ * sentence. A table per row, because a two-column layout is the one thing
+ * every client agrees on only when it is a table.
+ */
+const tip = (n, title, body) => `
+<tr>
+  <td valign="top" width="44" style="padding:0 0 18px">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+      <tr><td align="center" valign="middle" width="32" height="32" bgcolor="${BISQUE}"
+              style="border:2px solid ${INK};border-radius:10px;font-size:14px;font-weight:800;color:${TERRACOTTA}">${n}</td></tr>
+    </table>
+  </td>
+  <td valign="top" style="padding:0 0 18px">
+    <div style="font-size:15px;font-weight:700;color:${INK};line-height:1.35">${title}</div>
+    <div style="font-size:14px;line-height:1.6;color:${MUTED}">${body}</div>
+  </td>
+</tr>`;
+
 function welcomeHtml({ displayName, username, nookId, appUrl }) {
+  // The logo is a PNG served by the web app: Gmail and Outlook show no SVG.
+  const logo = `${appUrl.replace(/\/+$/, '')}/email-logo.png`;
+  const download = `${appUrl.replace(/\/+$/, '')}/download`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -216,46 +264,70 @@ function welcomeHtml({ displayName, username, nookId, appUrl }) {
 <body style="margin:0;padding:0;background:${BISQUE}">
 <!-- Shown in the inbox list under the subject, so it does the work of a subtitle. -->
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">
-  Your corner of the internet is ready. Here's your Nook ID.
+  Your corner of the internet is ready, ${esc(displayName)}. Here's your Nook ID and three things to try first.
 </div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-       style="background:${BISQUE};padding:40px 16px">
+       style="background:${BISQUE};padding:36px 14px">
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-           style="max-width:460px;background:${SURFACE};border-radius:28px;padding:36px;
-                  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
-      <tr><td>
-        <div style="font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:${MUTED}">Nook</div>
-        <h1 style="margin:14px 0 10px;font-size:28px;line-height:1.15;color:${INK};letter-spacing:-0.02em">
-          Welcome, ${esc(displayName)}.
+           style="max-width:480px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+
+      <!-- brand -->
+      <tr><td align="center" style="padding:0 0 18px">
+        <img src="${logo}" width="64" height="64" alt="Nook"
+             style="display:block;border:0;width:64px;height:64px">
+      </td></tr>
+
+      <!-- the card -->
+      <tr><td style="background:${SURFACE};border:2px solid ${INK};border-radius:28px;padding:34px 30px">
+
+        <div style="font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:${TERRACOTTA};font-weight:700">
+          Welcome to Nook
+        </div>
+        <h1 style="margin:12px 0 10px;font-size:30px;line-height:1.12;color:${INK};letter-spacing:-0.02em">
+          Hi ${esc(displayName)}, your corner is ready.
         </h1>
-        <p style="margin:0 0 26px;font-size:15px;line-height:1.65;color:${MUTED}">
-          Your corner of the internet is ready. No feed, no reels, no strangers —
-          just the people you actually want to hear from.
+        <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:${MUTED}">
+          Nook is a small, quiet place for the people you actually want to hear from.
+          No feed, no reels, no strangers, no ads — just your people.
         </p>
 
+        <!-- account details, as a sunken panel -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-               style="margin:0 0 26px">
-          ${row('Your username', '@' + esc(username))}
-          ${row('Your Nook ID', esc(nookId))}
+               style="background:${BISQUE};border-radius:18px;margin:0 0 26px">
+          <tr><td style="padding:6px 18px 8px">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              ${row('Your username', '@' + esc(username))}
+              <tr><td style="padding:9px 0">
+                <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${MUTED}">Your Nook ID</span><br>
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:20px;font-weight:700;color:${TERRACOTTA};letter-spacing:.04em">${esc(nookId)}</span>
+              </td></tr>
+            </table>
+          </td></tr>
         </table>
 
-        <p style="margin:0 0 22px;font-size:14px;line-height:1.65;color:${MUTED}">
-          Share your <strong style="color:${INK}">Nook ID</strong> with anyone you want to hear from —
-          they can paste it straight into search. It is yours permanently and never changes,
-          so it keeps working even if you change your username later.
-        </p>
+        <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:${MUTED};margin:0 0 14px">
+          Three things to try first
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px">
+          ${tip(1, 'Bring your people in', 'Share your Nook ID — friends paste it into search to find you. It never changes, even if your username does.')}
+          ${tip(2, 'Make a chat feel like yours', 'Set a wallpaper on any conversation. Nook tints the bubbles to match it.')}
+          ${tip(3, 'Say more than text', 'Send a voice note, or a snap that disappears after it is seen.')}
+        </table>
 
         ${slab(appUrl, 'Open Nook')}
 
-        <p style="margin:26px 0 0;padding-top:20px;border-top:1px solid ${HAIRLINE};
-                  font-size:13px;line-height:1.6;color:${MUTED}">
-          Your email is only ever used to get you back in if you forget your password.
-          Nook has no ads and nothing to sell.
-          <br><br>
-          Didn't sign up? Someone typed your address by mistake — ignore this and no account is
-          attached to you.
+        <p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:${MUTED}">
+          On Android? <a href="${download}" style="color:${TERRACOTTA};font-weight:700;text-decoration:underline">Get the app</a>
+          for notifications that arrive even when your phone is locked.
         </p>
+      </td></tr>
+
+      <!-- footer -->
+      <tr><td style="padding:22px 18px 0;font-size:12px;line-height:1.65;color:${MUTED};text-align:center">
+        Your email is only ever used to get you back in if you forget your password.
+        Nook has no ads and nothing to sell.<br>
+        Didn't sign up? Someone typed your address by mistake — ignore this and no account is attached to you.
       </td></tr>
     </table>
   </td></tr>
@@ -267,7 +339,8 @@ export function sendWelcome({ to, displayName, username, nookId }) {
   const appUrl = env.appUrl;
   return send({
     to,
-    subject: 'Welcome to Nook — here’s your Nook ID',
+    // A name is user input; a line break in a header would start a new one.
+    subject: `Welcome to Nook, ${String(displayName).replace(/[\r\n]+/g, ' ').slice(0, 60)} — your corner is ready`,
     html: welcomeHtml({ displayName, username, nookId, appUrl }),
     text: [
       `Welcome, ${displayName}.`,
@@ -277,11 +350,13 @@ export function sendWelcome({ to, displayName, username, nookId }) {
       `Username: @${username}`,
       `Nook ID:  ${nookId}`,
       '',
-      'Share your Nook ID with anyone you want to hear from — they can paste it',
-      'straight into search. It is yours permanently and never changes, so it keeps',
-      'working even if you change your username later.',
+      'Three things to try first:',
+      '  1. Share your Nook ID — friends paste it into search to find you.',
+      '  2. Set a wallpaper on a chat; Nook tints the bubbles to match.',
+      '  3. Send a voice note, or a snap that disappears after it is seen.',
       '',
       `Open Nook: ${appUrl}`,
+      `Android app: ${appUrl.replace(/\/+$/, '')}/download`,
       '',
       'Your email is only used to get you back in if you forget your password.',
       "Didn't sign up? Ignore this — no account is attached to you.",

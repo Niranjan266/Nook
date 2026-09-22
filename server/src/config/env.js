@@ -66,6 +66,18 @@ export const env = {
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
 
+  /**
+   * Resend — the mail provider from here on. With the key set it wins over
+   * Gmail and Brevo in `auto`. RESEND_FROM must be on a domain verified in
+   * Resend; the default onboarding@resend.dev only delivers to the Resend
+   * account's own address, so it is for trying things out, not for users.
+   */
+  resend: {
+    enabled: bool(process.env.RESEND_API_KEY),
+    apiKey: (process.env.RESEND_API_KEY || '').trim(),
+    from: (process.env.RESEND_FROM || 'Nook <onboarding@resend.dev>').trim(),
+  },
+
   brevo: {
     enabled: bool(process.env.BREVO_API_KEY),
     apiKey: process.env.BREVO_API_KEY,
@@ -118,7 +130,7 @@ export const env = {
   },
 
   /**
-   * `auto` picks Gmail if it is configured, then Brevo, then the console.
+   * `auto` picks Resend if it is configured, then Gmail, then Brevo, then the console.
    * Set it explicitly to pin one — useful when both are configured and you
    * want to be certain which is in play.
    */

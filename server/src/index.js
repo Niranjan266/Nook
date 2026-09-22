@@ -109,7 +109,7 @@ app.get('/api/health', (req, res) => {
     // Only when mail is not working, and only variable names — never values.
     // All four Gmail settings are required, so from outside the container a
     // missing token and a missing sender look identical. This says which.
-    ...(mail === 'console' ? { mailMissing: gmailMissing(), brevoKeySet: env.brevo.enabled } : {}),
+    ...(mail === 'console' ? { mailMissing: gmailMissing(), brevoKeySet: env.brevo.enabled, resendKeySet: env.resend.enabled } : {}),
     push: pushProvider(),
     time: new Date().toISOString(),
   });

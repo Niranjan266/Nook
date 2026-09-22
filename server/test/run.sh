@@ -27,6 +27,9 @@ export ADMIN_USERNAME=testadmin
 export ADMIN_PASSWORD_HASH='$2a$10$fBtNOxiuJ/bI.oovrRe1puXoMzsxV9AxhLL7gtsmQqLxa3DuWcaV2'
 export ADMIN_PASSWORD=testadminpass
 export ADMIN_EMAILS=''
+# dotenv fills in anything not set here from server/.env, which holds real
+# mail credentials. Tests must never send real email.
+export MAIL_PROVIDER=console
 
 rm -f "$DB"*
 node src/index.js > /tmp/nook-test-server.log 2>&1 &
