@@ -971,6 +971,13 @@ export default function SettingsSheet() {
             <span className="list-row-label">Scheduled messages</span>
           </span>
         </button>
+        <button className="list-row" onClick={() => openSheet('reminders')}>
+          <IconBell size={19} />
+          <span className="grow">
+            <span className="list-row-label">Reminders</span>
+            <span className="list-row-sub">Messages you asked to come back to</span>
+          </span>
+        </button>
         <button className="list-row" onClick={() => openSheet('starred')}>
           <IconStar size={19} />
           <span className="grow">

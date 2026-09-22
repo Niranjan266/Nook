@@ -195,6 +195,72 @@ async function systemNotification({
   }
 }
 
+/**
+ * A reminder the person set for themselves, coming due.
+ *
+ * Unlike a message it ignores mute — nobody mutes their own alarm — and it
+ * does not count toward the unread title, because nothing new was said. With
+ * the tab hidden it raises a system notification under the same tag the
+ * server's push uses, so where both arrive the second replaces the first
+ * rather than doubling up.
+ */
+export async function reminderArrived({
+  id,
+  conversationId,
+  title,
+  body,
+  sound,
+  soundOn,
+  vibrate,
+  data,
+  onOpen,
+}: {
+  id: string;
+  conversationId: string;
+  title: string;
+  body: string;
+  sound: SoundId;
+  soundOn: boolean;
+  vibrate?: boolean;
+  data: Record<string, string>;
+  onOpen: () => void;
+}) {
+  if (soundOn) playSound(sound);
+  buzz(vibrate);
+
+  if (document.visibilityState === 'visible') {
+    banner({ conversationId, conversationName: title, senderName: title, preview: body, onOpen: () => onOpen() });
+    return;
+  }
+  if (!canNotify()) return;
+
+  const options: NotificationOptions & { renotify?: boolean } = {
+    body,
+    tag: `reminder-${id}`,
+    renotify: true,
+    icon: '/logo.svg',
+    badge: '/logo.svg',
+    silent: soundOn,
+    data: { ...data, conversationId, kind: 'reminder' },
+  };
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) return void (await reg.showNotification(title, options));
+  } catch {
+    /* fall through to the constructor */
+  }
+  try {
+    const n = new Notification(title, options);
+    n.onclick = () => {
+      window.focus();
+      onOpen();
+      n.close();
+    };
+  } catch {
+    /* the sound already did what it could */
+  }
+}
+
 /* ── the in-app banner ────────────────────────────────────────────────────
    Registered by the shell so this module stays free of React.
    ────────────────────────────────────────────────────────────────────────── */

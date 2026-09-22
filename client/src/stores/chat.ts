@@ -14,7 +14,7 @@ import {
 } from '@/lib/outbox';
 import { useUi } from '@/stores/ui';
 import { watchConversation } from '@/lib/focus';
-import type { Conversation, Message, Person } from '@/lib/types';
+import type { Conversation, Message, Person, Reminder, ReminderDue } from '@/lib/types';
 
 interface Presence {
   online: boolean;
@@ -121,6 +121,26 @@ interface ChatState {
   loadScheduled: () => Promise<void>;
   cancelScheduled: (id: string) => Promise<void>;
 
+  /* ── reminders ─────────────────────────────────────────────────────── */
+  /** Pending, soonest first. */
+  reminders: Reminder[];
+  /** Fired in the last week, newest first. */
+  recentReminders: Reminder[];
+  /** messageId -> reminder id, for the bell on the bubble. */
+  remindedIds: Record<string, string>;
+  loadReminders: () => Promise<void>;
+  setReminder: (messageId: string, remindAt: Date, note?: string) => Promise<Reminder>;
+  cancelReminder: (id: string) => Promise<void>;
+  onReminderDue: (due: ReminderDue) => void;
+
+  /**
+   * A message to scroll to once its conversation is on screen — from a
+   * reminder, which points at one message rather than just a chat.
+   */
+  jumpTarget: { conversationId: string; messageId: string } | null;
+  openAt: (conversationId: string, messageId?: string | null) => void;
+  clearJump: () => void;
+
   /** socket entry points */
   onMessage: (m: Message) => void;
   onThreadReply: (payload: { rootId: string; message: Message; root: Message }) => void;
@@ -145,6 +165,13 @@ const isTransient = (err: any) => err?.message === 'offline' || err?.message ===
 let flushing: Promise<void> | null = null;
 
 const uid = () => `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+/** Bubbles ask "is there a bell on me?" — a lookup, not a scan of the list. */
+const indexReminders = (list: Reminder[]) => {
+  const out: Record<string, string> = {};
+  for (const r of list) out[r.messageId] = r.id;
+  return out;
+};
 
 const sortOrder = (convos: Record<string, Conversation>) =>
   Object.values(convos)
@@ -178,6 +205,8 @@ export const useChat = create<ChatState>((set, get) => ({
      * settles, and the user would just see an empty list with no error.
      */
     const fresh = get().loadConversations();
+    // Small, and needed for the bells on bubbles; never worth blocking on.
+    get().loadReminders().catch(() => {});
 
     readCachedConversations<Conversation>()
       .then((cached) => {
@@ -201,6 +230,8 @@ export const useChat = create<ChatState>((set, get) => ({
     set({ stale });
     await Promise.all([
       get().loadConversations().catch(() => {}),
+      // A reminder that fired while the socket was down never told this tab.
+      get().loadReminders().catch(() => {}),
       activeId ? get().loadMessages(activeId) : Promise.resolve(),
     ]);
   },
@@ -223,6 +254,10 @@ export const useChat = create<ChatState>((set, get) => ({
       threads: {},
       openThreadId: null,
       scheduled: [],
+      reminders: [],
+      recentReminders: [],
+      remindedIds: {},
+      jumpTarget: null,
     });
   },
 
@@ -874,6 +909,62 @@ export const useChat = create<ChatState>((set, get) => ({
     await del(`/messages/scheduled/${id}`);
     set((s) => ({ scheduled: s.scheduled.filter((m) => m.id !== id) }));
   },
+
+  /* ── reminders ──────────────────────────────────────────────────────── */
+
+  reminders: [],
+  recentReminders: [],
+  remindedIds: {},
+  jumpTarget: null,
+
+  async loadReminders() {
+    const { upcoming, recent } = await apiGet<{ upcoming: Reminder[]; recent: Reminder[] }>('/reminders');
+    set({ reminders: upcoming, recentReminders: recent, remindedIds: indexReminders(upcoming) });
+  },
+
+  async setReminder(messageId, remindAt, note = '') {
+    const { reminder } = await post<{ reminder: Reminder }>('/reminders', {
+      messageId,
+      remindAt: remindAt.toISOString(),
+      note,
+    });
+    // Setting one twice moves it on the server, so replace rather than append.
+    set((s) => {
+      const reminders = [...s.reminders.filter((r) => r.id !== reminder.id), reminder].sort(
+        (a, b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime()
+      );
+      return { reminders, remindedIds: indexReminders(reminders) };
+    });
+    return reminder;
+  },
+
+  async cancelReminder(id) {
+    await del(`/reminders/${id}`);
+    set((s) => {
+      const reminders = s.reminders.filter((r) => r.id !== id);
+      return { reminders, remindedIds: indexReminders(reminders) };
+    });
+  },
+
+  onReminderDue(due) {
+    set((s) => {
+      const fired = s.reminders.find((r) => r.id === due.id);
+      const reminders = s.reminders.filter((r) => r.id !== due.id);
+      const recent = fired
+        ? [{ ...fired, firedAt: new Date().toISOString(), gone: due.gone }, ...s.recentReminders]
+        : s.recentReminders;
+      return { reminders, recentReminders: recent, remindedIds: indexReminders(reminders) };
+    });
+  },
+
+  openAt(conversationId, messageId) {
+    set({ jumpTarget: messageId ? { conversationId, messageId } : null });
+    // Jumping within the chat already open should not throw away a half-set
+    // reply, which is what re-activating it would do.
+    if (!messageId || get().activeId !== conversationId) get().setActive(conversationId);
+  },
+
+  clearJump: () => set({ jumpTarget: null }),
 
   /* ── socket handlers ────────────────────────────────────────────────── */
 

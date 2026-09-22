@@ -549,3 +549,36 @@ ALTER TABLE push_devices ADD COLUMN channels INTEGER NOT NULL DEFAULT 1;
 -- first, and the order can then come straight off the index.
 CREATE INDEX IF NOT EXISTS idx_messages_kind ON messages (conversation_id, type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (conversation_id, sender_id, created_at DESC);
+
+-- Message reminders — "remind me about this".
+--
+-- No foreign key to messages on purpose. A message can be unsent, burnt or
+-- swept by a timer before its reminder comes due, and a cascade would make the
+-- reminder vanish silently; the person asked to be told, so the scheduler has
+-- to find the row and say the message went. Users do cascade: a deleted
+-- account has nobody left to remind.
+--
+-- `fired_at` doubles as the claim. The scheduler sets it with a conditional
+-- UPDATE before sending anything, so a restart mid-tick, or a second instance,
+-- cannot fire one reminder twice. `outcome` records what the claim led to —
+-- 'sent', 'gone' (message deleted, notice sent) or 'dropped' (no longer yours
+-- to see) — so the list can show recent reminders without the dropped ones.
+CREATE TABLE IF NOT EXISTS reminders (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  message_id      TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  remind_at       INTEGER NOT NULL,
+  note            TEXT NOT NULL DEFAULT '',
+  created_at      INTEGER NOT NULL,
+  fired_at        INTEGER,
+  outcome         TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders (fired_at, remind_at);
+CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders (user_id, remind_at);
+
+-- One pending reminder per person per message: setting it again moves the
+-- time rather than stacking a second bell on the same bubble.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reminders_active
+  ON reminders (user_id, message_id) WHERE fired_at IS NULL;

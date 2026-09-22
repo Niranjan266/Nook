@@ -21,6 +21,7 @@ export type SheetKind =
   | 'room'
   | 'folders'
   | 'scheduled'
+  | 'reminders'
   | 'media'
   | 'chat-search';
 

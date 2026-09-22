@@ -18,6 +18,7 @@ import type { Conversation } from './types';
 
 const JOIN_KEY = 'nook.pendingJoin';
 const OPEN_KEY = 'nook.pendingOpen';
+const OPEN_MSG_KEY = 'nook.pendingOpenMessage';
 
 const store = {
   get(key: string) {
@@ -61,7 +62,10 @@ export function captureLaunchLinks(): { guest: string | null } {
   const open = url.searchParams.get('c');
   if (open) {
     store.set(OPEN_KEY, open);
+    // `m` rides along from a tapped reminder: the message to scroll to.
+    store.set(OPEN_MSG_KEY, url.searchParams.get('m'));
     url.searchParams.delete('c');
+    url.searchParams.delete('m');
     changed = true;
   }
   if (changed) window.history.replaceState({}, '', url.pathname + url.search + url.hash);
@@ -71,7 +75,10 @@ export function captureLaunchLinks(): { guest: string | null } {
 }
 
 /** Where to land once signed in — e.g. the conversation a guest just joined. */
-export const openAfterSignIn = (conversationId: string) => store.set(OPEN_KEY, conversationId);
+export const openAfterSignIn = (conversationId: string) => {
+  store.set(OPEN_KEY, conversationId);
+  store.set(OPEN_MSG_KEY, null);
+};
 
 /** Called once conversations have loaded for the signed-in account. */
 export async function openLaunchTarget() {
@@ -94,7 +101,9 @@ export async function openLaunchTarget() {
 
   const open = store.get(OPEN_KEY);
   if (open) {
+    const messageId = store.get(OPEN_MSG_KEY);
     store.set(OPEN_KEY, null);
-    if (chat.conversations[open]) chat.setActive(open);
+    store.set(OPEN_MSG_KEY, null);
+    if (chat.conversations[open]) chat.openAt(open, messageId);
   }
 }

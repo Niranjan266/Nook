@@ -90,6 +90,12 @@ export function isWatching(userId, conversationId) {
   return seen.conversationId === String(conversationId);
 }
 
+/** True while this person has any conversation open in a visible window. */
+export function isLooking(userId) {
+  const seen = focus.get(String(userId));
+  return Boolean(seen) && Date.now() - seen.at <= FOCUS_TTL_MS;
+}
+
 export function emitToUser(userId, event, payload) {
   if (!io) return;
   io.to(`user:${String(userId)}`).emit(event, payload);

@@ -221,6 +221,42 @@ const automatic = {
     banner: null,
   },
 
+  /**
+   * A message the person asked to be reminded about.
+   *
+   * The only notification the recipient scheduled for themselves, so it is
+   * worded as theirs: their note leads when they wrote one, because that is
+   * the reason they set it. `gone` is the message having been deleted since —
+   * still worth the notification, since the alternative is a reminder that
+   * silently never comes, which reads as the feature being broken.
+   *
+   * Its own tag rather than the conversation's, so a new message in the same
+   * chat does not replace the reminder on the lock screen before it is seen.
+   */
+  reminder: {
+    id: 'reminder',
+    label: 'Message reminder',
+    kind: 'automatic',
+    fields: ['sender', 'preview', 'note'],
+    push: ({ sender, preview, note, gone, conversationId, messageId, reminderId }) => ({
+      title: trim(note, 60) ? `Reminder: ${trim(note, 60)}` : `Reminder · ${who(sender)}`,
+      body: gone
+        ? 'A message you saved was deleted.'
+        : trim(preview) || 'A message you wanted to come back to.',
+      tag: `reminder-${reminderId ?? ''}`,
+      kind: 'reminder',
+      conversationId: String(conversationId ?? ''),
+      // No message to jump to once it is gone; the chat is still somewhere to land.
+      messageId: gone ? '' : String(messageId ?? ''),
+      icon: '/logo.svg',
+    }),
+    email: null, // Set minutes or days ago, by you; an inbox is the wrong place for it.
+    banner: ({ sender, preview, note, gone }) => ({
+      title: trim(note, 60) || `Reminder · ${who(sender)}`,
+      body: gone ? 'A message you saved was deleted.' : trim(preview, 80) || 'Tap to see the message.',
+    }),
+  },
+
   pushTest: {
     id: 'push-test',
     label: 'Test notification',

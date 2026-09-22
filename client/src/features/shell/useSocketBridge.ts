@@ -10,6 +10,7 @@ import { playNudge, type SoundId } from '@/lib/sounds';
 import { buzz } from '@/lib/native';
 import { previewOf } from '@/lib/format';
 import * as notifier from '@/lib/notify';
+import type { ReminderDue } from '@/lib/types';
 
 /** Wires every server event into the stores. One place, so nothing goes missing. */
 export function useSocketBridge(enabled: boolean) {
@@ -76,6 +77,26 @@ export function useSocketBridge(enabled: boolean) {
 
     // A scheduled message finally landing is just a normal message arriving.
     socket.on('message:scheduled', () => chat().loadScheduled().catch(() => {}));
+
+    /**
+     * A reminder coming due. Opening it lands on the message itself, not just
+     * the chat — the whole point was to come back to that one line.
+     */
+    socket.on('reminder:due', (due: ReminderDue) => {
+      chat().onReminderDue(due);
+      const settings = useAuth.getState().me?.settings;
+      void notifier.reminderArrived({
+        id: due.id,
+        conversationId: due.conversationId,
+        title: due.banner?.title || 'Reminder',
+        body: due.banner?.body || '',
+        sound: (settings?.notifySound || 'default') as SoundId,
+        soundOn: settings?.soundOn !== false,
+        vibrate: settings?.notifyVibrate !== false,
+        data: due.messageId ? { messageId: due.messageId } : {},
+        onOpen: () => chat().openAt(due.conversationId, due.messageId),
+      });
+    });
 
     socket.on('nudge', ({ from }) => {
       playNudge();
@@ -167,7 +188,8 @@ export function useSocketBridge(enabled: boolean) {
 
     const onSwMessage = (e: MessageEvent) => {
       if (e.data?.type === 'open-conversation' && e.data.conversationId) {
-        useChat.getState().setActive(e.data.conversationId);
+        // A reminder names a message too; everything else just opens the chat.
+        useChat.getState().openAt(e.data.conversationId, e.data.messageId);
       }
     };
     navigator.serviceWorker?.addEventListener('message', onSwMessage);
@@ -178,8 +200,8 @@ export function useSocketBridge(enabled: boolean) {
      * the same thing, so it lands on the same handler.
      */
     const onNativeOpen = (e: Event) => {
-      const id = (e as CustomEvent).detail?.conversationId;
-      if (id) useChat.getState().setActive(id);
+      const { conversationId: id, messageId } = (e as CustomEvent).detail || {};
+      if (id) useChat.getState().openAt(id, messageId);
     };
     window.addEventListener('nook:open-conversation', onNativeOpen);
 

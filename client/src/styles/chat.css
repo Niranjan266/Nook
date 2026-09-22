@@ -1239,6 +1239,56 @@
   min-width: 196px;
 }
 
+/* ── reminders ─────────────────────────────────────────────────────────────
+   The menu's second page. Wider than the first, because each pick carries
+   its day and time — a quick pick is only quick if it is never a guess. */
+.remind-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 248px;
+}
+.remind-head {
+  border-bottom: 1px dashed color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: var(--r-clay-sm) var(--r-clay-sm) 0 0;
+  padding-bottom: 9px;
+  margin-bottom: 2px;
+}
+.remind-hint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.remind-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 4px 6px;
+}
+.remind-custom .groove {
+  padding: 10px 12px;
+  font-size: var(--t-sm);
+  color-scheme: light;
+}
+:root[data-theme='dark'] .remind-custom .groove {
+  color-scheme: dark;
+}
+
+/* The bell in a bubble's corner: small, in the meta line, never loud. */
+.msg-remind {
+  display: inline-flex;
+  color: var(--accent-deep);
+}
+.msg.mine .msg-remind {
+  color: inherit;
+}
+
+/* Reminders that already went off sit back a step behind the waiting ones. */
+.reminder-past {
+  opacity: 0.72;
+}
+
 .rec-bar {
   display: flex;
   align-items: center;

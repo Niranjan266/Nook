@@ -40,6 +40,9 @@ export GOOGLE_CLIENT_SECRET=test-google-secret
 export CLOUDFLARE_TURN_KEY_ID=
 export CLOUDFLARE_TURN_API_TOKEN=
 export TURN_URL=
+# Reminders fire on a scheduler tick; a second keeps the firing test short
+# without touching the send-later clock the other suites run against.
+export REMINDER_TICK_MS=1000
 
 rm -f "$DB"*
 node src/index.js > /tmp/nook-test-server.log 2>&1 &
@@ -61,7 +64,7 @@ if [ $# -gt 0 ]; then
   SUITES=()
   for name in "$@"; do SUITES+=("test/$name.mjs"); done
 else
-  SUITES=(test/features.mjs test/security.mjs test/snap.mjs test/notify.mjs test/push.mjs test/google-native.mjs test/notifyprefs.mjs test/templates.mjs test/account.mjs test/snapkeep.mjs test/turn.mjs test/search.mjs)
+  SUITES=(test/features.mjs test/security.mjs test/snap.mjs test/notify.mjs test/push.mjs test/google-native.mjs test/notifyprefs.mjs test/templates.mjs test/account.mjs test/snapkeep.mjs test/turn.mjs test/search.mjs test/reminders.mjs)
 fi
 
 FAILED=0

@@ -186,9 +186,14 @@ export async function registerNativePush(): Promise<'on' | 'denied' | 'unavailab
      * knows how to act on `open-conversation`.
      */
     await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-      const conversationId = action.notification?.data?.conversationId;
+      const data = action.notification?.data || {};
+      const conversationId = data.conversationId;
+      // A reminder lands on its message; a message push lands on the chat.
+      const messageId = data.kind === 'reminder' ? data.messageId || '' : '';
       if (conversationId) {
-        window.dispatchEvent(new CustomEvent('nook:open-conversation', { detail: { conversationId } }));
+        window.dispatchEvent(
+          new CustomEvent('nook:open-conversation', { detail: { conversationId, messageId } })
+        );
       }
     });
 

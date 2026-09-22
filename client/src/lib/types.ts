@@ -322,3 +322,33 @@ export interface CallRecord {
   at: string;
   with: Person;
 }
+
+/** "Remind me about this message" — private to the person who set it. */
+export interface Reminder {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  remindAt: string;
+  note: string;
+  createdAt: string;
+  firedAt: string | null;
+  /** The message was deleted since; the reminder still stands, empty. */
+  gone: boolean;
+  /** In a chat locked right now, so the snippet is withheld. */
+  locked: boolean;
+  snippet: string;
+  senderName: string;
+}
+
+/** What the server sends when a reminder comes due. */
+export interface ReminderDue {
+  id: string;
+  conversationId: string;
+  messageId: string | null;
+  gone: boolean;
+  locked: boolean;
+  note: string;
+  snippet: string;
+  senderName: string;
+  banner: { title: string; body: string };
+}

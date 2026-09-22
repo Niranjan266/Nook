@@ -238,6 +238,42 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
   }, [jump?.n, conversation.id]);
 
   /**
+   * Landing on one message — a reminder, opened. The message may be older
+   * than the first page, or loaded but outside the rendered window, so this
+   * widens the window first and pages back a bounded number of times before
+   * giving up: a year-old reminder should not pull a whole history down.
+   */
+  const jumpTarget = useChat((s) => (s.jumpTarget?.conversationId === conversation.id ? s.jumpTarget : null));
+  const pagesBack = useRef(0);
+  useEffect(() => {
+    if (!jumpTarget) {
+      pagesBack.current = 0;
+      return;
+    }
+    const { clearJump } = useChat.getState();
+    const index = list.findIndex((m) => m.id === jumpTarget.messageId);
+
+    if (index >= 0) {
+      setWindowSize((n) => Math.max(n, list.length - index + 10));
+      // After the widened window has painted, or there is no node to find.
+      const t = setTimeout(() => {
+        jumpTo(jumpTarget.messageId);
+        clearJump();
+      }, 120);
+      return () => clearTimeout(t);
+    }
+
+    if (rawList === undefined || loadState) return; // still arriving; this runs again when it does
+    if (more && pagesBack.current < 12) {
+      pagesBack.current += 1;
+      loadMessages(conversation.id, { more: true });
+      return;
+    }
+    useUi.getState().toast('That message is no longer in this chat.');
+    clearJump();
+  }, [jumpTarget, list, rawList, loadState, more, conversation.id, jumpTo, loadMessages]);
+
+  /**
    * In a direct chat the wallpaper belongs to both people, so choosing one
    * only *proposes* it until the other accepts. That is the right rule — but
    * it meant the person who chose saw absolutely nothing happen: the sheet

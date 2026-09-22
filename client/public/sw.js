@@ -120,9 +120,12 @@ self.addEventListener('push', (event) => {
     badge: '/favicon.svg',
     tag: data.tag || 'nook',
     renotify: true,
-    data: { conversationId: data.conversationId, messageId: data.messageId },
+    data: { conversationId: data.conversationId, messageId: data.messageId, kind: data.kind },
+    // A reminder is not a message to reply to; tapping it is the only action.
     actions: data.urgent
       ? [{ action: 'open', title: 'Answer' }]
+      : data.kind === 'reminder'
+      ? []
       : [
           { action: 'reply', title: 'Reply' },
           { action: 'read', title: 'Mark read' },
@@ -136,13 +139,19 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const conversationId = event.notification.data?.conversationId;
-  const target = conversationId ? `/?c=${conversationId}` : '/';
+  // Only a reminder points at one message; a message push opens its chat at
+  // the bottom, where the new message already is.
+  const messageId =
+    event.notification.data?.kind === 'reminder' ? event.notification.data?.messageId || '' : '';
+  const target = conversationId
+    ? `/?c=${conversationId}${messageId ? `&m=${messageId}` : ''}`
+    : '/';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if ('focus' in client) {
-          client.postMessage({ type: 'open-conversation', conversationId, action: event.action });
+          client.postMessage({ type: 'open-conversation', conversationId, messageId, action: event.action });
           return client.focus();
         }
       }

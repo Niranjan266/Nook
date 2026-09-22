@@ -98,6 +98,34 @@ t.ok(
   TEMPLATES.notice.email({ headline: 'x', message: 'y' }).body.includes('never ask you for your password')
 );
 
+/* ── reminders, the one notification people schedule for themselves ───── */
+
+p = TEMPLATES.reminder.push({ sender: 'Ada', preview: 'the address is 12 Elm St', conversationId: 7, messageId: 9, reminderId: 3 });
+t.ok('a reminder names who wrote it when there is no note', p.title === 'Reminder · Ada', p.title);
+t.ok('and shows the message', p.body === 'the address is 12 Elm St', p.body);
+t.ok('it carries where to jump to', p.conversationId === '7' && p.messageId === '9', `${p.conversationId} ${p.messageId}`);
+t.ok('it says it is a reminder, so the app can open the message not just the chat', p.kind === 'reminder');
+// A new message in the same chat must not replace it on the lock screen.
+t.ok('its tag is its own, not the conversation stack', p.tag === 'reminder-3' && !p.tag.startsWith('convo-'), p.tag);
+
+p = TEMPLATES.reminder.push({ sender: 'Ada', preview: 'hi', note: 'book the table', reminderId: 3 });
+t.ok('the note leads when there is one — it is why they set it', p.title === 'Reminder: book the table', p.title);
+
+p = TEMPLATES.reminder.push({ sender: 'Ada', gone: true, conversationId: 7, messageId: 9, reminderId: 3 });
+t.ok('a deleted message still reminds, and says it went', p.body === 'A message you saved was deleted.', p.body);
+t.ok('with nothing to jump to', p.messageId === '', p.messageId);
+
+p = TEMPLATES.reminder.push({ sender: 'Ada', preview: '' });
+t.ok('previews off still leaves a body', p.body.length > 0, p.body);
+
+t.ok('a reminder is not urgent — it is not a call', !TEMPLATES.reminder.push({ sender: 'A' }).urgent);
+t.ok('a reminder sends no email', TEMPLATES.reminder.email === null);
+
+const rb = TEMPLATES.reminder.banner({ sender: 'Ada', preview: 'hello there', note: '' });
+t.ok('the in-app banner renders', rb.title === 'Reminder · Ada' && rb.body === 'hello there', JSON.stringify(rb));
+t.ok('the banner says so when the message went', TEMPLATES.reminder.banner({ gone: true }).body.includes('deleted'));
+t.ok('a reminder is not offered as an announcement', !catalogue().some((x) => x.id === 'reminder'));
+
 /* ── the verification template, which is the one with a code in it ─────── */
 
 const v = TEMPLATES.emailVerify.email({ code: '123456', displayName: 'Ada' });

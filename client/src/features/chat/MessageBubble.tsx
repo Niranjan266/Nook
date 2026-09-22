@@ -34,7 +34,9 @@ import {
   IconPin,
   IconThread,
   IconDown,
+  IconBell,
 } from '@/components/Icon';
+import RemindPicker from './RemindPicker';
 import { safeUrl } from '@/lib/config';
 import { tap } from '@/lib/native';
 
@@ -96,7 +98,15 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
     setAnchorRect(bubbleRef.current?.getBoundingClientRect() || null);
     setPicker(true);
   };
-  const [menu, setMenu] = useState(false);
+  const [menu, setMenuOpen] = useState(false);
+  /** The menu's second page. Reset on every close so it always opens at the top. */
+  const [reminding, setReminding] = useState(false);
+  const setMenu = (v: boolean | ((prev: boolean) => boolean)) => {
+    setMenuOpen(v);
+    setReminding(false);
+  };
+  // A primitive from the selector, so only the bubble whose bell changed re-renders.
+  const reminded = useChat((s) => Boolean(s.remindedIds[m.id]));
   const [history, setHistory] = useState<{ body: string; at: string; current?: boolean }[] | null>(null);
 
   const mine = m.sender.id === meId;
@@ -491,6 +501,11 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
               </button>
             )}
             {m.starred && <IconStarFill size={11} />}
+            {reminded && (
+              <span className="msg-remind" title="You have a reminder on this">
+                <IconBell size={11} />
+              </span>
+            )}
             <time dateTime={m.createdAt}>{clock(m.createdAt)}</time>
             <Ticks m={m} meId={meId} convo={conversation} />
           </span>
@@ -524,8 +539,24 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                 initial="hidden"
                 animate="show"
                 exit="exit"
-                onMouseLeave={() => setMenu(false)}
+                // Not on the reminder page: a native date picker pulls the
+                // pointer out of the menu, and closing then loses the choice.
+                onMouseLeave={() => !reminding && setMenu(false)}
               >
+                {reminding ? (
+                  <RemindPicker messageId={m.id} onBack={() => setReminding(false)} onDone={() => setMenu(false)} />
+                ) : (
+                <>
+                {/* Not on a message still sending: it has no id the server knows yet. */}
+                {!m.status && (
+                  <button className="list-row" onClick={() => setReminding(true)}>
+                    <IconBell size={17} />
+                    <span className="grow">
+                      <span className="list-row-label">{reminded ? 'Reminder set' : 'Remind me'}</span>
+                      <span className="list-row-sub">{reminded ? 'Change or cancel it' : 'Bring this back later'}</span>
+                    </span>
+                  </button>
+                )}
                 <button
                   className="list-row"
                   onClick={() => {
@@ -648,6 +679,8 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                       <span className="list-row-label">Unsend for everyone</span>
                     </span>
                   </button>
+                )}
+                </>
                 )}
               </motion.div>
             )}
