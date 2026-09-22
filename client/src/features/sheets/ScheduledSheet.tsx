@@ -7,8 +7,14 @@ import { IconSchedule, IconTrash } from '@/components/Icon';
 
 /** Messages written now, arriving later. Cancellable until they land. */
 export default function ScheduledSheet() {
-  const { sheet, closeSheet, toast } = useUi();
-  const { scheduled, loadScheduled, cancelScheduled, conversations, setActive } = useChat();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const toast = useUi((s) => s.toast);
+  const scheduled = useChat((s) => s.scheduled);
+  const loadScheduled = useChat((s) => s.loadScheduled);
+  const cancelScheduled = useChat((s) => s.cancelScheduled);
+  const conversations = useChat((s) => s.conversations);
+  const setActive = useChat((s) => s.setActive);
   const open = sheet === 'scheduled';
 
   useEffect(() => {

@@ -22,9 +22,17 @@ export default defineConfig({
     target: 'es2020',
     rollupOptions: {
       output: {
+        /**
+         * Vendor code in its own long-lived chunks. It changes far less often
+         * than the app, so after a deploy the service worker's cache-first
+         * /assets rule keeps serving these from disk and only the app chunk
+         * is fetched again.
+         */
         manualChunks: {
+          react: ['react', 'react-dom', 'react/jsx-runtime', 'scheduler'],
           motion: ['framer-motion'],
           net: ['socket.io-client'],
+          store: ['zustand', 'idb-keyval'],
         },
       },
     },

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChat } from '@/stores/chat';
 import { useFriends } from '@/stores/friends';
@@ -10,8 +10,7 @@ import { popIn, spring } from '@/lib/motion';
 import { duration } from '@/lib/format';
 import { compressImage } from '@/lib/color';
 import { transcribe, canTranscribe } from '@/lib/transcribe';
-import SnapCamera from './SnapCamera';
-import EmojiPicker from './EmojiPicker';
+import { lazyChunk, prefetch, whenIdle } from '@/lib/idle';
 import type { PublicQuietHours, Conversation as Convo } from '@/lib/types';
 import {
   IconSend,
@@ -38,12 +37,29 @@ interface Props {
 /** Voice-note formats in order of preference; the first the browser can record wins. */
 const VOICE_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/ogg;codecs=opus'];
 
-export default function Composer({ conversationId }: Props) {
-  const { send, replyTo, setReplyTo, editing, setEditing, edit, conversations } = useChat();
-  const enterToSend = useAuth((s) => s.me?.settings.enterToSend ?? true);
-  const { toast } = useUi();
+/**
+ * The emoji grid and the snap camera are the two heaviest things in the
+ * composer and neither is on screen until asked for, so they live in their
+ * own chunks — warmed on idle, so the first tap still opens instantly.
+ */
+const loadEmoji = () => import('./EmojiPicker');
+const loadCamera = () => import('./SnapCamera');
+const EmojiPicker = lazyChunk(loadEmoji);
+const SnapCamera = lazyChunk(loadCamera);
 
-  const conversation = conversations[conversationId];
+export default function Composer({ conversationId }: Props) {
+  // Picked field by field. Destructuring the whole store re-rendered this —
+  // the biggest component in the chat — on every typing blip and presence
+  // change in any conversation.
+  const send = useChat((s) => s.send);
+  const replyTo = useChat((s) => s.replyTo);
+  const setReplyTo = useChat((s) => s.setReplyTo);
+  const editing = useChat((s) => s.editing);
+  const setEditing = useChat((s) => s.setEditing);
+  const edit = useChat((s) => s.edit);
+  const conversation = useChat((s) => s.conversations[conversationId]);
+  const enterToSend = useAuth((s) => s.me?.settings.enterToSend ?? true);
+  const toast = useUi((s) => s.toast);
   const partner = conversation?.partner;
   const [partnerQuiet, setPartnerQuiet] = useState<PublicQuietHours | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -56,6 +72,13 @@ export default function Composer({ conversationId }: Props) {
   const [camOpen, setCamOpen] = useState(false);
   const [snapFile, setSnapFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<{ name: string; pct: number } | null>(null);
+
+  // Mounted from the first open onward, so closing still plays the exit.
+  const [emojiUsed, setEmojiUsed] = useState(false);
+  const [camUsed, setCamUsed] = useState(false);
+  if (emojiOpen && !emojiUsed) setEmojiUsed(true);
+  if (camOpen && !camUsed) setCamUsed(true);
+  useEffect(() => whenIdle(() => prefetch(loadEmoji, loadCamera), 4000), []);
 
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
@@ -738,6 +761,8 @@ export default function Composer({ conversationId }: Props) {
         }}
       />
 
+      {emojiUsed && (
+        <Suspense fallback={null}>
       <EmojiPicker
         open={emojiOpen}
         anchor={emojiAnchor}
@@ -749,7 +774,11 @@ export default function Composer({ conversationId }: Props) {
           textarea.current?.focus();
         }}
       />
+        </Suspense>
+      )}
 
+      {camUsed && (
+        <Suspense fallback={null}>
       <SnapCamera
         open={camOpen}
         initialFile={snapFile}
@@ -767,6 +796,8 @@ export default function Composer({ conversationId }: Props) {
           cameraInput.current?.click();
         }}
       />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -782,7 +813,7 @@ export default function Composer({ conversationId }: Props) {
  */
 function LockedComposer({ conversation }: { conversation: Convo }) {
   const partner = conversation.partner;
-  const { toast } = useUi();
+  const toast = useUi((s) => s.toast);
   const { incoming, outgoing, send, accept, decline, cancel } = useFriends();
   const [busy, setBusy] = useState(false);
 

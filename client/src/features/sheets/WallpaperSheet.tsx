@@ -11,7 +11,9 @@ import { IconImage, IconCheck, IconUsers, IconUser, IconRefresh } from '@/compon
 import { cssUrl } from '@/lib/config';
 
 export default function WallpaperSheet() {
-  const { sheet, closeSheet, toast } = useUi();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const toast = useUi((s) => s.toast);
   const conversation = useChat(selectActive);
   const setWallpaper = useChat((s) => s.setWallpaper);
   const meId = useAuth((s) => s.me?.id);

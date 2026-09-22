@@ -1,7 +1,12 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls, type PanInfo } from 'framer-motion';
 import { IconClose } from './Icon';
-import { spring, sheetSlide } from '@/lib/motion';
+import { sheetSlide, sheetSlideUp } from '@/lib/motion';
+import { usePhone } from '@/lib/useMediaQuery';
+
+/** Pulled this far down, or flicked this fast, a phone sheet lets go. */
+const DISMISS_DISTANCE = 110;
+const DISMISS_VELOCITY = 650;
 
 interface Props {
   /**
@@ -21,6 +26,17 @@ interface Props {
 
 export default function Sheet({ open, onClose, title, children, footer, headExtra , seeThrough }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const phone = usePhone();
+  const drag = useDragControls();
+
+  /**
+   * On a phone the sheet is a bottom sheet (see shell.css), so it rises from
+   * the bottom and can be pulled back down — but only by its head. Dragging
+   * from the body would fight the body's own scrolling.
+   */
+  const onDragEnd = (_: unknown, info: PanInfo) => {
+    if (info.offset.y > DISMISS_DISTANCE || info.velocity.y > DISMISS_VELOCITY) onClose();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -58,9 +74,8 @@ export default function Sheet({ open, onClose, title, children, footer, headExtr
           <motion.div
             className={`sheet-scrim${seeThrough ? " see-through" : ""}`}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            animate={{ opacity: 1, transition: { duration: 0.2 } }}
+            exit={{ opacity: 0, transition: { duration: 0.16 } }}
             onClick={onClose}
           />
           <motion.div
@@ -69,10 +84,16 @@ export default function Sheet({ open, onClose, title, children, footer, headExtr
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            {...sheetSlide}
-            transition={spring}
+            {...(phone ? sheetSlideUp : sheetSlide)}
+            drag={phone ? 'y' : false}
+            dragListener={false}
+            dragControls={drag}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.7 }}
+            dragMomentum={false}
+            onDragEnd={onDragEnd}
           >
-            <header className="sheet-head">
+            <header className="sheet-head" onPointerDown={phone ? (e) => drag.start(e) : undefined}>
               <h2 className="sheet-title">{title}</h2>
               {headExtra}
               <button className="clay-round" onClick={onClose} aria-label="Close">

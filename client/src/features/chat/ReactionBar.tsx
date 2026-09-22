@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { spring } from '@/lib/motion';
-import EmojiPicker from './EmojiPicker';
+import { lazyChunk } from '@/lib/idle';
 import { IconPlus } from '@/components/Icon';
 
 /**
@@ -26,6 +26,10 @@ import { IconPlus } from '@/components/Icon';
  * an ancestor the containing block for `position: fixed` children — the same
  * trap that collapsed the snap camera into an 80px bar.
  */
+
+// The full grid is its own chunk (the composer warms it on idle); most
+// reactions never leave the quick row.
+const EmojiPicker = lazyChunk(() => import('./EmojiPicker'));
 
 const QUICK_KEY = 'nook.reactions.quick';
 const DEFAULTS = ['❤️', '😂', '👍', '😮', '😢', '🙏'];
@@ -80,6 +84,8 @@ const ROW_H = CELL;
 export default function ReactionBar({ open, anchor, mine, onPick, onClose }: Props) {
   const [quick, setQuick] = useState<string[]>(readQuick);
   const [browsing, setBrowsing] = useState(false);
+  const [browsed, setBrowsed] = useState(false);
+  if (browsing && !browsed) setBrowsed(true);
   const row = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -178,6 +184,8 @@ export default function ReactionBar({ open, anchor, mine, onPick, onClose }: Pro
         )}
       </AnimatePresence>
 
+      {browsed && (
+        <Suspense fallback={null}>
       <EmojiPicker
         open={browsing}
         anchor={{
@@ -190,6 +198,8 @@ export default function ReactionBar({ open, anchor, mine, onPick, onClose }: Pro
         }}
         onPick={choose}
       />
+        </Suspense>
+      )}
     </>,
     document.body
   );

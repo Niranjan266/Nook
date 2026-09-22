@@ -35,7 +35,10 @@ import {
 const TIMERS = [0, 3600, 86400, 604800, 2592000];
 
 export default function ChatInfoSheet() {
-  const { sheet, closeSheet, openSheet, toast } = useUi();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const openSheet = useUi((s) => s.openSheet);
+  const toast = useUi((s) => s.toast);
   const conversation = useChat(selectActive);
   const { updatePrefs, setDisappearing, removeMember, setRole, presence, setPace, loadConversations } =
     useChat();
@@ -589,8 +592,9 @@ function LockFlow({
   step: LockStep;
   onDone: () => void;
 }) {
-  const { setLock, removeLock } = useChat();
-  const { toast } = useUi();
+  const setLock = useChat((s) => s.setLock);
+  const removeLock = useChat((s) => s.removeLock);
+  const toast = useUi((s) => s.toast);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [current, setCurrent] = useState('');

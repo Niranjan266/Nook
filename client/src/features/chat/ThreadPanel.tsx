@@ -4,7 +4,8 @@ import { useChat, selectActive } from '@/stores/chat';
 import { useAuth } from '@/stores/auth';
 import Avatar from '@/components/Avatar';
 import { clock, linkify } from '@/lib/format';
-import { spring, sheetSlide, bubbleIn } from '@/lib/motion';
+import { sheetSlide, sheetSlideUp, bubbleIn } from '@/lib/motion';
+import { usePhone } from '@/lib/useMediaQuery';
 import { IconClose, IconSend, IconThread } from '@/components/Icon';
 
 /**
@@ -12,18 +13,26 @@ import { IconClose, IconSend, IconThread } from '@/components/Icon';
  * a forum, and the whole point is to keep a tangent *out* of the main room
  * without creating a second place to check.
  */
+const NO_REPLIES: never[] = [];
+
 export default function ThreadPanel() {
-  const { openThreadId, threads, messages, activeId, openThread, sendInThread } = useChat();
+  // Narrow reads: this is mounted all the time, so a whole-store read made it
+  // re-render on every event in every conversation, open or not.
+  const openThreadId = useChat((s) => s.openThreadId);
+  const replies = useChat((s) => (s.openThreadId ? s.threads[s.openThreadId] : undefined)) || NO_REPLIES;
+  const root = useChat((s) =>
+    s.activeId && s.openThreadId
+      ? (s.messages[s.activeId] || []).find((m) => m.id === s.openThreadId)
+      : undefined
+  );
+  const { openThread, sendInThread } = useChat.getState();
+  const phone = usePhone();
   const conversation = useChat(selectActive);
   const me = useAuth((s) => s.me);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
-  const root = activeId
-    ? (messages[activeId] || []).find((m) => m.id === openThreadId)
-    : undefined;
-  const replies = openThreadId ? threads[openThreadId] || [] : [];
 
   useEffect(() => {
     if (openThreadId) setText('');
@@ -57,9 +66,8 @@ export default function ThreadPanel() {
           <motion.div
             className="sheet-scrim"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            animate={{ opacity: 1, transition: { duration: 0.2 } }}
+            exit={{ opacity: 0, transition: { duration: 0.16 } }}
             onClick={() => openThread(null)}
           />
           <motion.aside
@@ -67,8 +75,7 @@ export default function ThreadPanel() {
             role="dialog"
             aria-modal="true"
             aria-label="Thread"
-            {...sheetSlide}
-            transition={spring}
+            {...(phone ? sheetSlideUp : sheetSlide)}
           >
             <header className="sheet-head">
               <h2 className="sheet-title row" style={{ gap: 8 }}>

@@ -20,7 +20,7 @@ export default function PinBar({
   onJump: (messageId: string) => void;
 }) {
   const unpin = useChat((s) => s.unpin);
-  const { toast } = useUi();
+  const toast = useUi((s) => s.toast);
   const [index, setIndex] = useState(0);
 
   const pins = conversation.pins || [];

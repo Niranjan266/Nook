@@ -92,12 +92,56 @@ time,
   letter-spacing: -0.02em;
 }
 
+/* ── motion tokens beyond tokens.css ─────────────────────────────────────
+   Mirrored in lib/motion.ts (`ease`) so CSS and Framer move alike. Leaving
+   is quicker and accelerates away; arriving decelerates in.               */
+
+:root {
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-press: 90ms;
+  --dur-theme: 280ms;
+}
+
 /* ── focus: a hard slab ring, visible on clay and on wallpaper ──────────── */
 
 :focus-visible {
   outline: 2.5px solid var(--ink);
   outline-offset: 3px;
   border-radius: var(--r-slab);
+}
+
+/* A mouse click or a tap never shows the ring; only the keyboard does. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Over the near-black media viewers the ink ring would vanish. */
+.lightbox :focus-visible,
+.snap-view :focus-visible {
+  outline-color: #f7f2ea;
+}
+
+/* ── theme switching ─────────────────────────────────────────────────────
+   main.tsx puts .theme-changing on <html> for ~300ms when data-theme flips.
+   Only the big painted surfaces fade — enough to turn a flash into a
+   dissolve — and the class comes off straight after, so nothing carries a
+   colour transition the rest of the time.                                 */
+
+.theme-changing body,
+.theme-changing .shell,
+.theme-changing .rail,
+.theme-changing .shelf,
+.theme-changing .surface,
+.theme-changing .sheet,
+.theme-changing .chat-head,
+.theme-changing .composer,
+.theme-changing .bubble,
+.theme-changing .list-row {
+  transition:
+    background-color var(--dur-theme) var(--ease-out),
+    color var(--dur-theme) var(--ease-out),
+    box-shadow var(--dur-theme) var(--ease-out) !important;
 }
 
 ::selection {
@@ -294,14 +338,28 @@ textarea,
  */
 @media (hover: none) {
   button:active,
-  .list-row:active {
+  .list-row:active,
+  .tile:active {
     transform: scale(0.97);
+  }
+
+  /*
+   * Presses in almost instantly and eases back out, so a tap registers the
+   * moment a finger lands instead of snapping. :where() keeps this at zero
+   * specificity: controls that declare their own transition keep it.
+   */
+  :where(button, .list-row) {
+    transition: transform 160ms var(--ease-out);
+  }
+  :where(button, .list-row):active {
+    transition-duration: var(--dur-press);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   button:active,
-  .list-row:active {
+  .list-row:active,
+  .tile:active {
     transform: none;
   }
 }

@@ -2,7 +2,15 @@
 
 // Bumping this name is what evicts an old cache: `activate` deletes every key
 // that is not the current one. It must change whenever the caching rules do.
-const SHELL = 'nook-shell-v2';
+const SHELL = 'nook-shell-v3';
+
+// Hashed build output lives in its own cache, which survives a SHELL bump.
+// Its URLs can never go stale, so there is nothing to evict on a rule change —
+// and keeping it means an updated service worker does not make the Android app
+// re-download every script on its next launch. Only its size is managed.
+const RUNTIME = 'nook-assets-v1';
+const RUNTIME_MAX = 160;
+const KEEP = [SHELL, RUNTIME];
 
 // '/' is deliberately absent. It is the same document as /index.html, and
 // having it precached under its own key is what let a stale copy be served.
@@ -16,7 +24,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== SHELL).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => !KEEP.includes(k)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -59,13 +67,28 @@ async function networkFirst(request) {
   }
 }
 
+/**
+ * Every deploy adds a new set of hashed files and orphans the old ones. Cache
+ * keys come back in insertion order, so trimming from the front drops the
+ * builds nobody is running any more.
+ */
+async function trim(cache) {
+  const keys = await cache.keys();
+  const excess = keys.length - RUNTIME_MAX;
+  for (let i = 0; i < excess; i++) await cache.delete(keys[i]);
+}
+
 async function cacheFirst(request) {
-  const cached = await caches.match(request);
+  const cache = await caches.open(RUNTIME);
+  // Older installs kept assets in the shell cache; honour those until evicted.
+  const cached = (await cache.match(request)) || (await caches.match(request));
   if (cached) return cached;
   const response = await fetch(request);
-  if (response.ok) {
+  // Only a whole, same-origin 200. A 404 for a chunk from a replaced build
+  // must stay a 404 — caching it would pin the failure forever.
+  if (response.ok && response.type === 'basic' && response.status === 200) {
     const copy = response.clone();
-    caches.open(SHELL).then((cache) => cache.put(request, copy));
+    cache.put(request, copy).then(() => trim(cache)).catch(() => {});
   }
   return response;
 }

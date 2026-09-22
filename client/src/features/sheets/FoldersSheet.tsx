@@ -15,9 +15,12 @@ const EMOJI = ['📁', '💼', '🏠', '❤️', '🎧', '🧭', '🌿', '🔧',
  * yours, and the other person never learns which drawer you filed them in.
  */
 export default function FoldersSheet() {
-  const { sheet, closeSheet, toast } = useUi();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const toast = useUi((s) => s.toast);
   const { me, setMe } = useAuth();
-  const { conversations, order } = useChat();
+  const conversations = useChat((s) => s.conversations);
+  const order = useChat((s) => s.order);
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [editing, setEditing] = useState<string | null>(null);

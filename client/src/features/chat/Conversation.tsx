@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChat } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
@@ -11,7 +11,8 @@ import PinBar from './PinBar';
 import CodeEntry from '@/components/CodeEntry';
 import { MOOD_EMOJI, MOOD_LABEL, daysUntil } from '@/lib/rooms';
 import { dayLabel, sameDay, lastSeenLabel } from '@/lib/format';
-import { spring } from '@/lib/motion';
+import { spring, convoEnter } from '@/lib/motion';
+import { usePhone } from '@/lib/useMediaQuery';
 import {
   IconBack,
   IconPhone,
@@ -24,25 +25,61 @@ import {
   IconClose,
   IconClockSmall,
 } from '@/components/Icon';
-import type { Conversation as Convo } from '@/lib/types';
+import type { Conversation as Convo, Message } from '@/lib/types';
 import { safeUrl, cssUrl } from '@/lib/config';
 
 const GAP_MINUTES = 6;
+const NO_MESSAGES: Message[] = [];
+const NO_TYPERS: string[] = [];
+
+/**
+ * A bubble's identity across the optimistic -> confirmed swap. The server
+ * assigns a new id but echoes our clientId, so keying on that keeps the same
+ * element instead of unmounting the pending bubble and springing in a copy.
+ */
+const bubbleKey = (m: Message) => m.clientId || m.id;
+
+/** Rough shapes of a conversation, shown while the first page loads. */
+function StreamSkeleton() {
+  return (
+    <div className="stream-skeleton" aria-hidden="true">
+      {[62, 44, 70, 38, 56, 48].map((w, i) => (
+        <span key={i} className={`skel-bubble${i % 3 === 1 ? ' mine' : ''}`} style={{ width: `${w}%` }} />
+      ))}
+    </div>
+  );
+}
 
 export default function Conversation({ conversation }: { conversation: Convo }) {
-  const { messages, typing, presence, loadMessages, hasMore, markRead, respondWallpaper, removeWallObject } =
-    useChat();
-  const unlockChat = useChat((s) => s.unlockChat);
-  const { openSheet, setShelf, toast } = useUi();
-  const me = useAuth((s) => s.me);
+  /**
+   * Narrow reads only. This used to take the whole chat store, so a typing
+   * blip or a presence ping in *any* conversation re-rendered this screen and
+   * — through props — the visible history with it.
+   */
+  const rawList = useChat((s) => s.messages[conversation.id]);
+  const rawTypers = useChat((s) => s.typing[conversation.id]);
+  const partnerPresence = useChat((s) =>
+    conversation.partner ? s.presence[conversation.partner.id] : undefined
+  );
+  const more = useChat((s) => s.hasMore[conversation.id]);
+  const loadState = useChat((s) => s.loading[conversation.id]);
+  const { loadMessages, markRead, respondWallpaper, removeWallObject, unlockChat } = useChat.getState();
+  const { openSheet, setShelf } = useUi.getState();
+  const meId = useAuth((s) => s.me?.id || '');
   const startCall = useCall((s) => s.start);
+  const isPhone = usePhone();
 
   const stream = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [lockError, setLockError] = useState('');
   const [unlocking, setUnlocking] = useState(false);
 
-  const list = messages[conversation.id] || [];
+  const list = rawList || NO_MESSAGES;
+  // Not fetched yet (nor cached): shapes, not a blank. A failed load falls
+  // through to the empty state as before.
+  const firstLoad = rawList === undefined && loadState !== false;
+  const shownSkeleton = useRef(firstLoad);
+  if (firstLoad) shownSkeleton.current = true;
 
   /**
    * Only ever render a window of the history.
@@ -55,13 +92,51 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
    */
   const WINDOW_STEP = 60;
   const [windowSize, setWindowSize] = useState(WINDOW_STEP);
-  const windowed = list.length > windowSize ? list.slice(-windowSize) : list;
+  const windowed = useMemo(
+    () => (list.length > windowSize ? list.slice(-windowSize) : list),
+    [list, windowSize]
+  );
 
   useEffect(() => setWindowSize(WINDOW_STEP), [conversation.id]);
 
-  const meId = me?.id || '';
-  const typers = (typing[conversation.id] || []).filter((id) => id !== meId);
-  const partnerPresence = conversation.partner ? presence[conversation.partner.id] : undefined;
+  const typers = useMemo(() => (rawTypers || NO_TYPERS).filter((id) => id !== meId), [rawTypers, meId]);
+
+  /**
+   * Which bubbles are allowed to spring in: only ones that arrived at the end
+   * of the list since the last render, and only a couple at a time. The first
+   * load, a cache being replaced by the server copy, and older pages arriving
+   * at the top all just appear.
+   */
+  const seen = useRef<Set<string> | null>(null);
+  const fresh = useMemo(() => {
+    const known = seen.current;
+    const out = new Set<string>();
+    if (!known || !rawList) return out;
+    const added = rawList.filter((m) => !known.has(bubbleKey(m)));
+    if (added.length === 0 || added.length > 2) return out;
+    const tail = rawList.slice(-added.length);
+    if (added.every((m, i) => m === tail[i])) added.forEach((m) => out.add(bubbleKey(m)));
+    return out;
+  }, [rawList]);
+  useEffect(() => {
+    if (rawList) seen.current = new Set(rawList.map(bubbleKey));
+  }, [rawList]);
+
+  /** Run grouping, worked out once per list change rather than on every render. */
+  const rows = useMemo(
+    () =>
+      windowed.map((m, i) => {
+        const prev = windowed[i - 1];
+        const next = windowed[i + 1];
+        const newDay = !prev || !sameDay(prev.createdAt, m.createdAt);
+        const gap =
+          !prev ||
+          prev.sender.id !== m.sender.id ||
+          new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > GAP_MINUTES * 60000;
+        return { m, newDay, runStart: newDay || gap, lastOfRun: !next || next.sender.id !== m.sender.id };
+      }),
+    [windowed]
+  );
 
   useEffect(() => {
     setLockError('');
@@ -95,7 +170,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
       return;
     }
 
-    if (el.scrollTop < 80 && hasMore[conversation.id]) {
+    if (el.scrollTop < 80 && more) {
       const prevHeight = el.scrollHeight;
       loadMessages(conversation.id, { more: true }).then(() => {
         requestAnimationFrame(() => {
@@ -105,15 +180,16 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
     }
   };
 
-  const jumpTo = (id: string) => {
+  // Stable, so the memoised bubbles are not all re-rendered by a new function.
+  const jumpTo = useCallback((id: string) => {
     const node = document.getElementById(`m-${id}`);
-    if (!node) return toast('That message is further back — scroll up to load it.');
+    if (!node) return useUi.getState().toast('That message is further back — scroll up to load it.');
     node.scrollIntoView({ behavior: 'smooth', block: 'center' });
     node.animate(
       [{ filter: 'brightness(1)' }, { filter: 'brightness(1.14)' }, { filter: 'brightness(1)' }],
       { duration: 1100 }
     );
-  };
+  }, []);
 
   /**
    * In a direct chat the wallpaper belongs to both people, so choosing one
@@ -218,7 +294,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
    */
   if (conversation.locked && !conversation.lockOpen) {
     return (
-      <section className="surface">
+      <motion.section className="surface" {...convoEnter(isPhone)}>
         <div className="lock-gate">
           <div className="stack" style={{ alignItems: 'center', gap: 18, width: '100%' }}>
             <span className="clay-round" style={{ width: 66, height: 66 }}>
@@ -248,12 +324,16 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
             />
           </div>
         </div>
-      </section>
+      </motion.section>
     );
   }
 
   return (
-    <section className="surface" aria-label={`Conversation with ${conversation.name}`}>
+    <motion.section
+      className="surface"
+      aria-label={`Conversation with ${conversation.name}`}
+      {...convoEnter(isPhone)}
+    >
       <header className="chat-head">
         {/* Visibility is CSS-driven so it survives a resize without a re-render. */}
         <button className="clay-round chat-back" onClick={() => setShelf(true)} aria-label="Back to conversations">
@@ -439,8 +519,17 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
           )}
         </AnimatePresence>
 
-        <div className="stream" ref={stream} onScroll={onScroll} role="log" aria-live="polite">
-          {hasMore[conversation.id] && (
+        <div
+          className={`stream${shownSkeleton.current && !firstLoad ? ' stream-fresh' : ''}`}
+          ref={stream}
+          onScroll={onScroll}
+          role="log"
+          aria-live="polite"
+          aria-busy={firstLoad || undefined}
+        >
+          {firstLoad && <StreamSkeleton />}
+
+          {more && (
             <button
               className="clay-btn"
               style={{ alignSelf: 'center', marginBottom: 12 }}
@@ -450,7 +539,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
             </button>
           )}
 
-          {windowed.length === 0 && (
+          {!firstLoad && windowed.length === 0 && (
             <div className="empty" style={{ margin: 'auto' }}>
               <svg className="empty-art" viewBox="0 0 200 200" fill="none" aria-hidden="true">
                 <rect x="24" y="30" width="152" height="120" rx="34" fill="var(--clay-surface)" />
@@ -470,31 +559,21 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
           )}
 
           <AnimatePresence initial={false}>
-            {windowed.map((m, i) => {
-              const prev = windowed[i - 1];
-              const newDay = !prev || !sameDay(prev.createdAt, m.createdAt);
-              const gap =
-                !prev ||
-                prev.sender.id !== m.sender.id ||
-                new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > GAP_MINUTES * 60000;
-              const next = windowed[i + 1];
-              const lastOfRun = !next || next.sender.id !== m.sender.id;
-
-              return (
-                <div key={m.id} style={{ display: 'contents' }}>
-                  {newDay && <div className="day-mark">{dayLabel(m.createdAt)}</div>}
-                  <MessageBubble
-                    message={m}
-                    conversation={conversation}
-                    meId={meId}
-                    runStart={newDay || gap}
-                    showAvatar={lastOfRun}
-                    eager={i >= windowed.length - 12}
-                    onJumpTo={jumpTo}
-                  />
-                </div>
-              );
-            })}
+            {rows.map(({ m, newDay, runStart, lastOfRun }, i) => (
+              <div key={bubbleKey(m)} className="msg-row">
+                {newDay && <div className="day-mark">{dayLabel(m.createdAt)}</div>}
+                <MessageBubble
+                  message={m}
+                  conversation={conversation}
+                  meId={meId}
+                  runStart={runStart}
+                  showAvatar={lastOfRun}
+                  eager={i >= rows.length - 12}
+                  animateIn={fresh.has(bubbleKey(m))}
+                  onJumpTo={jumpTo}
+                />
+              </div>
+            ))}
           </AnimatePresence>
 
           {typers.length > 0 && (
@@ -522,8 +601,9 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
               exit={{ opacity: 0, y: 14, scale: 0.85 }}
               transition={spring}
               onClick={() => {
-                const el = stream.current;
-                if (el) el.scrollTop = el.scrollHeight;
+                // The one scroll that should glide (the stream itself no longer
+                // smooth-scrolls every write; see chat.css).
+                stream.current?.scrollTo({ top: stream.current.scrollHeight, behavior: 'smooth' });
                 markRead(conversation.id);
               }}
               aria-label="Jump to latest"
@@ -536,6 +616,6 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
       </div>
 
       <Composer conversationId={conversation.id} />
-    </section>
+    </motion.section>
   );
 }

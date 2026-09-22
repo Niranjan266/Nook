@@ -14,9 +14,14 @@ import { cssUrl } from '@/lib/config';
  * and the history of every wallpaper this room has worn.
  */
 export default function RoomSheet() {
-  const { sheet, closeSheet, toast } = useUi();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const toast = useUi((s) => s.toast);
   const conversation = useChat(selectActive);
-  const { setMood, addWallObject, setSchedule, restoreWallpaper } = useChat();
+  const setMood = useChat((s) => s.setMood);
+  const addWallObject = useChat((s) => s.addWallObject);
+  const setSchedule = useChat((s) => s.setSchedule);
+  const restoreWallpaper = useChat((s) => s.restoreWallpaper);
 
   const [note, setNote] = useState('');
   const [objectText, setObjectText] = useState('');

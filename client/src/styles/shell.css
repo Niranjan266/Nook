@@ -158,7 +158,12 @@
   font-weight: 500;
   color: var(--ink-soft);
   white-space: nowrap;
-  transition: all var(--dur) var(--ease-out);
+  /* Named, not `all`: `all` also animated layout properties whenever the
+     tab row reflowed. */
+  transition:
+    background var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out);
 }
 .shelf-tab.on {
   background: var(--clay-sunk);
@@ -197,6 +202,18 @@
 .tile.active {
   background: var(--clay-surface);
   box-shadow: var(--clay-2);
+}
+/* The press scale lives in base.css; this lets it ease instead of snap. */
+@media (hover: none) {
+  .tile {
+    transition:
+      transform 160ms var(--ease-out),
+      background var(--dur) var(--ease-out),
+      box-shadow var(--dur) var(--ease-out);
+  }
+  .tile:active {
+    transition-duration: var(--dur-press), var(--dur), var(--dur);
+  }
 }
 .tile.active::after {
   content: '';
@@ -536,6 +553,16 @@ button.list-row:active {
   .sheet-head {
     position: relative;
     padding-top: var(--s-5);
+    /* The head is the drag handle (Sheet.tsx); the browser must not claim
+       the gesture as a scroll first. */
+    touch-action: none;
+  }
+  /* A backdrop blur re-rasterises everything behind it on every frame of
+     the fade — the single most expensive thing on a mid-range Android GPU.
+     A slightly deeper tint reads the same at phone size. */
+  .sheet-scrim {
+    backdrop-filter: none;
+    background: rgba(30, 26, 23, 0.4);
   }
 }
 

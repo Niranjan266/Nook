@@ -22,7 +22,9 @@ const NO_MESSAGES: Message[] = [];
 
 /** Everything shared in one conversation, without scrolling back through it. */
 export default function MediaSheet() {
-  const { sheet, closeSheet, setLightbox } = useUi();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const setLightbox = useUi((s) => s.setLightbox);
   const conversation = useChat(selectActive);
   const messages = useChat((s) => (s.activeId ? s.messages[s.activeId] : undefined) ?? NO_MESSAGES);
   const [tab, setTab] = useState<Tab>('media');

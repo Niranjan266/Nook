@@ -136,7 +136,88 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  scroll-behavior: smooth;
+  /* Deliberately not smooth. With scroll-behavior: smooth every programmatic
+     scrollTop write animates too — opening a chat visibly scrolled through
+     the whole history, and paging older messages in slid the view instead of
+     holding it still. The places that want a glide ask for one explicitly. */
+  scroll-behavior: auto;
+}
+
+/* The row wrapper is only there to key the day mark with its message. */
+.msg-row {
+  display: contents;
+}
+
+/* The first page arriving over the skeleton fades in rather than popping. */
+.stream-fresh {
+  animation: stream-in 260ms var(--ease-out) both;
+}
+@keyframes stream-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ── loading skeleton ──────────────────────────────────────────────────────
+   Bubble-shaped, so the screen already looks like a conversation while the
+   first page loads. The shimmer is a transformed pseudo-element sliding over
+   each shape: compositor-only, no background-position repaint per frame.   */
+
+.stream-skeleton {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: var(--s-2);
+}
+.skel-bubble {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  height: 38px;
+  max-width: min(420px, 70%);
+  border-radius: var(--r-clay);
+  background: color-mix(in srgb, var(--clay-raised) 78%, transparent);
+  box-shadow: var(--clay-1);
+}
+.skel-bubble:nth-child(3n) {
+  height: 58px;
+}
+.skel-bubble.mine {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent) 30%, var(--clay-raised));
+}
+.skel-bubble::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--clay-surface) 55%, transparent) 50%,
+    transparent 80%
+  );
+  transform: translateX(-100%);
+  animation: skel-shimmer 1.3s var(--ease-in-out) infinite;
+}
+.skel-bubble:nth-child(2)::after { animation-delay: 80ms; }
+.skel-bubble:nth-child(3)::after { animation-delay: 160ms; }
+.skel-bubble:nth-child(4)::after { animation-delay: 240ms; }
+.skel-bubble:nth-child(5)::after { animation-delay: 320ms; }
+.skel-bubble:nth-child(6)::after { animation-delay: 400ms; }
+@keyframes skel-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-bubble::after {
+    animation: none;
+    display: none;
+  }
+  .stream-fresh {
+    animation: none;
+  }
 }
 
 .day-mark {
@@ -203,6 +284,14 @@
 }
 .msg.mine .bubble a {
   color: var(--on-accent);
+}
+
+/* Dark mode: the rust and clay-blue accents are too dim to carry dark text at
+   4.5:1 (about 4.0 and 4.3). Lifting just the bubble a touch clears it
+   (about 5.0 and 5.5) without changing anyone's accent anywhere else. */
+:root[data-theme='dark'][data-accent='rust'] .msg.mine .bubble,
+:root[data-theme='dark'][data-accent='clay-blue'] .msg.mine .bubble {
+  background: color-mix(in srgb, var(--accent) 85%, #fff);
 }
 
 /* the tail: a clay corner that squares off at the start of a run */

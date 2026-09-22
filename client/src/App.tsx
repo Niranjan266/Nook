@@ -4,8 +4,6 @@ import { useAuth } from '@/stores/auth';
 import { useChat, selectActive } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
 
-import FrontDoor from '@/features/auth/FrontDoor';
-import GuestDoor from '@/features/auth/GuestDoor';
 import { captureLaunchLinks, openLaunchTarget } from '@/lib/links';
 import DockRail from '@/features/shell/DockRail';
 import Shelf from '@/features/shell/Shelf';
@@ -18,25 +16,10 @@ import { bindBackButton, isNativeApp } from '@/lib/native';
 
 import Toasts from '@/components/Toasts';
 import Welcome, { shouldWelcome } from '@/components/Welcome';
+import Tour, { startTourOnce } from '@/components/Tour';
 import NotifyNudge from '@/components/NotifyNudge';
 import Lightbox from '@/components/Lightbox';
-import {
-  NewChatSheet,
-  NewGroupSheet,
-  ForwardSheet,
-  SearchSheet,
-  StarredSheet,
-  CallsSheet,
-  RequestsSheet,
-} from '@/features/sheets/PeopleSheets';
-import ChatInfoSheet from '@/features/sheets/ChatInfoSheet';
-import WallpaperSheet from '@/features/sheets/WallpaperSheet';
-import SettingsSheet from '@/features/sheets/SettingsSheet';
-import RoomSheet from '@/features/sheets/RoomSheet';
-import FoldersSheet from '@/features/sheets/FoldersSheet';
-import ScheduledSheet from '@/features/sheets/ScheduledSheet';
-import MediaSheet from '@/features/sheets/MediaSheet';
-import ThreadPanel from '@/features/chat/ThreadPanel';
+import { lazyChunk, prefetch, whenIdle } from '@/lib/idle';
 
 import { registerServiceWorker } from '@/lib/push';
 import { IMPERSONATE_KEY } from '@/lib/adminApi';
@@ -151,6 +134,55 @@ function OfflineBar() {
  */
 const AdminApp = lazy(() => import('@/features/admin/AdminApp'));
 
+/**
+ * Everything that is not the first screen, split out of the startup bundle.
+ *
+ * On a phone the cost of JavaScript is parse time as much as download, and
+ * none of these are on screen when the app opens. They are warmed on idle
+ * once signed in (see Nook), so opening one later is still instant; the doors
+ * are only ever needed by someone signed out.
+ */
+const loadPeople = () => import('@/features/sheets/PeopleSheets');
+const loadChatInfo = () => import('@/features/sheets/ChatInfoSheet');
+const loadWallpaper = () => import('@/features/sheets/WallpaperSheet');
+const loadSettings = () => import('@/features/sheets/SettingsSheet');
+const loadRoom = () => import('@/features/sheets/RoomSheet');
+const loadFolders = () => import('@/features/sheets/FoldersSheet');
+const loadScheduled = () => import('@/features/sheets/ScheduledSheet');
+const loadMedia = () => import('@/features/sheets/MediaSheet');
+const loadThread = () => import('@/features/chat/ThreadPanel');
+
+const NewChatSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.NewChatSheet })));
+const NewGroupSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.NewGroupSheet })));
+const ForwardSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.ForwardSheet })));
+const SearchSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.SearchSheet })));
+const StarredSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.StarredSheet })));
+const CallsSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.CallsSheet })));
+const RequestsSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.RequestsSheet })));
+const ChatInfoSheet = lazyChunk(loadChatInfo);
+const WallpaperSheet = lazyChunk(loadWallpaper);
+const SettingsSheet = lazyChunk(loadSettings);
+const RoomSheet = lazyChunk(loadRoom);
+const FoldersSheet = lazyChunk(loadFolders);
+const ScheduledSheet = lazyChunk(loadScheduled);
+const MediaSheet = lazyChunk(loadMedia);
+const ThreadPanel = lazyChunk(loadThread);
+const FrontDoor = lazyChunk(() => import('@/features/auth/FrontDoor'));
+const GuestDoor = lazyChunk(() => import('@/features/auth/GuestDoor'));
+
+const warmSheets = () =>
+  prefetch(
+    loadPeople,
+    loadChatInfo,
+    loadWallpaper,
+    loadSettings,
+    loadRoom,
+    loadFolders,
+    loadScheduled,
+    loadMedia,
+    loadThread
+  );
+
 const isAdminRoute = () => window.location.pathname.replace(/\/+$/, '') === '/nookcontrol';
 
 export default function App() {
@@ -209,7 +241,10 @@ function Nook() {
   const { me, status, init } = useAuth();
   const conversation = useChat(selectActive);
   const hydrate = useChat((s) => s.hydrate);
-  const { shelfOpen, sheet } = useUi();
+  // Selected one by one: a whole-store read re-rendered the entire shell on
+  // every toast and wallpaper-slider tick.
+  const shelfOpen = useUi((s) => s.shelfOpen);
+  const sheet = useUi((s) => s.sheet);
   const isPhone = usePhone();
   const isNarrow = useNarrow();
   // Read before anything else looks at the address bar; see lib/links.
@@ -333,10 +368,28 @@ function Nook() {
 
   useSocketBridge(Boolean(me));
 
+  /**
+   * The split-out sheets mount once the first screen has painted and the
+   * browser goes idle — or sooner, the moment one is actually asked for.
+   */
+  const [warm, setWarm] = useState(false);
+  const threadOpen = useChat((s) => Boolean(s.openThreadId));
+  useEffect(() => {
+    if (!me) return;
+    return whenIdle(() => {
+      warmSheets();
+      setWarm(true);
+    });
+  }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (status === 'loading') return <Booting />;
 
   if (status === 'out' || !me)
-    return guestCode ? <GuestDoor code={guestCode} onDone={() => setGuestCode(null)} /> : <FrontDoor />;
+    return (
+      <Suspense fallback={<Booting />}>
+        {guestCode ? <GuestDoor code={guestCode} onDone={() => setGuestCode(null)} /> : <FrontDoor />}
+      </Suspense>
+    );
 
   /**
    * Phone  — one pane at a time: the list, or the conversation.
@@ -362,22 +415,31 @@ function Nook() {
           something already granted. */}
       <NotifyNudge show={Boolean(conversation) && !isNativeApp()} />
 
-      <NewChatSheet />
-      <NewGroupSheet />
-      <ForwardSheet />
-      <SearchSheet />
-      <StarredSheet />
-      <CallsSheet />
-      <RequestsSheet />
-      <ChatInfoSheet />
-      <WallpaperSheet />
-      <SettingsSheet />
-      <RoomSheet />
-      <FoldersSheet />
-      <ScheduledSheet />
-      <MediaSheet />
+      {/* Fallback is nothing: each sheet brings its own entrance. */}
+      {(warm || sheet) && (
+        <Suspense fallback={null}>
+          <NewChatSheet />
+          <NewGroupSheet />
+          <ForwardSheet />
+          <SearchSheet />
+          <StarredSheet />
+          <CallsSheet />
+          <RequestsSheet />
+          <ChatInfoSheet />
+          <WallpaperSheet />
+          <SettingsSheet />
+          <RoomSheet />
+          <FoldersSheet />
+          <ScheduledSheet />
+          <MediaSheet />
+        </Suspense>
+      )}
 
-      <ThreadPanel />
+      {(warm || threadOpen) && (
+        <Suspense fallback={null}>
+          <ThreadPanel />
+        </Suspense>
+      )}
       <CallOverlay />
       <Lightbox />
       <MessageBanner message={banner} onDismiss={() => setBanner(null)} />
@@ -387,9 +449,14 @@ function Nook() {
           open={welcome}
           name={me.displayName}
           userId={me.id}
-          onClose={() => setWelcome(false)}
+          onClose={() => {
+            setWelcome(false);
+            // The tour follows the celebration, once its confetti has settled.
+            startTourOnce(me.id, 450);
+          }}
         />
       )}
+      <Tour />
       <OfflineBar />
     </>
   );

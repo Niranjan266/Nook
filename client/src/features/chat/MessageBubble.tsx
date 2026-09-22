@@ -36,6 +36,7 @@ import {
   IconDown,
 } from '@/components/Icon';
 import { safeUrl } from '@/lib/config';
+import { tap } from '@/lib/native';
 
 
 interface Props {
@@ -46,6 +47,12 @@ interface Props {
   showAvatar: boolean;
   /** Recent media loads immediately; older media stays lazy. */
   eager?: boolean;
+  /**
+   * Only a message that has just arrived springs in. Everything present when
+   * the chat opens (or loads in, or is paged in from above) simply appears —
+   * sixty bubbles bouncing at once reads as the app shuffling, not arriving.
+   */
+  animateIn?: boolean;
   onJumpTo: (id: string) => void;
 }
 
@@ -63,10 +70,17 @@ function Ticks({ m, meId, convo }: { m: Message; meId: string; convo: Conversati
   );
 }
 
-function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, eager, onJumpTo }: Props) {
+function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, eager, animateIn, onJumpTo }: Props) {
+  /**
+   * Actions only, read without subscribing. `useChat()` with no selector
+   * subscribed every bubble to the whole store, so each typing blip or
+   * presence ping re-rendered the entire visible history — which quietly
+   * defeated the memo below. Store actions are stable, so nothing is lost.
+   */
   const { react, star, remove, setReplyTo, setEditing, retry, markSnapViewed, saveMessage, pin, unpin, openThread } =
-    useChat();
-  const { openSheet, setLightbox, toast } = useUi();
+    useChat.getState();
+  const { openSheet, setLightbox, toast } = useUi.getState();
+  const enter = animateIn ? 'hidden' : false;
   const swipeEnabled = useAuth((s) => s.me?.settings.swipeToReply ?? true);
   const [picker, setPicker] = useState(false);
   /**
@@ -119,7 +133,8 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
     const nowArmed = eased >= THRESHOLD;
     if (nowArmed !== armed) {
       setArmed(nowArmed);
-      if (nowArmed && navigator.vibrate) navigator.vibrate(12);
+      // A real haptic tick in the app; the web's 12 ms buzz elsewhere.
+      if (nowArmed) void tap();
     }
   };
 
@@ -135,7 +150,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
 
   if (m.type === 'system') {
     return (
-      <motion.div className="system-note" variants={bubbleIn} initial="hidden" animate="show">
+      <motion.div className="system-note" variants={bubbleIn} initial={enter} animate="show">
         {m.body}
       </motion.div>
     );
@@ -143,7 +158,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
 
   if (m.deletedForAll) {
     return (
-      <motion.div className={`msg${mine ? ' mine' : ''}`} variants={bubbleIn} initial="hidden" animate="show">
+      <motion.div className={`msg${mine ? ' mine' : ''}`} variants={bubbleIn} initial={enter} animate="show">
         <div className="bubble" style={{ opacity: 0.7, fontStyle: 'italic' }}>
           <span className="msg-text small">This message was unsent</span>
         </div>
@@ -378,7 +393,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           m.status === 'pending' ? ' pending' : ''
         }${m.status === 'failed' ? ' failed' : ''}`}
         variants={bubbleIn}
-        initial="hidden"
+        initial={enter}
         animate="show"
         exit="exit"
         layout="position"
@@ -709,15 +724,41 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         The reaction picker. Anchored to this message and rendered into
         <body> — see ReactionBar for why both matter.
       */}
-      <ReactionBar
-        open={picker}
-        anchor={anchorRect}
-        mine={mine}
-        onPick={(emoji) => react(m, emoji)}
-        onClose={() => setPicker(false)}
-      />
+      {/* Mounted from the first open on (so it can still animate out), not
+          once per bubble up front — sixty idle pickers is sixty storage reads. */}
+      {anchorRect && (
+        <ReactionBar
+          open={picker}
+          anchor={anchorRect}
+          mine={mine}
+          onPick={(emoji) => react(m, emoji)}
+          onClose={() => setPicker(false)}
+        />
+      )}
     </>
   );
 }
 
-export default memo(MessageBubble);
+/**
+ * A conversation object is replaced whenever anything about the room changes
+ * — a new last message, an unread count — which re-rendered every bubble for
+ * each arrival. Compare only the handful of room fields a bubble reads.
+ */
+function sameBubble(a: Props, b: Props) {
+  return (
+    a.message === b.message &&
+    a.meId === b.meId &&
+    a.runStart === b.runStart &&
+    a.showAvatar === b.showAvatar &&
+    a.eager === b.eager &&
+    a.animateIn === b.animateIn &&
+    a.onJumpTo === b.onJumpTo &&
+    a.conversation.id === b.conversation.id &&
+    a.conversation.type === b.conversation.type &&
+    a.conversation.disappearAfter === b.conversation.disappearAfter &&
+    a.conversation.pins === b.conversation.pins &&
+    a.conversation.members.length === b.conversation.members.length
+  );
+}
+
+export default memo(MessageBubble, sameBubble);

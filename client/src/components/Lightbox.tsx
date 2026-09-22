@@ -1,20 +1,37 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUi } from '@/stores/ui';
 import { useChat } from '@/stores/chat';
 import { post } from '@/lib/api';
 import { clock } from '@/lib/format';
 import { IconClose, IconDownload, IconWarning } from '@/components/Icon';
-import { spring } from '@/lib/motion';
+import { spring, ease } from '@/lib/motion';
 import { safeUrl } from '@/lib/config';
 
 export default function Lightbox() {
-  const { lightbox, setLightbox } = useUi();
-  const { messages, activeId } = useChat();
+  const lightbox = useUi((s) => s.lightbox);
+  const setLightbox = useUi((s) => s.setLightbox);
+  // Just the one message: a whole-store read re-rendered this on every
+  // typing blip even while closed.
+  const message = useChat((s) =>
+    lightbox ? (s.messages[s.activeId || ''] || []).find((m) => m.id === lightbox.messageId) : null
+  );
 
-  const message = lightbox
-    ? (messages[activeId || ''] || []).find((m) => m.id === lightbox.messageId)
-    : null;
+  /**
+   * Where the picture was on screen, so it can grow out of its bubble and
+   * shrink back into it rather than appearing from nowhere. Measured once per
+   * open; if the bubble is not in view it simply zooms from the centre.
+   */
+  const origin = useMemo(() => {
+    const el = lightbox && document.querySelector(`#m-${CSS.escape(lightbox.messageId)} .media-frame`);
+    const r = el?.getBoundingClientRect();
+    if (!r || r.bottom < 0 || r.top > window.innerHeight) return { x: 0, y: 0, scale: 0.94 };
+    return {
+      x: r.left + r.width / 2 - window.innerWidth / 2,
+      y: r.top + r.height / 2 - window.innerHeight / 2,
+      scale: Math.min(0.9, Math.max(0.2, r.width / (window.innerWidth * 0.8))),
+    };
+  }, [lightbox?.messageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!lightbox) return;
@@ -49,8 +66,8 @@ export default function Lightbox() {
         <motion.div
           className={isSnap ? 'snap-view' : 'lightbox'}
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { duration: 0.2, ease: ease.out } }}
+          exit={{ opacity: 0, transition: { duration: 0.2, ease: ease.in } }}
           role="dialog"
           aria-modal="true"
           aria-label={isSnap ? 'Snap' : 'Media'}
@@ -91,9 +108,9 @@ export default function Lightbox() {
 
           <motion.div
             className="lightbox-stage"
-            initial={{ scale: 0.94, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={spring}
+            initial={{ ...origin, opacity: 0 }}
+            animate={{ x: 0, y: 0, scale: 1, opacity: 1, transition: spring }}
+            exit={{ ...origin, opacity: 0, transition: { duration: 0.2, ease: ease.in } }}
           >
             {message.media.mime?.startsWith('video/') ? (
               <video src={safeUrl(message.media.url)} controls autoPlay playsInline />

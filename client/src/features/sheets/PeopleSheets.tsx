@@ -22,8 +22,12 @@ import {
 /* ── new conversation ─────────────────────────────────────────────────────── */
 
 export function NewChatSheet() {
-  const { sheet, closeSheet, openSheet, toast } = useUi();
-  const { openDirect, setActive } = useChat();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const openSheet = useUi((s) => s.openSheet);
+  const toast = useUi((s) => s.toast);
+  const openDirect = useChat((s) => s.openDirect);
+  const setActive = useChat((s) => s.setActive);
   const { send: sendRequest, accept } = useFriends();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Person[]>([]);
@@ -158,8 +162,11 @@ export function NewChatSheet() {
 /* ── new group ────────────────────────────────────────────────────────────── */
 
 export function NewGroupSheet() {
-  const { sheet, closeSheet, toast } = useUi();
-  const { createGroup, setActive } = useChat();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const toast = useUi((s) => s.toast);
+  const createGroup = useChat((s) => s.createGroup);
+  const setActive = useChat((s) => s.setActive);
   const [name, setName] = useState('');
   const [q, setQ] = useState('');
   const [people, setPeople] = useState<Person[]>([]);
@@ -274,8 +281,13 @@ export function NewGroupSheet() {
 /* ── forward ──────────────────────────────────────────────────────────────── */
 
 export function ForwardSheet() {
-  const { sheet, sheetPayload, closeSheet, toast } = useUi();
-  const { conversations, order, forward } = useChat();
+  const sheet = useUi((s) => s.sheet);
+  const sheetPayload = useUi((s) => s.sheetPayload);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const toast = useUi((s) => s.toast);
+  const conversations = useChat((s) => s.conversations);
+  const order = useChat((s) => s.order);
+  const forward = useChat((s) => s.forward);
   const [picked, setPicked] = useState<string[]>([]);
   const open = sheet === 'forward';
 
@@ -337,8 +349,10 @@ export function ForwardSheet() {
 /* ── search across everything ─────────────────────────────────────────────── */
 
 export function SearchSheet() {
-  const { sheet, closeSheet } = useUi();
-  const { conversations, setActive } = useChat();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const conversations = useChat((s) => s.conversations);
+  const setActive = useChat((s) => s.setActive);
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Message[]>([]);
   const [busy, setBusy] = useState(false);
@@ -407,8 +421,10 @@ export function SearchSheet() {
 /* ── starred ──────────────────────────────────────────────────────────────── */
 
 export function StarredSheet() {
-  const { sheet, closeSheet } = useUi();
-  const { conversations, setActive } = useChat();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const conversations = useChat((s) => s.conversations);
+  const setActive = useChat((s) => s.setActive);
   const [items, setItems] = useState<Message[]>([]);
   const open = sheet === 'starred';
 
@@ -451,8 +467,9 @@ export function StarredSheet() {
 /* ── call history ─────────────────────────────────────────────────────────── */
 
 export function CallsSheet() {
-  const { sheet, closeSheet } = useUi();
-  const { setActive } = useChat();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const setActive = useChat((s) => s.setActive);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const open = sheet === 'calls';
 
@@ -508,8 +525,11 @@ export function CallsSheet() {
  * sent to the wrong person can be taken back.
  */
 export function RequestsSheet() {
-  const { sheet, closeSheet, toast } = useUi();
-  const { openDirect, setActive } = useChat();
+  const sheet = useUi((s) => s.sheet);
+  const closeSheet = useUi((s) => s.closeSheet);
+  const toast = useUi((s) => s.toast);
+  const openDirect = useChat((s) => s.openDirect);
+  const setActive = useChat((s) => s.setActive);
   const { incoming, outgoing, load, accept, decline, cancel } = useFriends();
   const [busy, setBusy] = useState('');
   const open = sheet === 'requests';
