@@ -21,7 +21,8 @@ export type SheetKind =
   | 'room'
   | 'folders'
   | 'scheduled'
-  | 'media';
+  | 'media'
+  | 'chat-search';
 
 interface Toast {
   id: number;
@@ -74,6 +75,18 @@ interface UiState {
   dropToast: (id: number) => void;
   setLightbox: (v: { messageId: string; onClose?: () => void } | null) => void;
   setWallpaperDraft: (v: UiState['wallpaperDraft']) => void;
+
+  /**
+   * A message a search result asked the open conversation to scroll to.
+   *
+   * A request rather than a direct call because the conversation may not be
+   * mounted yet (a global result opens it first) and the message may not be
+   * loaded yet (it could be months back) — Conversation owns both of those.
+   * `n` makes tapping the same result twice a new request.
+   */
+  jump: { conversationId: string; messageId: string; n: number } | null;
+  requestJump: (conversationId: string, messageId: string) => void;
+  clearJump: () => void;
 }
 
 const KEY = 'nook.ui';
@@ -113,6 +126,7 @@ export const useUi = create<UiState>((set, get) => ({
   toasts: [],
   lightbox: null,
   wallpaperDraft: null,
+  jump: null,
 
   setTheme(theme) {
     applyTheme(theme, get().accent);
@@ -138,6 +152,10 @@ export const useUi = create<UiState>((set, get) => ({
   dropToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   setWallpaperDraft: (wallpaperDraft) => set({ wallpaperDraft }),
+
+  requestJump: (conversationId, messageId) =>
+    set((s) => ({ jump: { conversationId, messageId, n: (s.jump?.n || 0) + 1 } })),
+  clearJump: () => set({ jump: null }),
 
   setLightbox: (lightbox) => {
     // Closing runs the callback the opener left behind, exactly once.

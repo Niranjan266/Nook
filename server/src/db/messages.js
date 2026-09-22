@@ -180,44 +180,129 @@ export async function listThread({ rootId, userId, limit = 200 }) {
 }
 
 /**
- * Full-text search through FTS5.
+ * What each search filter means, as SQL over `m`.
  *
- * A genuine upgrade on the old regex scan: ranked by relevance, prefix-matched,
- * and it uses an index instead of reading every row.
+ * Photos and videos need their media: an unsent or burnt message keeps its
+ * type but not its file, and a grid tile with nothing in it is a bug report.
+ * Links match on the preview *or* the body, because previews are fetched
+ * after the fact and some sites never answer.
  */
-export async function searchMessages({ userId, query, conversationId, limit = 60 }) {
+export const SEARCH_KINDS = {
+  photos: "m.type = 'image' AND m.media IS NOT NULL",
+  videos: "m.type = 'video' AND m.media IS NOT NULL",
+  voice: "m.type IN ('voice', 'audio') AND m.media IS NOT NULL",
+  files: "m.type = 'file' AND m.media IS NOT NULL",
+  links:
+    "(m.link_preview IS NOT NULL OR m.body LIKE '%http://%' OR m.body LIKE '%https://%' OR m.body LIKE '%www.%')",
+};
+
+/** Opaque to the client: newest-first position as `createdAt:id`. */
+export const encodeCursor = (m) => `${new Date(m.createdAt).getTime()}:${m._id}`;
+function decodeCursor(cursor) {
+  const [at, id] = String(cursor || '').split(':');
+  const t = Number(at);
+  return Number.isFinite(t) && id && /^[\w-]{1,64}$/.test(id) ? { t, id } : null;
+}
+
+/**
+ * Search with filters, newest first, a page at a time.
+ *
+ * Text goes through FTS5 — prefix-matched and index-backed, never a scan of
+ * every body — and the filters narrow it from there. With no text, a type or
+ * sender filter alone walks the conversation indexes instead.
+ *
+ * Recency rather than FTS rank: a filtered search pages, and rank has no
+ * stable "after this one" to resume from. Chat search is nearly always "the
+ * one from last week" anyway.
+ *
+ * Everything a viewer must not see is excluded here, not after the LIMIT —
+ * filtering a page after it is cut leaves holes, and a short page reads as
+ * the end of the results. Snaps go entirely, caption and all: their media
+ * was never the viewer's to browse. `excludeConversationIds` carries the
+ * locked chats, which only the route can decide (unlocks live in memory).
+ */
+export async function searchFiltered({
+  userId,
+  query = '',
+  conversationId = null,
+  kind = null,
+  from = null,
+  before = null,
+  after = null,
+  cursor = null,
+  excludeConversationIds = [],
+  limit = 30,
+}) {
+  const where = [
+    'm.deleted_for_all = 0',
+    'm.delivered = 1',
+    'm.view_once = 0',
+    "m.type NOT IN ('snap', 'call', 'system')",
+    // A kept message outlives its timer (see deleteExpired), so it stays findable.
+    "(m.expires_at IS NULL OR m.expires_at > ? OR m.saved_by != '')",
+    // IN rather than EXISTS so SQLite can walk each conversation's index.
+    'm.conversation_id IN (SELECT cm.conversation_id FROM conversation_members cm WHERE cm.user_id = ?)',
+    'NOT EXISTS (SELECT 1 FROM message_deletions d WHERE d.message_id = m.id AND d.user_id = ?)',
+  ];
+  const args = [Date.now(), userId, userId];
+  let join = '';
+
   // FTS5 treats punctuation as syntax; strip it and prefix-match each term.
-  const terms = query
+  const terms = String(query || '')
     .replace(/["'()*:^-]/g, ' ')
     .split(/\s+/)
     .filter(Boolean)
+    .slice(0, 8)
     .map((t) => `"${t}"*`)
     .join(' AND ');
-  if (!terms) return [];
+  if (terms) {
+    join = 'JOIN messages_fts f ON f.rowid = m.rowid';
+    where.push('messages_fts MATCH ?');
+    args.push(terms);
+  }
 
-  const scope = conversationId ? 'AND m.conversation_id = ?' : '';
-  const args = [terms, userId, userId];
-  if (conversationId) args.push(conversationId);
-  args.push(limit);
+  if (conversationId) {
+    where.push('m.conversation_id = ?');
+    args.push(conversationId);
+  }
+  if (excludeConversationIds.length) {
+    where.push(`m.conversation_id NOT IN (${placeholders(excludeConversationIds)})`);
+    args.push(...excludeConversationIds);
+  }
+  if (kind && SEARCH_KINDS[kind]) where.push(SEARCH_KINDS[kind]);
+  if (from) {
+    where.push('m.sender_id = ?');
+    args.push(from);
+  }
+  if (Number.isFinite(before)) {
+    where.push('m.created_at < ?');
+    args.push(before);
+  }
+  if (Number.isFinite(after)) {
+    where.push('m.created_at >= ?');
+    args.push(after);
+  }
+  const at = decodeCursor(cursor);
+  if (at) {
+    where.push('(m.created_at < ? OR (m.created_at = ? AND m.id < ?))');
+    args.push(at.t, at.t, at.id);
+  }
 
+  // One extra row says whether there is another page without a COUNT(*).
+  args.push(limit + 1);
   const rows = await all(
     `${SENDER_JOIN}
-       JOIN messages_fts f ON f.rowid = m.rowid
-      WHERE messages_fts MATCH ?
-        AND m.deleted_for_all = 0
-        AND m.delivered = 1
-        AND EXISTS (SELECT 1 FROM conversation_members cm
-                     WHERE cm.conversation_id = m.conversation_id AND cm.user_id = ?)
-        AND NOT EXISTS (SELECT 1 FROM message_deletions d WHERE d.message_id = m.id AND d.user_id = ?)
-        ${scope}
-      ORDER BY rank
+       ${join}
+      WHERE ${where.join('\n        AND ')}
+      ORDER BY m.created_at DESC, m.id DESC
       LIMIT ?`,
     args
   );
 
-  const messages = rows.map(baseMessage);
+  const more = rows.length > limit;
+  const messages = rows.slice(0, limit).map(baseMessage);
   await attachChildren(messages);
-  return messages;
+  return { messages, nextCursor: more && messages.length ? encodeCursor(messages[messages.length - 1]) : null };
 }
 
 export async function listStarred(userId, limit = 100) {

@@ -56,6 +56,34 @@
     display: grid;
   }
 }
+/* Four round buttons beside the back arrow leave a phone no room for the
+   name. Search is also in the details sheet, so it is the one that goes. */
+@media (max-width: 460px) {
+  .chat-head-actions.has-calls .chat-head-search {
+    display: none;
+  }
+}
+
+/* A message a search jumped to: a brief wash behind the row. */
+.m-flash {
+  border-radius: var(--r-clay-sm);
+  animation: m-flash 1.8s var(--ease-out);
+}
+@keyframes m-flash {
+  0%,
+  35% {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-flash {
+    animation: none;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+}
 
 /* ── the wallpaper layer ────────────────────────────────────────────────── */
 

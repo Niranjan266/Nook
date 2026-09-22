@@ -18,6 +18,7 @@ import {
   IconVideo,
   IconPlus,
 } from '@/components/Icon';
+import { useMessageSearch, SearchBox, SearchChips, SearchResults, openResult, type SearchKind } from './MessageSearch';
 
 /* ── new conversation ─────────────────────────────────────────────────────── */
 
@@ -351,69 +352,31 @@ export function ForwardSheet() {
 export function SearchSheet() {
   const sheet = useUi((s) => s.sheet);
   const closeSheet = useUi((s) => s.closeSheet);
-  const conversations = useChat((s) => s.conversations);
-  const setActive = useChat((s) => s.setActive);
   const [q, setQ] = useState('');
-  const [results, setResults] = useState<Message[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [kind, setKind] = useState<SearchKind>('all');
   const open = sheet === 'search';
 
   useEffect(() => {
     if (!open) {
       setQ('');
-      setResults([]);
+      setKind('all');
     }
   }, [open]);
 
-  useEffect(() => {
-    if (q.trim().length < 2) return setResults([]);
-    setBusy(true);
-    const t = setTimeout(() => {
-      get<{ results: Message[] }>(`/messages/search/all?q=${encodeURIComponent(q)}`)
-        .then((r) => setResults(r.results))
-        .catch(() => {})
-        .finally(() => setBusy(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [q]);
+  const state = useMessageSearch({ open, q, kind });
 
   return (
     <Sheet open={open} onClose={closeSheet} title="Search messages">
-      <label className="field" style={{ position: 'relative' }}>
-        <IconSearch size={17} style={{ position: 'absolute', left: 14, top: 15, color: 'var(--ink-faint)' }} />
-        <input
-          className="groove"
-          style={{ paddingLeft: 40 }}
-          placeholder="What are you looking for?"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </label>
-
-      <div className="sheet-section">
-        {busy && <p className="small muted">Looking…</p>}
-        {results.map((m) => {
-          const c = conversations[m.conversationId];
-          return (
-            <button
-              key={m.id}
-              className="list-row"
-              onClick={() => {
-                setActive(m.conversationId);
-                closeSheet();
-              }}
-            >
-              <Avatar name={c?.name || '?'} src={c?.avatarUrl} id={m.conversationId} size={38} square={c?.type === 'group'} />
-              <span className="grow">
-                <span className="list-row-label truncate">{c?.name || 'Conversation'}</span>
-                <span className="list-row-sub truncate">{previewOf(m)}</span>
-              </span>
-              <span className="tiny faint tabular">{stamp(m.createdAt)}</span>
-            </button>
-          );
-        })}
-        {!busy && q.length >= 2 && !results.length && <p className="small muted">Nothing matched.</p>}
-      </div>
+      <SearchBox value={q} onChange={setQ} placeholder="What are you looking for?" />
+      <SearchChips kind={kind} onChange={setKind} />
+      <SearchResults
+        state={state}
+        query={q}
+        kind={kind}
+        scope="all"
+        onPick={openResult}
+        idleHint="Type at least two letters, or pick a filter to browse every chat."
+      />
     </Sheet>
   );
 }

@@ -223,6 +223,15 @@ export async function listConversationsFor(userId, limit = 200) {
   return hydrateConversations(rows);
 }
 
+/** Chats this person has put a code on. Whether they are open right now is lockgrants' call. */
+export const lockedConversationIdsFor = async (userId) =>
+  (
+    await all(
+      "SELECT conversation_id FROM conversation_members WHERE user_id = ? AND locked = 1 AND lock_hash != ''",
+      [userId]
+    )
+  ).map((r) => String(r.conversation_id));
+
 export async function memberIdsOf(conversationId, exceptUserId) {
   const rows = await all('SELECT user_id FROM conversation_members WHERE conversation_id = ?', [
     conversationId,

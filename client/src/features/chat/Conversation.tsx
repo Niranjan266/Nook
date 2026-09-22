@@ -18,6 +18,7 @@ import {
   IconPhone,
   IconVideo,
   IconMore,
+  IconSearch,
   IconDown,
   IconClock,
   IconLock,
@@ -189,7 +190,52 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
       [{ filter: 'brightness(1)' }, { filter: 'brightness(1.14)' }, { filter: 'brightness(1)' }],
       { duration: 1100 }
     );
+    // A wash behind the row too: brightness alone is lost on a busy wallpaper,
+    // and after a search you need to see *which* bubble it was.
+    node.classList.remove('m-flash');
+    void node.offsetWidth;
+    node.classList.add('m-flash');
+    window.setTimeout(() => node.classList.remove('m-flash'), 1800);
   }, []);
+
+  /**
+   * A search result asked for a message. It may be months back, so walk the
+   * history a page at a time until it is loaded, widen the window over it,
+   * and only then scroll — jumpTo can only find what is in the DOM.
+   */
+  const jump = useUi((s) => (s.jump?.conversationId === conversation.id ? s.jump : null));
+  useEffect(() => {
+    if (!jump) return;
+    let cancelled = false;
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    (async () => {
+      // Forty pages of forty is well past anything someone scrolls to by hand.
+      for (let page = 0; page < 40 && !cancelled; page++) {
+        const chat = useChat.getState();
+        const loaded = chat.messages[conversation.id] || NO_MESSAGES;
+        const index = loaded.findIndex((m) => m.id === jump.messageId);
+        if (index >= 0) {
+          setWindowSize((n) => Math.max(n, loaded.length - index + 10));
+          await frame();
+          if (!cancelled) jumpTo(jump.messageId);
+          break;
+        }
+        if (chat.loading[conversation.id]) {
+          await new Promise((r) => setTimeout(r, 120));
+          continue;
+        }
+        if (chat.hasMore[conversation.id] === false) {
+          useUi.getState().toast('That message is no longer in this chat.');
+          break;
+        }
+        await loadMessages(conversation.id, { more: true });
+      }
+      if (!cancelled) useUi.getState().clearJump();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jump?.n, conversation.id]);
 
   /**
    * In a direct chat the wallpaper belongs to both people, so choosing one
@@ -357,7 +403,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
           </span>
         </button>
 
-        <div className="chat-head-actions">
+        <div className={`chat-head-actions${conversation.type === 'direct' && conversation.partner ? ' has-calls' : ''}`}>
           {conversation.disappearAfter > 0 && (
             <span className="clay-round" style={{ width: 38, height: 38, color: 'var(--ochre-deep)' }} title="Disappearing messages are on">
               <IconClock size={18} />
@@ -385,6 +431,9 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
               </button>
             </>
           )}
+          <button className="clay-round chat-head-search" onClick={() => openSheet('chat-search')} aria-label="Search this chat">
+            <IconSearch />
+          </button>
           <button className="clay-round" onClick={() => openSheet('chat-info')} aria-label="Conversation details">
             <IconMore />
           </button>

@@ -30,6 +30,7 @@ import {
   IconPlus,
   IconCheck,
   IconRefresh,
+  IconSearch,
 } from '@/components/Icon';
 
 const TIMERS = [0, 3600, 86400, 604800, 2592000];
@@ -179,6 +180,14 @@ export default function ChatInfoSheet() {
             <span className="list-row-sub">
               Mood, the wall, time of day, and every wallpaper it has worn
             </span>
+          </span>
+        </button>
+
+        <button className="list-row" onClick={() => openSheet('chat-search')}>
+          <IconSearch size={19} />
+          <span className="grow">
+            <span className="list-row-label">Search in this chat</span>
+            <span className="list-row-sub">Words, photos, links, voice notes, or one person</span>
           </span>
         </button>
 

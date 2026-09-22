@@ -150,6 +150,7 @@ const loadRoom = () => import('@/features/sheets/RoomSheet');
 const loadFolders = () => import('@/features/sheets/FoldersSheet');
 const loadScheduled = () => import('@/features/sheets/ScheduledSheet');
 const loadMedia = () => import('@/features/sheets/MediaSheet');
+const loadSearch = () => import('@/features/sheets/MessageSearch');
 const loadThread = () => import('@/features/chat/ThreadPanel');
 
 const NewChatSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.NewChatSheet })));
@@ -166,6 +167,7 @@ const RoomSheet = lazyChunk(loadRoom);
 const FoldersSheet = lazyChunk(loadFolders);
 const ScheduledSheet = lazyChunk(loadScheduled);
 const MediaSheet = lazyChunk(loadMedia);
+const ChatSearchSheet = lazyChunk(loadSearch);
 const ThreadPanel = lazyChunk(loadThread);
 const FrontDoor = lazyChunk(() => import('@/features/auth/FrontDoor'));
 const GuestDoor = lazyChunk(() => import('@/features/auth/GuestDoor'));
@@ -180,6 +182,7 @@ const warmSheets = () =>
     loadFolders,
     loadScheduled,
     loadMedia,
+    loadSearch,
     loadThread
   );
 
@@ -432,6 +435,7 @@ function Nook() {
           <FoldersSheet />
           <ScheduledSheet />
           <MediaSheet />
+          <ChatSearchSheet />
         </Suspense>
       )}
 

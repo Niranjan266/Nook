@@ -540,3 +540,12 @@ CREATE TABLE IF NOT EXISTS media_uploads (
 -- custom sound, and old APKs stay installed for months — so the app says what
 -- it has when it registers, and old rows default to the v1 channels.
 ALTER TABLE push_devices ADD COLUMN channels INTEGER NOT NULL DEFAULT 1;
+
+-- Filtered search.
+--
+-- "Photos in this chat" or "everything Sam sent" with no text to match has no
+-- FTS row to start from, so without these it read the whole conversation to
+-- find a handful of rows. Both end in created_at because results page newest
+-- first, and the order can then come straight off the index.
+CREATE INDEX IF NOT EXISTS idx_messages_kind ON messages (conversation_id, type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (conversation_id, sender_id, created_at DESC);

@@ -196,22 +196,59 @@ router.post(
    FTS5: ranked, prefix-matched, index-backed. The old version was a regex
    scan over every message body.                                           */
 
+/** A date filter as ms, from either an ISO string or a number. */
+const when = z
+  .union([z.coerce.number().int().nonnegative(), z.string().max(40).transform((s) => Date.parse(s))])
+  .refine((n) => Number.isFinite(n), 'That date is not readable.')
+  .optional();
+
+const searchQuery = z.object({
+  q: z.string().max(200).optional().default(''),
+  conversationId: z.string().max(64).optional(),
+  type: z.enum(['all', 'photos', 'videos', 'voice', 'files', 'links']).optional().default('all'),
+  from: z.string().max(64).optional(),
+  before: when,
+  after: when,
+  cursor: z.string().max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(60).optional().default(30),
+});
+
 router.get(
   '/search/all',
   asyncRoute(async (req, res) => {
-    const q = String(req.query.q || '').trim();
-    if (q.length < 2) return res.json({ results: [] });
+    const f = searchQuery.parse(req.query);
+    const q = f.q.trim();
+    const kind = f.type === 'all' ? null : f.type;
 
-    const found = await M.searchMessages({
+    // A single letter matches half the history; it only counts beside a
+    // filter, where the filter is doing the narrowing.
+    const text = q.length >= 2 ? q : '';
+    if (!text && !kind && !f.from) return res.json({ results: [], nextCursor: null });
+
+    // Aimed at one chat: be a member, and have it open. Search was the
+    // easiest way past the lock — point it at the locked conversation and
+    // page the contents out by guessing common words.
+    if (f.conversationId) await mustBeUnlocked(f.conversationId, req.user.id);
+
+    // Everywhere else, locked chats are left out in SQL rather than dropped
+    // from the page afterwards, so a page is never short for a hidden reason.
+    const locked = (await C.lockedConversationIdsFor(req.user.id)).filter((cid) => !hasUnlock(req.user.id, cid));
+
+    const { messages, nextCursor } = await M.searchFiltered({
       userId: req.user.id,
-      query: q,
-      conversationId: req.query.conversationId || null,
+      query: text,
+      conversationId: f.conversationId || null,
+      kind,
+      from: f.from || null,
+      before: f.before,
+      after: f.after,
+      cursor: f.cursor || null,
+      excludeConversationIds: locked,
+      limit: f.limit,
     });
-    // Search was the easiest way past the lock: point it at the locked
-    // conversation with `?conversationId=` and page the contents out by
-    // guessing common words.
-    const results = await dropLocked(found, req.user.id);
-    res.json({ results: results.map((m) => serializeMessage(m, req.user.id)) });
+    // Belt and braces: an unlock can lapse between the two queries.
+    const results = await dropLocked(messages, req.user.id);
+    res.json({ results: results.map((m) => serializeMessage(m, req.user.id)), nextCursor });
   })
 );
 
