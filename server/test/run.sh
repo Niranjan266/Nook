@@ -47,6 +47,8 @@ export TURN_URL=
 # Reminders fire on a scheduler tick; a second keeps the firing test short
 # without touching the send-later clock the other suites run against.
 export REMINDER_TICK_MS=1000
+# All suites sign up from 127.0.0.1; together they exceed the real limit.
+export AUTH_RATE_LIMIT_MAX=1000
 
 rm -f "$DB"*
 node src/index.js > $LOG 2>&1 &

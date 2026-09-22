@@ -23,7 +23,9 @@ const router = Router();
 
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 40,
+  // Tests raise this: every suite signs its people up from the same address,
+  // and fifteen suites together pass forty. Unset everywhere else.
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX) || 40,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many attempts. Give it ten minutes.' },
