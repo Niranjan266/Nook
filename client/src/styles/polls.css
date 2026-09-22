@@ -1,0 +1,391 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Polls and shared lists — the cards inside a bubble, and the builder sheet.
+
+   Imported by the components that use it (as tour.css is), so it travels in
+   the same chunk as them.
+
+   Everything inside a card is drawn in currentColor mixes rather than named
+   tokens, so one set of rules reads on a clay bubble, on your own accent
+   bubble, and in both themes without an override per case.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Non-text payloads need a shelf for the timestamp, as snaps and calls do. */
+.bubble:has(.poll-card, .list-card) {
+  padding-bottom: 24px;
+}
+
+.poll-card,
+.list-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* A bubble shrinks to its content, so a percentage has nothing to be a
+     percentage of. Tied to the viewport instead: full width on a desktop,
+     and still clear of the avatar gutter on a 360px phone. */
+  width: min(300px, calc(78vw - 64px));
+  padding-top: 2px;
+}
+
+.poll-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-xs);
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.poll-question {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-md);
+  line-height: 1.3;
+}
+
+.poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.poll-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  overflow: hidden;
+  isolation: isolate;
+  text-align: left;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.poll-option:hover:not([aria-disabled='true']) {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.poll-option:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.poll-option[aria-disabled='true'] {
+  cursor: default;
+}
+
+/* The result itself: a bar sliding in behind the text. */
+.poll-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.poll-option.picked .poll-bar {
+  background: color-mix(in srgb, currentColor 26%, transparent);
+}
+.poll-option.top {
+  font-weight: 600;
+}
+
+/* A round mark for pick-one, a square for pick-any — the cue a paper form
+   gives, so nobody has to read the small print to know which this is. */
+.poll-mark {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+.poll-mark.square {
+  border-radius: 5px;
+}
+.poll-option.picked .poll-mark,
+.list-item.checked .poll-mark {
+  opacity: 1;
+  background: currentColor;
+}
+.poll-option.picked .poll-mark svg,
+.list-item.checked .poll-mark svg {
+  color: var(--clay-raised);
+}
+.msg.mine .poll-option.picked .poll-mark svg,
+.msg.mine .list-item.checked .poll-mark svg {
+  color: var(--accent);
+}
+
+.poll-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-sm);
+  line-height: 1.35;
+}
+
+.poll-voters {
+  display: inline-flex;
+  flex: none;
+}
+.poll-voter {
+  display: inline-grid;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--clay-raised);
+}
+.msg.mine .poll-voter {
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
+.poll-voter + .poll-voter {
+  margin-left: -6px;
+}
+
+.poll-count {
+  flex: none;
+  min-width: 34px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  opacity: 0.85;
+}
+
+.poll-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--t-xs);
+  opacity: 0.85;
+}
+
+/* A small slab: closing is deliberate and cannot be undone, so it gets the
+   material of things you press — at a size that stays out of the way. */
+.poll-close {
+  padding: 4px 10px;
+  border: 2px solid currentColor;
+  border-radius: var(--r-slab);
+  box-shadow: 2px 2px 0 currentColor;
+  color: inherit;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-xs);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.poll-close:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 currentColor;
+}
+.poll-close:disabled {
+  opacity: 0.5;
+}
+
+.poll-card.closed .poll-option {
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+/* ── list ───────────────────────────────────────────────────────────────── */
+
+.list-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+.list-tick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 6px;
+  border-radius: 9px;
+  text-align: left;
+  color: inherit;
+}
+.list-tick:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.list-tick:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+.list-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.list-label {
+  font-size: var(--t-sm);
+  line-height: 1.35;
+}
+.list-item.checked .list-label {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  opacity: 0.6;
+}
+.list-by {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.list-remove {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: inherit;
+  opacity: 0.55;
+}
+.list-remove:hover,
+.list-remove:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.list-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 3px 3px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.list-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--t-sm);
+}
+.list-add input::placeholder {
+  color: inherit;
+  opacity: 0.6;
+}
+.list-add input:focus {
+  outline: none;
+}
+.list-add:focus-within {
+  box-shadow: 0 0 0 2px currentColor;
+}
+.list-add-btn {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.list-add-btn:disabled {
+  opacity: 0.4;
+}
+
+/* ── the builder sheet ──────────────────────────────────────────────────── */
+
+.builder {
+  gap: var(--s-4);
+}
+.builder-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.builder-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.builder-line .groove {
+  padding: 11px 14px;
+}
+.builder-remove {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--ink-soft);
+}
+.builder-remove:hover,
+.builder-remove:focus-visible {
+  color: var(--rust);
+  background: var(--clay-sunk);
+}
+.builder-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r-clay-sm);
+  color: var(--accent-deep);
+  font-weight: 600;
+  font-size: var(--t-sm);
+}
+.builder-add:hover {
+  background: var(--clay-sunk);
+}
+.builder-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.builder-close {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: var(--r-clay-sm);
+  background: var(--clay-surface);
+  box-shadow: var(--clay-1);
+}
+.builder-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.builder-chip {
+  padding: 6px 11px;
+  border-radius: var(--r-pill);
+  background: var(--clay-sunk);
+  box-shadow: var(--clay-in);
+  color: var(--ink-soft);
+  font-size: var(--t-xs);
+  font-weight: 500;
+}
+.builder-chip.on {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+}
+
+/* The bars and list rows already skip their animation in JS; this covers the
+   small CSS transitions the same setting should quiet. */
+@media (prefers-reduced-motion: reduce) {
+  .poll-option,
+  .poll-close,
+  .list-tick {
+    transition: none;
+  }
+}

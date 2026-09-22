@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChat } from '@/stores/chat';
 import { useFriends } from '@/stores/friends';
@@ -30,7 +30,10 @@ import {
   IconSun,
   IconLock,
   IconSticker,
+  IconPoll,
+  IconChecklist,
 } from '@/components/Icon';
+import PollBuilder, { type BuilderKind, type BuiltPoll, type BuiltList } from './PollBuilder';
 
 interface Props {
   conversationId: string;
@@ -78,6 +81,9 @@ export default function Composer({ conversationId }: Props) {
   const [snapMode, setSnapMode] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
   const [snapFile, setSnapFile] = useState<File | null>(null);
+  const [builder, setBuilder] = useState<BuilderKind | null>(null);
+  // Stable, because the sheet re-arms its keyboard handling whenever this changes.
+  const closeBuilder = useCallback(() => setBuilder(null), []);
   const [uploading, setUploading] = useState<{ name: string; pct: number } | null>(null);
 
   // Mounted from the first open onward, so closing still plays the exit.
@@ -186,7 +192,14 @@ export default function Composer({ conversationId }: Props) {
   async function submit(scheduledFor?: string) {
     const body = text.trim();
     if (editing) {
-      if (body && body !== editing.body) await edit(editing, body);
+      // A poll that has picked up votes since the edit began is refused by
+      // the server; say so instead of letting the rejection vanish.
+      try {
+        if (body && body !== editing.body) await edit(editing, body);
+      } catch (err: any) {
+        toast(err?.message || 'Could not save that edit.', true);
+        return;
+      }
       setEditing(null);
       setText('');
       return;
@@ -201,6 +214,15 @@ export default function Composer({ conversationId }: Props) {
       // Slow mode and blocks both land here with a readable reason.
       toast(err?.message || 'Could not send that.', true);
       setText(body);
+    }
+  }
+
+  /** A finished poll or list from the builder sheet. Replies carry over like text. */
+  async function sendBuilt(built: BuiltPoll | BuiltList) {
+    try {
+      await send({ conversationId, ...built, replyTo: replyTo?.id || null });
+    } catch (err: any) {
+      toast(err?.message || 'Could not send that.', true);
     }
   }
 
@@ -646,6 +668,32 @@ export default function Composer({ conversationId }: Props) {
                     <span className="list-row-label">Document</span>
                   </span>
                 </button>
+                <button
+                  className="list-row"
+                  onClick={() => {
+                    setBuilder('poll');
+                    setAttachOpen(false);
+                  }}
+                >
+                  <IconPoll size={18} />
+                  <span className="grow">
+                    <span className="list-row-label">Poll</span>
+                    <span className="list-row-sub">Ask everyone to pick</span>
+                  </span>
+                </button>
+                <button
+                  className="list-row"
+                  onClick={() => {
+                    setBuilder('list');
+                    setAttachOpen(false);
+                  }}
+                >
+                  <IconChecklist size={18} />
+                  <span className="grow">
+                    <span className="list-row-label">Shared list</span>
+                    <span className="list-row-sub">Anyone can add and tick things off</span>
+                  </span>
+                </button>
               </motion.div>
             )}
 
@@ -892,6 +940,8 @@ export default function Composer({ conversationId }: Props) {
           />
         </Suspense>
       )}
+
+      <PollBuilder kind={builder} onClose={closeBuilder} onSend={sendBuilt} />
 
       {camUsed && (
         <Suspense fallback={null}>

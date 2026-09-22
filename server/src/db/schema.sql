@@ -603,3 +603,56 @@ CREATE TABLE IF NOT EXISTS stickers (
 );
 
 CREATE INDEX IF NOT EXISTS idx_stickers_user ON stickers (user_id, sort_order DESC);
+
+-- ─── Polls and shared lists ─────────────────────────────────────────────────
+--
+-- The question (or the list's title) lives in `messages.body`, so search,
+-- previews and the edit path all see it without learning a new column. These
+-- tables hold only what a message body cannot.
+--
+-- Votes get a row each, keyed on (message, option, person), rather than a JSON
+-- tally on the poll. Two people tapping at once — or one person tapping twice —
+-- would both read the same tally and both write it back, and a vote would
+-- vanish. A primary key and ON CONFLICT make that impossible in one statement.
+CREATE TABLE IF NOT EXISTS polls (
+  message_id TEXT PRIMARY KEY REFERENCES messages (id) ON DELETE CASCADE,
+  multiple   INTEGER NOT NULL DEFAULT 0,
+  anonymous  INTEGER NOT NULL DEFAULT 0,
+  closes_at  INTEGER,                                -- null = open until closed
+  closed_at  INTEGER,
+  closed_by  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS poll_options (
+  id         TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL REFERENCES messages (id) ON DELETE CASCADE,
+  position   INTEGER NOT NULL,
+  text       TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_poll_options_message ON poll_options (message_id, position);
+
+CREATE TABLE IF NOT EXISTS poll_votes (
+  message_id TEXT NOT NULL REFERENCES messages (id) ON DELETE CASCADE,
+  option_id  TEXT NOT NULL REFERENCES poll_options (id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  at         INTEGER NOT NULL,
+  PRIMARY KEY (message_id, option_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_poll_votes_user ON poll_votes (message_id, user_id);
+
+-- One row per item, so ticking one thing never rewrites — and never races
+-- with — somebody adding another.
+CREATE TABLE IF NOT EXISTS list_items (
+  id         TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL REFERENCES messages (id) ON DELETE CASCADE,
+  position   INTEGER NOT NULL,
+  text       TEXT NOT NULL,
+  added_by   TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  added_at   INTEGER NOT NULL,
+  checked_by TEXT,
+  checked_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_list_items_message ON list_items (message_id, position);

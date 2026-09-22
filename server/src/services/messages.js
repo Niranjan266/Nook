@@ -19,6 +19,8 @@ export const preview = (m) => {
   if (m.type === 'file') return `📎 ${m.media?.name || 'File'}`;
   if (m.type === 'snap') return '🔥 Snap';
   if (m.type === 'sticker') return '🌟 Sticker';
+  if (m.type === 'poll') return `📊 Poll: ${(m.body || '').slice(0, 100)}`;
+  if (m.type === 'list') return `📝 List: ${(m.body || '').slice(0, 100)}`;
   if (m.type === 'call') return m.call?.kind === 'video' ? 'Video call' : 'Voice call';
   return m.body || '';
 };
@@ -141,6 +143,8 @@ export async function createMessage({ conversationId, senderId, payload, system 
     scheduledFor: isScheduled ? scheduledFor : null,
     delivered: !isScheduled,
     call: payload.call,
+    poll: payload.poll,
+    list: payload.list,
     expiresAt: convo.disappearAfter ? new Date(startsAt + convo.disappearAfter * 1000) : null,
   });
 

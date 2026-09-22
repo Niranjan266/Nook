@@ -79,7 +79,38 @@ export type MessageType =
   | 'snap'
   | 'sticker'
   | 'system'
-  | 'call';
+  | 'call'
+  | 'poll'
+  | 'list';
+
+/**
+ * A poll as the server lets this viewer see it. `voters` is always empty on an
+ * anonymous poll — for the creator too — so nothing here needs to check.
+ */
+export interface PollState {
+  multiple: boolean;
+  anonymous: boolean;
+  closesAt: string | null;
+  closed: boolean;
+  closedAt: string | null;
+  closedBy: string | null;
+  /** People who voted at all; the bars are a share of this, not of votes. */
+  totalVoters: number;
+  options: { id: string; text: string; count: number; voters: string[] }[];
+  myVotes: string[];
+}
+
+export interface ListItem {
+  id: string;
+  text: string;
+  addedBy: string;
+  checkedBy: string | null;
+  checkedAt: string | null;
+}
+
+export interface ListState {
+  items: ListItem[];
+}
 
 export interface MediaPayload {
   url: string;
@@ -213,6 +244,9 @@ export interface Message {
   /** Seconds on a snap; 0 means the sender set no limit. */
   viewSeconds?: number;
   call: { kind: 'audio' | 'video'; status: string; duration: number } | null;
+  /** Only on `poll` and `list` messages; the question or title is `body`. */
+  poll?: PollState | null;
+  list?: ListState | null;
   expiresAt: string | null;
   createdAt: string;
 

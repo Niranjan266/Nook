@@ -10,6 +10,7 @@
 import { z } from 'zod';
 import { uploadOwner } from '../db/messages.js';
 import { env } from '../config/env.js';
+import { POLL_MIN_OPTIONS, POLL_MAX_OPTIONS, LIST_MAX_ITEMS } from '../db/polls.js';
 
 /**
  * Media links end up in `src` and `href` on every client. Only web URLs and
@@ -60,8 +61,46 @@ export const mediaSchema = z.object({
   provider: z.string().max(20).nullish(),
 });
 
-export const sendPayloadSchema = z.object({
-  type: z.enum(['text', 'image', 'video', 'audio', 'voice', 'file', 'snap', 'sticker']).default('text'),
+/**
+ * A poll's question travels in `body`, like a list's title; this is the rest.
+ *
+ * A deadline must be in the future and within a month. A past one would
+ * create a poll that is closed on arrival, and an unbounded one is a poll
+ * nobody remembers to close, which is what closing early is for.
+ */
+const MAX_POLL_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
+
+export const pollSchema = z.object({
+  options: z
+    .array(z.string().trim().min(1, 'Options cannot be empty.').max(100, 'Keep each option under 100 characters.'))
+    .min(POLL_MIN_OPTIONS, 'A poll needs at least two options.')
+    .max(POLL_MAX_OPTIONS, 'A poll can have at most ten options.')
+    .refine(
+      (options) => new Set(options.map((o) => o.toLowerCase())).size === options.length,
+      'Each option must be different.'
+    ),
+  multiple: z.boolean().default(false),
+  anonymous: z.boolean().default(false),
+  closesAt: z
+    .string()
+    .max(64)
+    .nullish()
+    .refine((v) => {
+      if (!v) return true;
+      const t = new Date(v).getTime();
+      return Number.isFinite(t) && t > Date.now() && t - Date.now() <= MAX_POLL_WINDOW_MS;
+    }, 'Pick a closing time in the next month.'),
+});
+
+export const listSchema = z.object({
+  items: z
+    .array(z.string().trim().min(1, 'Items cannot be empty.').max(200, 'Keep each item under 200 characters.'))
+    .max(LIST_MAX_ITEMS, `A list can hold at most ${LIST_MAX_ITEMS} items.`)
+    .default([]),
+});
+
+const baseSendSchema = z.object({
+  type: z.enum(['text', 'image', 'video', 'audio', 'voice', 'file', 'snap', 'sticker', 'poll', 'list']).default('text'),
   body: z.string().max(8000).optional(),
   media: mediaSchema.nullish(),
   replyTo: z.string().max(64).nullable().optional(),
@@ -75,15 +114,47 @@ export const sendPayloadSchema = z.object({
   threadRoot: z.string().max(64).nullable().optional(),
   scheduledFor: z.string().max(64).nullable().optional(),
   transcript: z.string().max(8000).optional(),
-}).superRefine((p, ctx) => {
-  if (p.type !== 'sticker') return;
-  // A sticker is the picture and nothing else: no caption to render beside a
-  // bubble that is not there, and no view-once, which is what a snap is for.
-  if (!p.media) ctx.addIssue({ code: 'custom', path: ['media'], message: 'A sticker needs its picture.' });
-  else if (!isOwnMediaUrl(p.media.url))
-    ctx.addIssue({ code: 'custom', path: ['media', 'url'], message: 'Stickers must be uploaded to Nook.' });
-  if (p.body?.trim()) ctx.addIssue({ code: 'custom', path: ['body'], message: 'Stickers do not take a caption.' });
-  if (p.viewOnce) ctx.addIssue({ code: 'custom', path: ['viewOnce'], message: 'A sticker cannot be view-once.' });
+  poll: pollSchema.optional(),
+  list: listSchema.optional(),
+});
+
+export const sendPayloadSchema = baseSendSchema.superRefine((p, ctx) => {
+  /**
+   * Each shape belongs to exactly one type. A text message carrying `poll`
+   * would write poll rows under a message nothing renders as a poll, and a
+   * poll with no options would sit in the chat as an empty card forever.
+   */
+  const title = (p.body || '').trim();
+  const issue = (path, message) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+
+  if (p.type === 'poll') {
+    if (!p.poll) issue('poll', 'A poll needs options.');
+    if (!title) issue('body', 'Ask a question.');
+    if (title.length > 300) issue('body', 'Keep the question under 300 characters.');
+  } else if (p.poll) {
+    issue('poll', 'Only a poll can carry poll options.');
+  }
+
+  if (p.type === 'list') {
+    if (!title) issue('body', 'Give the list a title.');
+    if (title.length > 120) issue('body', 'Keep the title under 120 characters.');
+  } else if (p.list) {
+    issue('list', 'Only a list can carry list items.');
+  }
+
+  // A poll that vanishes after one look is a poll nobody can finish voting in.
+  if ((p.type === 'poll' || p.type === 'list') && (p.media || p.viewOnce))
+    issue('type', 'Polls and lists cannot carry media.');
+
+  if (p.type === 'sticker') {
+    // A sticker is the picture and nothing else: no caption to render beside a
+    // bubble that is not there, and no view-once, which is what a snap is for.
+    if (!p.media) issue('media', 'A sticker needs its picture.');
+    else if (!isOwnMediaUrl(p.media.url))
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['media', 'url'], message: 'Stickers must be uploaded to Nook.' });
+    if (title) issue('body', 'Stickers do not take a caption.');
+    if (p.viewOnce) issue('viewOnce', 'A sticker cannot be view-once.');
+  }
 });
 
 /**
@@ -99,6 +170,7 @@ export async function parseSendPayload(raw, senderId) {
   // One sticker file is shared by every chat it is sent to and by the tray.
   // Unsending one copy must not delete it for all the others.
   if (payload.type === 'sticker' && payload.media) delete payload.media.publicId;
+  if (payload.type === 'poll' || payload.type === 'list') payload.body = payload.body.trim();
   if (payload.media?.publicId) {
     const owner = await uploadOwner(payload.media.publicId);
     if (!owner || String(owner) !== String(senderId)) delete payload.media.publicId;

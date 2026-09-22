@@ -25,6 +25,13 @@ const set = (key: string, value: unknown) => {
   idbSet(key, value).catch(() => {});
 };
 
+export interface PollDraft {
+  options: string[];
+  multiple: boolean;
+  anonymous: boolean;
+  closesAt?: string | null;
+}
+
 export interface Outgoing {
   clientId: string;
   conversationId: string;
@@ -43,6 +50,9 @@ export interface Outgoing {
   viewSeconds?: number;
   /** A voice note's transcript, which a replay would otherwise lose. */
   transcript?: string;
+  /** A poll's options and settings, or a list's first items — see sendPayload.js. */
+  poll?: PollDraft;
+  list?: { items: string[] };
   queuedAt: number;
 }
 

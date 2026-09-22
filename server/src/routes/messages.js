@@ -10,6 +10,7 @@ import { createMessage, markRead } from '../services/messages.js';
 import { destroy } from '../services/media.js';
 import { hasUnlock } from '../lib/lockgrants.js';
 import { parseSendPayload } from '../lib/sendPayload.js';
+import { voteCount } from '../db/polls.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -278,7 +279,19 @@ router.patch(
     const msg = await loadMessage(req.params.id, req.user.id);
 
     if (String(msg.sender.id) !== req.user.id) throw httpError(403, 'You can only edit your own messages.');
-    if (msg.type !== 'text') throw httpError(400, 'Only text messages can be edited.');
+    if (!['text', 'poll', 'list'].includes(msg.type)) throw httpError(400, 'Only text messages can be edited.');
+
+    /**
+     * A poll's question is its body, so it goes through this same route — but
+     * only until somebody has answered. Rewording "Pizza on Friday?" into
+     * "Skip Friday?" after three people said yes would turn their votes into
+     * answers to a question they were never asked.
+     */
+    if (msg.type === 'poll') {
+      if (body.length > 300) throw httpError(400, 'Keep the question under 300 characters.');
+      if (await voteCount(msg.id)) throw httpError(409, 'People have voted, so the question is fixed now.');
+    }
+    if (msg.type === 'list' && body.length > 120) throw httpError(400, 'Keep the title under 120 characters.');
     if (Date.now() - new Date(msg.createdAt).getTime() > 15 * 60 * 1000)
       throw httpError(400, 'Too late to edit — 15 minute window.');
 
@@ -353,6 +366,11 @@ router.post(
     // Someone else's snap was theirs to show you once, not yours to pass on.
     if (source.viewOnce?.enabled && String(source.sender.id) !== req.user.id)
       throw httpError(403, 'Snaps cannot be forwarded.');
+
+    // A poll's votes and a list's ticks belong to the chat they were cast in;
+    // a forwarded copy would arrive as a question with no options.
+    if (source.type === 'poll' || source.type === 'list')
+      throw httpError(400, 'Polls and lists cannot be forwarded.');
 
     // The copy shares the file but must not own it: unsending a forward would
     // otherwise delete the original sender's picture out from under them.

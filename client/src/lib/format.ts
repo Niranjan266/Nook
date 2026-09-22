@@ -128,6 +128,10 @@ export const previewOf = (m: {
       return '🌟 Sticker';
     case 'call':
       return m.call?.kind === 'video' ? 'Video call' : 'Voice call';
+    case 'poll':
+      return `📊 Poll: ${m.body}`;
+    case 'list':
+      return `📝 List: ${m.body}`;
     default:
       return m.body;
   }

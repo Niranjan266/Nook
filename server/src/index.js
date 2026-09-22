@@ -23,6 +23,7 @@ import adminRoutes from './routes/admin.js';
 import userRoutes from './routes/users.js';
 import conversationRoutes from './routes/conversations.js';
 import messageRoutes from './routes/messages.js';
+import pollRoutes from './routes/polls.js';
 import mediaRoutes from './routes/media.js';
 import pushRoutes from './routes/push.js';
 import callRoutes from './routes/calls.js';
@@ -125,6 +126,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
+// Polls and lists live under /api/messages/:id/… too; none of their paths
+// overlap the messages router's, so the order between the two is free.
+app.use('/api/messages', pollRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/calls', callRoutes);

@@ -38,6 +38,7 @@ import {
 } from '@/components/Icon';
 import RemindPicker from './RemindPicker';
 import { safeUrl } from '@/lib/config';
+import { PollCard, ListCard } from './PollCard';
 import { tap } from '@/lib/native';
 
 
@@ -57,6 +58,14 @@ interface Props {
   animateIn?: boolean;
   onJumpTo: (id: string) => void;
 }
+
+/**
+ * What the Edit action may touch. A poll's question can be reworded only until
+ * the first vote — after that it would change what people answered — and a
+ * list's title any time within the usual window.
+ */
+const editable = (m: Message) =>
+  m.type === 'text' || m.type === 'list' || (m.type === 'poll' && (m.poll?.totalVoters ?? 0) === 0);
 
 function Ticks({ m, meId, convo }: { m: Message; meId: string; convo: Conversation }) {
   if (m.sender.id !== meId) return null;
@@ -376,6 +385,12 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           </motion.button>
         );
 
+      case 'poll':
+        return <PollCard message={m} conversation={conversation} meId={meId} />;
+
+      case 'list':
+        return <ListCard message={m} conversation={conversation} meId={meId} />;
+
       case 'call': {
         const missed = m.call?.status === 'missed' || m.call?.status === 'declined';
         return (
@@ -637,6 +652,8 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                     <span className="list-row-label">{isPinned ? 'Unpin' : 'Pin to the top'}</span>
                   </span>
                 </button>
+                {/* Votes and ticks belong to this chat; the server refuses a forward too. */}
+                {m.type !== 'poll' && m.type !== 'list' && (
                 <button
                   className="list-row"
                   onClick={() => {
@@ -649,6 +666,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                     <span className="list-row-label">Forward</span>
                   </span>
                 </button>
+                )}
                 {m.type === 'text' && (
                   <button
                     className="list-row"
@@ -664,7 +682,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                     </span>
                   </button>
                 )}
-                {mine && m.type === 'text' && Date.now() - new Date(m.createdAt).getTime() < 15 * 60 * 1000 && (
+                {mine && editable(m) && Date.now() - new Date(m.createdAt).getTime() < 15 * 60 * 1000 && (
                   <button
                     className="list-row"
                     onClick={() => {
@@ -815,6 +833,8 @@ function sameBubble(a: Props, b: Props) {
     a.conversation.type === b.conversation.type &&
     a.conversation.disappearAfter === b.conversation.disappearAfter &&
     a.conversation.pins === b.conversation.pins &&
+    // A list card offers Remove on anyone's item to a group admin.
+    a.conversation.myRole === b.conversation.myRole &&
     a.conversation.members.length === b.conversation.members.length
   );
 }

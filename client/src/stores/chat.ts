@@ -11,10 +11,11 @@ import {
   cacheConversations,
   readCachedConversations,
   type Outgoing,
+  type PollDraft,
 } from '@/lib/outbox';
 import { useUi } from '@/stores/ui';
 import { watchConversation } from '@/lib/focus';
-import type { Conversation, Message, Person, Reminder, ReminderDue } from '@/lib/types';
+import type { Conversation, Message, Person, Reminder, ReminderDue, PollState, ListState } from '@/lib/types';
 
 interface Presence {
   online: boolean;
@@ -56,6 +57,8 @@ interface ChatState {
     replyTo?: string | null;
     scheduledFor?: string | null;
     transcript?: string;
+    poll?: PollDraft;
+    list?: { items: string[] };
   }) => Promise<void>;
   retry: (clientId: string, conversationId: string) => Promise<void>;
   flushOutbox: () => Promise<void>;
@@ -68,6 +71,14 @@ interface ChatState {
   markSnapViewed: (messageId: string) => Promise<void>;
   /** Keep a message, or a no-timer snap, so it does not disappear. */
   saveMessage: (messageId: string, saved: boolean) => Promise<void>;
+
+  /* ── polls and shared lists ───────────────────────────────────────── */
+  /** Make my votes exactly `optionIds`. Optimistic; rolls back on refusal. */
+  votePoll: (message: Message, optionIds: string[]) => Promise<void>;
+  closePoll: (message: Message) => Promise<void>;
+  addListItem: (message: Message, text: string) => Promise<void>;
+  toggleListItem: (message: Message, itemId: string, checked: boolean) => Promise<void>;
+  removeListItem: (message: Message, itemId: string) => Promise<void>;
 
   setReplyTo: (m: Message | null) => void;
   setEditing: (m: Message | null) => void;
@@ -172,6 +183,80 @@ const indexReminders = (list: Reminder[]) => {
   for (const r of list) out[r.messageId] = r.id;
   return out;
 };
+
+/* ── poll and list helpers ─────────────────────────────────────────────── */
+
+/** The optimistic poll: the draft, in the shape the bubble renders. */
+const draftPoll = (d: PollDraft): PollState => ({
+  multiple: d.multiple,
+  anonymous: d.anonymous,
+  closesAt: d.closesAt || null,
+  closed: false,
+  closedAt: null,
+  closedBy: null,
+  totalVoters: 0,
+  options: d.options.map((text, i) => ({ id: `draft-${i}`, text, count: 0, voters: [] })),
+  myVotes: [],
+});
+
+const pollDraftOf = (p: PollState): PollDraft => ({
+  options: p.options.map((o) => o.text),
+  multiple: p.multiple,
+  anonymous: p.anonymous,
+  closesAt: p.closesAt,
+});
+
+const draftList = (l: { items: string[] }, meId: string): ListState => ({
+  items: l.items.map((text, i) => ({ id: `draft-${i}`, text, addedBy: meId, checkedBy: null, checkedAt: null })),
+});
+
+/**
+ * My votes swapped for `next`, with every count and the voter total moved to
+ * match. Counts are adjusted rather than recomputed from `voters`, because
+ * on an anonymous poll `voters` is empty and would zero every bar.
+ */
+function withMyVotes(poll: PollState, meId: string, next: string[]): PollState {
+  const had = new Set(poll.myVotes);
+  const will = new Set(next);
+  const options = poll.options.map((o) => {
+    const delta = (will.has(o.id) ? 1 : 0) - (had.has(o.id) ? 1 : 0);
+    if (!delta) return o;
+    const voters = poll.anonymous
+      ? o.voters
+      : delta > 0
+        ? [...o.voters, meId]
+        : o.voters.filter((v) => v !== meId);
+    return { ...o, count: Math.max(0, o.count + delta), voters };
+  });
+  const totalVoters = Math.max(0, poll.totalVoters + (will.size ? 1 : 0) - (had.size ? 1 : 0));
+  return { ...poll, options, myVotes: next, totalVoters };
+}
+
+const findMessage = (messages: Record<string, Message[]>, m: Message) =>
+  (messages[m.conversationId] || []).find((x) => x.id === m.id);
+
+type SetChat = (fn: (s: ChatState) => Partial<ChatState>) => void;
+
+const replaceMessage = (set: SetChat, next: Message) => {
+  set((s) => ({
+    messages: {
+      ...s.messages,
+      [next.conversationId]: (s.messages[next.conversationId] || []).map((x) => (x.id === next.id ? next : x)),
+    },
+  }));
+  return next;
+};
+
+/**
+ * Put back what was there before the tap — unless the server has already
+ * sent something newer, in which case that is the truth and the guess is
+ * simply gone. Comparing by reference is enough: every update replaces the
+ * message object.
+ */
+function rollback(set: SetChat, get: () => ChatState, before: Message, guess: Message) {
+  if (findMessage(get().messages, before) !== guess) return;
+  replaceMessage(set, before);
+}
 
 const sortOrder = (convos: Record<string, Conversation>) =>
   Object.values(convos)
@@ -356,6 +441,8 @@ export const useChat = create<ChatState>((set, get) => ({
     replyTo,
     scheduledFor,
     transcript,
+    poll,
+    list,
   }) {
     const clientId = uid();
     const meId = (window as any).__nookMeId as string;
@@ -373,6 +460,8 @@ export const useChat = create<ChatState>((set, get) => ({
         viewSeconds,
         transcript,
         scheduledFor,
+        poll,
+        list,
       });
       if (!res?.ok) throw new Error(res?.error || 'Could not schedule that.');
       if (res.message) set((s) => ({ scheduled: [...s.scheduled, res.message!] }));
@@ -401,6 +490,8 @@ export const useChat = create<ChatState>((set, get) => ({
         ? { enabled: true, seen: false, burnt: false, seconds: viewSeconds ?? 10, viewers: [] }
         : null,
       call: null,
+      poll: poll ? draftPoll(poll) : null,
+      list: list ? draftList(list, meId) : null,
       expiresAt: null,
       createdAt: new Date().toISOString(),
       transcript: transcript || '',
@@ -428,6 +519,8 @@ export const useChat = create<ChatState>((set, get) => ({
       viewOnce,
       viewSeconds,
       transcript,
+      poll,
+      list,
       queuedAt: Date.now(),
     };
 
@@ -497,6 +590,10 @@ export const useChat = create<ChatState>((set, get) => ({
       viewOnce: Boolean(msg.viewOnce?.enabled),
       viewSeconds: msg.viewOnce?.enabled ? msg.viewOnce.seconds : undefined,
       transcript: msg.transcript || undefined,
+      // Rebuilt from the optimistic bubble, which holds the draft in the
+      // serialised shape — turned back into what the send schema expects.
+      poll: msg.type === 'poll' && msg.poll ? pollDraftOf(msg.poll) : undefined,
+      list: msg.type === 'list' && msg.list ? { items: msg.list.items.map((i) => i.text) } : undefined,
       queuedAt: Date.now(),
     };
     try {
@@ -646,6 +743,80 @@ export const useChat = create<ChatState>((set, get) => ({
       }
       return { messages };
     });
+  },
+
+  /* ── polls and shared lists ─────────────────────────────────────────
+     Each change is shown the moment it is tapped and put back exactly as
+     it was if the server says no. The server's answer — and the
+     `message:edit` broadcast that follows — then replaces the guess
+     wholesale, so a vote cast by someone else in the same second is never
+     overwritten by this device's optimistic copy.                         */
+
+  async votePoll(message, optionIds) {
+    const meId = (window as any).__nookMeId as string;
+    const before = findMessage(get().messages, message);
+    if (!before?.poll) return;
+    const guess = replaceMessage(set, { ...before, poll: withMyVotes(before.poll, meId, optionIds) });
+    try {
+      const { message: updated } = await post<{ message: Message }>(`/messages/${message.id}/poll/vote`, {
+        optionIds,
+      });
+      get().onMessageUpdate(updated);
+    } catch (e: any) {
+      rollback(set, get, before, guess);
+      useUi.getState().toast(e?.message || 'Your vote did not go through.', true);
+    }
+  },
+
+  async closePoll(message) {
+    const { message: updated } = await post<{ message: Message }>(`/messages/${message.id}/poll/close`);
+    get().onMessageUpdate(updated);
+  },
+
+  async addListItem(message, text) {
+    // Not optimistic: the new row needs the server's id before it can be
+    // ticked or removed, and adding is rare enough that the wait is fine.
+    const { message: updated } = await post<{ message: Message }>(`/messages/${message.id}/list/items`, { text });
+    get().onMessageUpdate(updated);
+  },
+
+  async toggleListItem(message, itemId, checked) {
+    const meId = (window as any).__nookMeId as string;
+    const before = findMessage(get().messages, message);
+    if (!before?.list) return;
+    const guess = replaceMessage(set, {
+      ...before,
+      list: {
+        items: before.list.items.map((i) =>
+          i.id === itemId
+            ? { ...i, checkedBy: checked ? meId : null, checkedAt: checked ? new Date().toISOString() : null }
+            : i
+        ),
+      },
+    });
+    try {
+      const { message: updated } = await patch<{ message: Message }>(
+        `/messages/${message.id}/list/items/${itemId}`,
+        { checked }
+      );
+      get().onMessageUpdate(updated);
+    } catch (e: any) {
+      rollback(set, get, before, guess);
+      useUi.getState().toast(e?.message || 'That did not save.', true);
+    }
+  },
+
+  async removeListItem(message, itemId) {
+    const before = findMessage(get().messages, message);
+    if (!before?.list) return;
+    const guess = replaceMessage(set, { ...before, list: { items: before.list.items.filter((i) => i.id !== itemId) } });
+    try {
+      const { message: updated } = await del<{ message: Message }>(`/messages/${message.id}/list/items/${itemId}`);
+      get().onMessageUpdate(updated);
+    } catch (e: any) {
+      rollback(set, get, before, guess);
+      useUi.getState().toast(e?.message || 'That item could not be removed.', true);
+    }
   },
 
   setReplyTo: (replyTo) => set({ replyTo, editing: null }),

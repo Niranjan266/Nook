@@ -53,6 +53,59 @@ export function serializeUser(u, viewerId) {
 export const SNAP_REPLAYS = 3;
 export const SNAP_MAX_OPENS = SNAP_REPLAYS + 1;
 
+/**
+ * A poll as this viewer may see it.
+ *
+ * Anonymous means anonymous to everyone, the creator included — a poll that
+ * promised secrecy and then showed its author who picked what would be worse
+ * than one that never promised. Counts are always shown; only `voters` goes.
+ * `myVotes` is the viewer's own, which is never a secret from themselves.
+ */
+function serializePoll(poll, viewer) {
+  if (!poll) return null;
+  const closesAt = poll.closesAt ? new Date(poll.closesAt) : null;
+  const closed = Boolean(poll.closedAt) || Boolean(closesAt && closesAt.getTime() <= Date.now());
+  const everyone = new Set();
+  const myVotes = [];
+  const options = (poll.options || []).map((o) => {
+    const voters = (o.voters || []).map(String);
+    voters.forEach((v) => everyone.add(v));
+    if (voters.includes(viewer)) myVotes.push(String(o.id));
+    return {
+      id: String(o.id),
+      text: o.text,
+      count: voters.length,
+      voters: poll.anonymous ? [] : voters,
+    };
+  });
+  return {
+    multiple: Boolean(poll.multiple),
+    anonymous: Boolean(poll.anonymous),
+    closesAt: iso(closesAt),
+    closed,
+    closedAt: iso(poll.closedAt ? new Date(poll.closedAt) : null),
+    closedBy: poll.closedBy ? String(poll.closedBy) : null,
+    // People, not votes: in a multiple-choice poll the two differ, and the
+    // bar widths are a share of the people who took part.
+    totalVoters: everyone.size,
+    options,
+    myVotes,
+  };
+}
+
+function serializeList(list) {
+  if (!list) return null;
+  return {
+    items: (list.items || []).map((i) => ({
+      id: String(i.id),
+      text: i.text,
+      addedBy: String(i.addedBy),
+      checkedBy: i.checkedBy ? String(i.checkedBy) : null,
+      checkedAt: iso(i.checkedAt),
+    })),
+  };
+}
+
 export function serializeMessage(m, viewerId) {
   if (!m) return null;
   const id = String(m._id || m.id);
@@ -168,6 +221,8 @@ export function serializeMessage(m, viewerId) {
         }
       : null,
     call: m.call?.kind ? { kind: m.call.kind, status: m.call.status, duration: m.call.duration || 0 } : null,
+    poll: m.deletedForAll || deletedForMe ? null : serializePoll(m.poll, viewer),
+    list: m.deletedForAll || deletedForMe ? null : serializeList(m.list),
     expiresAt: iso(m.expiresAt),
     createdAt: iso(m.createdAt),
   };

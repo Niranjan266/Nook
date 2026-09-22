@@ -459,3 +459,20 @@ export const IconTag = (p: Props) => (
     <path d="M8.2 8.2v.1" />
   </Svg>
 );
+
+/** Three bars of different lengths — a result, not a chart axis. */
+export const IconPoll = (p: Props) => (
+  <Svg {...p}>
+    <path d="M5 6.5h9.5" />
+    <path d="M5 12h14" />
+    <path d="M5 17.5h6" />
+  </Svg>
+);
+
+export const IconChecklist = (p: Props) => (
+  <Svg {...p}>
+    <path d="m4 6.8 1.6 1.6L8.6 5.4" />
+    <path d="m4 13.8 1.6 1.6 3-3" />
+    <path d="M12 7h8M12 14h8M12 19.5h5" />
+  </Svg>
+);

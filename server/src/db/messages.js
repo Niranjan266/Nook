@@ -8,6 +8,7 @@
  */
 import { all, one, run, newId, now, parseJson, toJson, bool, placeholders } from './index.js';
 import { hydrateUser } from './users.js';
+import { attachPollsAndLists, createPoll, createList } from './polls.js';
 
 const SENDER_JOIN = `
   SELECT m.*,
@@ -70,6 +71,9 @@ function baseMessage(row) {
     deletedFor: [],
     mentions: [],
     edits: [],
+    // Filled in by attachPollsAndLists, only for those two types.
+    poll: null,
+    list: null,
   };
 }
 
@@ -104,6 +108,8 @@ async function attachChildren(messages) {
     m.viewOnce.opens[String(v.user_id)] = v.opens || 1;
   }
   for (const m of mentions) byId.get(m.message_id)?.mentions.push(m.user_id);
+
+  await attachPollsAndLists(messages);
 
   // Reply-to is rendered as a quote, so it needs the original's sender name
   // and a thumbnail — one extra query for the whole page of messages.
@@ -398,6 +404,11 @@ export async function createMessageRow(input) {
       t,
     ]
   );
+
+  // Written before anyone can be told the message exists, so no client ever
+  // receives a poll with no options or a list that is missing its items.
+  if (input.type === 'poll' && input.poll) await createPoll(id, input.poll);
+  if (input.type === 'list' && input.list) await createList(id, input.senderId, input.list.items || []);
 
   for (const userId of input.mentions || []) {
     await run('INSERT OR IGNORE INTO message_mentions (message_id, user_id) VALUES (?, ?)', [id, userId]);
