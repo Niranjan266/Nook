@@ -5,25 +5,14 @@ import { areFriends } from '../db/friends.js';
 import { serializeMessage } from '../lib/serialize.js';
 import { emitToConversation, emitToUser, isOnline, isWatching } from '../sockets/hub.js';
 import { notify } from './push.js';
-import { TEMPLATES } from './templates.js';
+import { preview, messagePushPayload } from '../lib/messagePush.js';
 import { isQuietNow } from './quietHours.js';
 import { fetchPreview, firstUrlIn } from './linkPreview.js';
 import { httpError } from '../middleware/error.js';
 
-export const preview = (m) => {
-  if (m.type === 'text') return (m.body || '').slice(0, 120);
-  if (m.type === 'image') return '📷 Photo';
-  if (m.type === 'video') return '🎬 Video';
-  if (m.type === 'voice') return '🎙 Voice message';
-  if (m.type === 'audio') return '🎵 Audio';
-  if (m.type === 'file') return `📎 ${m.media?.name || 'File'}`;
-  if (m.type === 'snap') return '🔥 Snap';
-  if (m.type === 'sticker') return '🌟 Sticker';
-  if (m.type === 'poll') return `📊 Poll: ${(m.body || '').slice(0, 100)}`;
-  if (m.type === 'list') return `📝 List: ${(m.body || '').slice(0, 100)}`;
-  if (m.type === 'call') return m.call?.kind === 'video' ? 'Video call' : 'Voice call';
-  return m.body || '';
-};
+// Kept exported from here for existing importers; it lives beside the push
+// rules now, because what a preview may say is a push decision.
+export { preview };
 
 /**
  * May this person put a message in front of the others in this conversation?
@@ -42,7 +31,7 @@ export async function assertMayReach(convo, senderId) {
   for (const otherId of others) {
     if (await blockExistsBetween(senderId, otherId))
       throw httpError(403, 'You cannot message this person.');
-    if (convo.type === 'direct' && !(await areFriends(senderId, otherId)))
+    if ((convo.type === 'direct' || convo.type === 'secret') && !(await areFriends(senderId, otherId)))
       throw httpError(403, 'They need to accept your request before you can chat.', {
         code: 'NOT_FRIENDS',
       });
@@ -101,6 +90,28 @@ export async function createMessage({ conversationId, senderId, payload, system 
    */
   if (!system) await assertMayReach(convo, senderId);
 
+  /**
+   * Secret chats carry ciphertext and nothing else.
+   *
+   * Refused rather than quietly encrypted-for-you, because the server cannot
+   * encrypt for a secret chat — it has no keys, by design. A plaintext
+   * message arriving here is a client bug (a thread reply, a forward, an old
+   * build), and accepting it would store exactly what the chat promised not
+   * to. The reverse holds too: ciphertext in an ordinary chat is unreadable
+   * to everyone, so it is refused rather than shown as noise.
+   */
+  const secretChat = convo.type === 'secret';
+  if (!system && secretChat && payload.type !== 'encrypted')
+    throw httpError(400, 'Secret chats only carry encrypted messages.', { code: 'SECRET_ONLY' });
+  if (!secretChat && payload.type === 'encrypted')
+    throw httpError(400, 'Encrypted messages belong in a secret chat.');
+  if (secretChat) {
+    if (payload.threadRoot) throw httpError(400, 'Threads are not available in secret chats.');
+    if (payload.forwardedFrom) throw httpError(400, 'Nothing can be forwarded into a secret chat.');
+    if (payload.scheduledFor) throw httpError(400, 'Secret messages cannot be scheduled.');
+    if (!payload.body) throw httpError(400, 'That secret message is empty.');
+  }
+
   // A thread reply must belong to a real root in this same conversation, and
   // threads are one level deep on purpose — nesting turns a chat into a forum.
   let threadRoot = null;
@@ -126,20 +137,29 @@ export async function createMessage({ conversationId, senderId, payload, system 
   // written; claimScheduled shifts it again if delivery runs late.
   const startsAt = isScheduled ? scheduledFor.getTime() : Date.now();
 
+  /**
+   * An encrypted message keeps only what routing needs. Its ciphertext goes
+   * to `cipher`, and everything that would otherwise sit beside it in the
+   * clear — a transcript, a quote, mentions, a media link — is dropped: the
+   * client puts those inside the ciphertext, where they belong.
+   */
+  const encrypted = payload.type === 'encrypted';
+
   const id = await M.createMessageRow({
     conversationId: convo.id,
     senderId,
     type: payload.type || 'text',
-    body: payload.body,
-    media: payload.media,
-    replyTo,
+    body: encrypted ? '' : payload.body,
+    cipher: encrypted ? payload.body : '',
+    media: encrypted ? null : payload.media,
+    replyTo: encrypted ? null : replyTo,
     forwardedFrom: payload.forwardedFrom || null,
-    mentions: payload.mentions || [],
+    mentions: encrypted ? [] : payload.mentions || [],
     clientId: payload.clientId || '',
-    viewOnce: Boolean(payload.viewOnce),
+    viewOnce: encrypted ? false : Boolean(payload.viewOnce),
     viewSeconds: Number.isFinite(payload.viewSeconds) ? payload.viewSeconds : 10,
     threadRoot: threadRoot?.id || null,
-    transcript: payload.transcript || '',
+    transcript: encrypted ? '' : payload.transcript || '',
     scheduledFor: isScheduled ? scheduledFor : null,
     delivered: !isScheduled,
     call: payload.call,
@@ -271,17 +291,16 @@ export async function deliver({ message, convo, senderId, threadRoot, system = f
      * allowed, which sound applies, whether to buzz — because those are
      * questions about this recipient and this conversation. How it reads on a
      * lock screen is a question about Nook, and it is answered once, in one
-     * place, for every notification the app sends.
+     * place, for every notification the app sends. Secret chats are decided
+     * in lib/messagePush.js, which never lets their content near a payload.
      */
     notify(
       uid,
-      TEMPLATES.message.push({
-        sender: sender.displayName,
-        preview: showPreview ? preview(message) : 'New message',
-        conversationName: convo.type === 'group' ? convo.name : '',
-        conversationId: convo.id,
-        messageId: message.id,
-        icon: sender.avatarUrl || '/logo.svg',
+      messagePushPayload({
+        convo,
+        message,
+        sender,
+        showPreview,
         // A chat's own sound wins; otherwise the one chosen in Settings.
         sound: member.sound && member.sound !== 'default' ? member.sound : prefs.notifySound || 'default',
         vibrate: shouldBuzz,
@@ -297,6 +316,10 @@ export async function deliver({ message, convo, senderId, threadRoot, system = f
  * forget: a slow third-party site must never delay a message.
  */
 async function maybeAttachPreview(message, convo) {
+  // Never for a secret chat: fetching a link the server read out of a message
+  // would prove it could read the message. (It cannot — this is the belt to
+  // that pair of braces.)
+  if (convo.type === 'secret' || message.type === 'encrypted') return;
   if (message.type !== 'text' || message.linkPreview?.url) return;
   const url = firstUrlIn(message.body);
   if (!url) return;

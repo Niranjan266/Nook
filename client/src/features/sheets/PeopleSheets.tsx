@@ -17,6 +17,7 @@ import {
   IconPhone,
   IconVideo,
   IconPlus,
+  IconLock,
 } from '@/components/Icon';
 import { useMessageSearch, SearchBox, SearchChips, SearchResults, openResult, type SearchKind } from './MessageSearch';
 
@@ -28,8 +29,12 @@ export function NewChatSheet() {
   const openSheet = useUi((s) => s.openSheet);
   const toast = useUi((s) => s.toast);
   const openDirect = useChat((s) => s.openDirect);
+  const openSecret = useChat((s) => s.openSecret);
   const setActive = useChat((s) => s.setActive);
   const { send: sendRequest, accept } = useFriends();
+  /** Picking someone for a secret chat instead of an ordinary one. */
+  const [secretMode, setSecretMode] = useState(false);
+  const [starting, setStarting] = useState('');
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Person[]>([]);
   const [contacts, setContacts] = useState<Person[]>([]);
@@ -40,8 +45,31 @@ export function NewChatSheet() {
 
   useEffect(() => {
     if (!open) return;
+    setSecretMode(false);
     get<{ contacts: Person[] }>('/users').then((r) => setContacts(r.contacts)).catch(() => {});
   }, [open]);
+
+  /**
+   * A secret chat needs someone who has already accepted you: it is bound to
+   * one of their devices the moment it is made, and that is not something to
+   * do to a stranger. The server refuses otherwise; this just says so first.
+   */
+  const startSecret = async (person: Person) => {
+    if (person.friendship && person.friendship !== 'friends') {
+      toast(`${person.displayName.split(' ')[0]} has to accept you before you can start a secret chat.`, true);
+      return;
+    }
+    setStarting(person.id);
+    try {
+      const id = await openSecret(person.id);
+      setActive(id);
+      closeSheet();
+    } catch (e: any) {
+      toast(e?.message || 'Could not start a secret chat.', true);
+    } finally {
+      setStarting('');
+    }
+  };
 
   useEffect(() => {
     if (q.trim().length < 2) {
@@ -97,7 +125,7 @@ export function NewChatSheet() {
   const shown = q.trim().length >= 2 ? results : contacts;
 
   return (
-    <Sheet open={open} onClose={closeSheet} title="New conversation">
+    <Sheet open={open} onClose={closeSheet} title={secretMode ? 'New secret chat' : 'New conversation'}>
       <label className="field">
         <span className="sr-only">Find someone by username or Nook ID</span>
         <input
@@ -113,6 +141,22 @@ export function NewChatSheet() {
         A Nook ID looks like <code>nook-7f3k2q</code>. Yours is in Settings.
       </p>
 
+      <button
+        className={`list-row secret-row${secretMode ? ' on' : ''}`}
+        onClick={() => setSecretMode((v) => !v)}
+        aria-pressed={secretMode}
+      >
+        <span className="clay-round secret-seal" style={{ width: 40, height: 40, boxShadow: 'none' }}>
+          <IconLock size={18} />
+        </span>
+        <span className="grow">
+          <span className="list-row-label">{secretMode ? 'Pick who to talk to in secret' : 'New secret chat'}</span>
+          <span className="list-row-sub">
+            {secretMode ? 'Tap again for an ordinary conversation' : 'End-to-end encrypted, on this device and theirs'}
+          </span>
+        </span>
+      </button>
+
       <button className="list-row" onClick={() => openSheet('new-group')}>
         <span className="clay-round" style={{ width: 40, height: 40, boxShadow: 'none', background: 'var(--clay-sunk)' }}>
           <IconUsers size={19} />
@@ -126,7 +170,12 @@ export function NewChatSheet() {
       <div className="sheet-section">
         <span className="eyebrow">{q.trim().length >= 2 ? 'Search results' : 'Your contacts'}</span>
         {shown.map((p) => (
-          <button key={p.id} className="list-row" onClick={() => start(p)}>
+          <button
+            key={p.id}
+            className="list-row"
+            disabled={starting === p.id}
+            onClick={() => (secretMode ? startSecret(p) : start(p))}
+          >
             <Avatar name={p.displayName} src={p.avatarUrl} id={p.id} accent={p.accent} size={42} online={p.online} showDot />
             <span className="grow" style={{ minWidth: 0 }}>
               <span className="list-row-label">{p.displayName}</span>
@@ -320,7 +369,9 @@ export function ForwardSheet() {
       <div className="sheet-section">
         {order.map((id) => {
           const c = conversations[id];
-          if (!c) return null;
+          // A forward is a copy the server makes in the clear, which a secret
+          // chat must never hold — so it is not offered as a destination.
+          if (!c || c.type === 'secret') return null;
           const on = picked.includes(id);
           return (
             <button

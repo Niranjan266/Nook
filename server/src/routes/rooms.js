@@ -36,7 +36,7 @@ const load = async (id, userId) => {
 /** Anything that writes something the other person will see. */
 const loadWritable = async (id, userId) => {
   const convo = await load(id, userId);
-  if (convo.type === 'direct') {
+  if (convo.type === 'direct' || convo.type === 'secret') {
     for (const otherId of await C.memberIdsOf(convo.id, userId)) {
       if (await U.blockExistsBetween(userId, otherId))
         throw httpError(403, 'You cannot do that here.');
@@ -45,6 +45,16 @@ const loadWritable = async (id, userId) => {
     }
   }
   return convo;
+};
+
+/**
+ * Moods and wall notes are plain text the server stores and shows. A secret
+ * chat promises the server holds nothing readable, so they are off there
+ * rather than quietly sitting in the clear beside the ciphertext.
+ */
+const noPlaintext = (convo) => {
+  if (convo.type === 'secret')
+    throw httpError(400, 'Secret chats keep nothing in plain text, so moods and the wall are off here.');
 };
 
 async function broadcast(id) {
@@ -70,6 +80,7 @@ router.put(
       .parse(req.body);
 
     const convo = await loadWritable(req.params.id, req.user.id);
+    noPlaintext(convo);
     await C.updateConversation(convo.id, {
       roomState: {
         mood,
@@ -103,6 +114,7 @@ router.post(
       .parse(req.body);
 
     const convo = await loadWritable(req.params.id, req.user.id);
+    noPlaintext(convo);
     if ((await C.countWallObjects(convo.id)) >= 12)
       throw httpError(400, 'A wall holds twelve things. Take one down first.');
 
@@ -125,6 +137,7 @@ router.patch(
       .parse(req.body);
 
     const convo = await loadWritable(req.params.id, req.user.id);
+    noPlaintext(convo);
     if (!convo.wallObjects.some((o) => o.id === req.params.objectId))
       throw httpError(404, 'That is not on the wall.');
 

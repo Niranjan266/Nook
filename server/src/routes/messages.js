@@ -279,6 +279,9 @@ router.patch(
     const msg = await loadMessage(req.params.id, req.user.id);
 
     if (String(msg.sender.id) !== req.user.id) throw httpError(403, 'You can only edit your own messages.');
+    // An edit would be plaintext the server could read, or a re-encryption it
+    // could not check. Secret messages stay as they were sent.
+    if (msg.type === 'encrypted') throw httpError(400, 'Secret messages cannot be edited.');
     if (!['text', 'poll', 'list'].includes(msg.type)) throw httpError(400, 'Only text messages can be edited.');
 
     /**
@@ -362,6 +365,24 @@ router.post(
   asyncRoute(async (req, res) => {
     const { conversationIds } = z.object({ conversationIds: z.array(z.string()).min(1) }).parse(req.body);
     const source = await loadMessage(req.params.id, req.user.id);
+
+    /**
+     * Nothing leaves a secret chat and nothing enters one by forwarding.
+     *
+     * Out: the server holds only ciphertext, so a forward would copy noise —
+     * and the point of the chat is that its contents stay on two devices.
+     * In: a forward is a server-side copy in the clear, which a secret chat
+     * must never hold. Checked for every target before anything is sent, so a
+     * refusal never leaves half the forwards delivered.
+     */
+    const sourceConvo = await C.findConversation(source.conversation);
+    if (sourceConvo?.type === 'secret' || source.type === 'encrypted')
+      throw httpError(403, 'Messages in a secret chat cannot be forwarded.');
+    for (const conversationId of conversationIds) {
+      const target = await C.findConversationForUser(conversationId, req.user.id);
+      if (target?.type === 'secret')
+        throw httpError(403, 'Nothing can be forwarded into a secret chat.');
+    }
 
     // Someone else's snap was theirs to show you once, not yours to pass on.
     if (source.viewOnce?.enabled && String(source.sender.id) !== req.user.id)

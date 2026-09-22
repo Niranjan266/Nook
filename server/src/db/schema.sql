@@ -669,3 +669,33 @@ CREATE TABLE IF NOT EXISTS drive_links (
   refresh_token_enc TEXT NOT NULL,
   connected_at      INTEGER NOT NULL
 );
+
+-- ── secret chats ───────────────────────────────────────────────────────────
+-- Public keys only. Each device makes its own identity (ECDH) and signing
+-- (ECDSA) pair and publishes the public halves here; the private halves never
+-- leave it. Keyed per device rather than per person because a secret chat is
+-- bound to one device on each side — a second phone is a second identity.
+CREATE TABLE IF NOT EXISTS e2ee_devices (
+  user_id      TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  device_id    TEXT NOT NULL,
+  identity_pub TEXT NOT NULL,                     -- json jwk, public only
+  signing_pub  TEXT NOT NULL,                     -- json jwk, public only
+  created_at   INTEGER NOT NULL,
+  last_seen    INTEGER NOT NULL,
+  PRIMARY KEY (user_id, device_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_e2ee_devices_seen ON e2ee_devices (user_id, last_seen DESC);
+
+-- Which two devices a secret conversation is bound to, the public keys each
+-- had when it began, and the creator's signed handshake. Empty for every
+-- other kind of conversation. Public material only — the server can relay a
+-- handshake, it cannot complete one.
+ALTER TABLE conversations ADD COLUMN secret TEXT NOT NULL DEFAULT '';
+
+-- Ciphertext lives in its own column, not in `body`.
+--
+-- `body` is mirrored into the FTS index by triggers, and the boot-time
+-- rebuild re-reads every row. Keeping ciphertext out of that column is the
+-- only way to promise it is never indexed, rather than filtered afterwards.
+ALTER TABLE messages ADD COLUMN cipher TEXT NOT NULL DEFAULT '';

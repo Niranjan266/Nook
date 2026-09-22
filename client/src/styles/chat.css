@@ -2306,3 +2306,110 @@
     transform: none;
   }
 }
+
+/* ── secret chats ───────────────────────────────────────────────────────────
+   Moss, not terracotta: the same room in a quieter colour, so a secret chat
+   is recognisable at a glance and never mistaken for the ordinary one with
+   the same name beside it. Subtle on purpose — it is a place, not an alarm. */
+
+.surface.secret .chat-head {
+  background: color-mix(in srgb, var(--moss) 12%, color-mix(in srgb, var(--clay-surface) 88%, transparent));
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--moss) 35%, var(--clay-edge));
+}
+.secret-lock {
+  display: inline-block;
+  flex: none;
+  margin-right: 5px;
+  vertical-align: -1px;
+  color: var(--moss-deep);
+}
+
+.secret-banner {
+  align-self: center;
+  display: flex;
+  gap: var(--s-3);
+  max-width: min(460px, 92%);
+  margin: var(--s-2) 0 var(--s-4);
+  padding: 12px 14px;
+  border-radius: var(--r-clay-sm);
+  background: color-mix(in srgb, var(--moss) 14%, var(--clay-surface));
+  box-shadow: var(--clay-1);
+  line-height: 1.4;
+}
+.secret-banner-seal {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--clay-surface);
+  background: var(--moss);
+}
+
+.system-note.secret-warn {
+  max-width: min(460px, 90%);
+  border-radius: var(--r-clay-sm);
+  background: color-mix(in srgb, var(--ochre, #c8963e) 20%, var(--clay-surface));
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.secret-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.secret-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 220px;
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: var(--r-clay-sm);
+  background: color-mix(in srgb, var(--moss) 10%, var(--clay-sunk));
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.secret-media:disabled {
+  cursor: progress;
+}
+
+.safety-number {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px 10px;
+  margin: 2px 4px 10px;
+  padding: 14px;
+  border-radius: var(--r-clay-sm);
+  background: var(--clay-sunk);
+  box-shadow: var(--clay-in);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+.secret-warn-text {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0 4px 8px;
+  color: var(--rust);
+  line-height: 1.4;
+}
+
+.secret-seal {
+  color: var(--clay-surface);
+  background: var(--moss) !important;
+}
+.secret-row.on {
+  background: color-mix(in srgb, var(--moss) 14%, transparent);
+}

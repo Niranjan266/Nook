@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion';
 import type { Message, Conversation } from '@/lib/types';
 import { useChat } from '@/stores/chat';
@@ -35,11 +35,24 @@ import {
   IconThread,
   IconDown,
   IconBell,
+  IconLock,
 } from '@/components/Icon';
 import RemindPicker from './RemindPicker';
 import { safeUrl } from '@/lib/config';
 import { PollCard, ListCard } from './PollCard';
 import { tap } from '@/lib/native';
+import { decryptedUrl } from '@/lib/e2ee/media';
+
+/** Attachments this size or smaller open by themselves; bigger ones wait for a tap. */
+const AUTO_OPEN_BYTES = 20 * 1024 * 1024;
+
+/** What a secret message says when this device cannot show what is inside. */
+const SECRET_STATE_TEXT: Record<string, string> = {
+  elsewhere: 'This secret chat is on another device',
+  unkept: 'Sent from this device — no readable copy was kept',
+  waiting: 'Waiting for the secure setup to finish…',
+  failed: 'This message could not be decrypted',
+};
 
 
 interface Props {
@@ -120,6 +133,32 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
 
   const mine = m.sender.id === meId;
   const isPinned = conversation.pins?.some((p) => p.messageId === m.id);
+  // Things a secret chat cannot do honestly: threads and pins would be plain
+  // text on the server, forwards would copy it out, edits would re-send it.
+  const secretChat = conversation.type === 'secret';
+
+  /**
+   * A secret attachment arrives as a link to ciphertext. It is fetched and
+   * opened here, and the store is pointed at the local copy so the lightbox
+   * and the voice player see an ordinary blob: URL.
+   */
+  const secretMedia = m.secret?.state === 'ok' ? m.secret.media : undefined;
+  const needsOpen = Boolean(secretMedia && m.media?.url && !m.media.url.startsWith('blob:'));
+  const [opening, setOpening] = useState<'idle' | 'busy' | 'error'>('idle');
+  const openSecretMedia = () => {
+    if (!secretMedia || !m.media?.url || opening === 'busy') return;
+    setOpening('busy');
+    decryptedUrl(m.media.url, secretMedia.key, secretMedia.iv, secretMedia.mime)
+      .then((url) => {
+        useChat.getState().setSecretMediaUrl(m.conversationId, m.id, url);
+        setOpening('idle');
+      })
+      .catch(() => setOpening('error'));
+  };
+  useEffect(() => {
+    if (needsOpen && (m.media?.size || 0) <= AUTO_OPEN_BYTES) openSecretMedia();
+    // Keyed on the URL: once it is a blob there is nothing left to open.
+  }, [needsOpen, m.media?.url]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── swipe to reply ─────────────────────────────────────────────────────
      Drag the bubble toward the centre; past 48px it arms, and releasing sets
@@ -202,6 +241,30 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
       : undefined;
 
   const body = (() => {
+    if (m.secret && m.secret.state !== 'ok') {
+      return (
+        <span className="msg-text secret-state">
+          <IconLock size={13} /> {m.secret.note || SECRET_STATE_TEXT[m.secret.state] || 'Secret message'}
+        </span>
+      );
+    }
+
+    if (needsOpen) {
+      const label = m.type === 'image' ? 'photo' : m.type === 'voice' ? 'voice message' : m.type === 'video' ? 'video' : 'file';
+      return (
+        <button className="secret-media" onClick={openSecretMedia} disabled={opening === 'busy'} style={ratioStyle}>
+          <IconLock size={16} />
+          <span className="small">
+            {opening === 'busy'
+              ? `Decrypting ${label}…`
+              : opening === 'error'
+                ? `Could not open this ${label} — tap to try again`
+                : `Encrypted ${label}${m.media?.size ? ` · ${bytes(m.media.size)}` : ''} — tap to open`}
+          </span>
+        </button>
+      );
+    }
+
     switch (m.type) {
       case 'image':
         return (
@@ -555,13 +618,15 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
             <button onClick={() => setReplyTo(m)} aria-label="Reply" title="Reply">
               <IconReply size={16} />
             </button>
-            <button
-              onClick={() => openThread(m.id)}
-              aria-label="Reply in a thread"
-              title="Reply in a thread — keeps the tangent out of the main conversation"
-            >
-              <IconThread size={16} />
-            </button>
+            {!secretChat && (
+              <button
+                onClick={() => openThread(m.id)}
+                aria-label="Reply in a thread"
+                title="Reply in a thread — keeps the tangent out of the main conversation"
+              >
+                <IconThread size={16} />
+              </button>
+            )}
             <button onClick={openPicker} aria-label="React" title="React">
               <IconEmoji size={16} />
             </button>
@@ -638,6 +703,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                   </button>
                 )}
 
+                {!secretChat && (
                 <button
                   className="list-row"
                   onClick={() => {
@@ -652,8 +718,10 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                     <span className="list-row-label">{isPinned ? 'Unpin' : 'Pin to the top'}</span>
                   </span>
                 </button>
-                {/* Votes and ticks belong to this chat; the server refuses a forward too. */}
-                {m.type !== 'poll' && m.type !== 'list' && (
+                )}
+                {/* Votes and ticks belong to this chat, and a secret message can only
+                    be read here; the server refuses a forward of either too. */}
+                {!secretChat && m.type !== 'poll' && m.type !== 'list' && (
                 <button
                   className="list-row"
                   onClick={() => {
@@ -667,7 +735,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                   </span>
                 </button>
                 )}
-                {m.type === 'text' && (
+                {m.type === 'text' && m.body && (
                   <button
                     className="list-row"
                     onClick={() => {
@@ -682,7 +750,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                     </span>
                   </button>
                 )}
-                {mine && editable(m) && Date.now() - new Date(m.createdAt).getTime() < 15 * 60 * 1000 && (
+                {mine && !secretChat && editable(m) && Date.now() - new Date(m.createdAt).getTime() < 15 * 60 * 1000 && (
                   <button
                     className="list-row"
                     onClick={() => {

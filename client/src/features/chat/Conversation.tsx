@@ -28,6 +28,34 @@ import {
 } from '@/components/Icon';
 import type { Conversation as Convo, Message } from '@/lib/types';
 import { safeUrl, cssUrl } from '@/lib/config';
+import { useSecretPlace, usePartnerKeyStatus } from '@/lib/e2ee/useSecret';
+
+/**
+ * The first thing in every secret chat: what is protected, and what is not.
+ * Plain about the limits, because a privacy feature that oversells itself is
+ * worse than one that does less and says so.
+ */
+function SecretBanner({ name }: { name: string }) {
+  return (
+    <div className="secret-banner" role="note">
+      <span className="secret-banner-seal" aria-hidden="true">
+        <IconLock size={18} />
+      </span>
+      <span className="stack" style={{ gap: 4 }}>
+        <strong className="small">Secret chat with {name}</strong>
+        <span className="tiny">
+          Messages, photos, files and voice notes here are encrypted on this device and can only be
+          opened on {name.split(' ')[0]}’s — not by Nook’s server, and not on your other devices. They
+          can’t be forwarded or edited, and never show up in search or notifications.
+        </span>
+        <span className="tiny faint">
+          Nook can still see that you two talk, and when. Compare safety numbers in the chat details to
+          be sure nobody is in the middle.
+        </span>
+      </span>
+    </div>
+  );
+}
 
 const GAP_MINUTES = 6;
 const NO_MESSAGES: Message[] = [];
@@ -74,6 +102,12 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
   const [atBottom, setAtBottom] = useState(true);
   const [lockError, setLockError] = useState('');
   const [unlocking, setUnlocking] = useState(false);
+
+  // Secret chats: is this the device the chat is bound to, and has the
+  // partner's key stayed the one the chat was built on?
+  const place = useSecretPlace(conversation, meId);
+  const isSecret = conversation.type === 'secret';
+  const keyStatus = usePartnerKeyStatus(conversation, meId, isSecret && place.here);
 
   const list = rawList || NO_MESSAGES;
   // Not fetched yet (nor cached): shapes, not a blank. A failed load falls
@@ -412,8 +446,8 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
 
   return (
     <motion.section
-      className="surface"
-      aria-label={`Conversation with ${conversation.name}`}
+      className={`surface${isSecret ? ' secret' : ''}`}
+      aria-label={`${isSecret ? 'Secret chat' : 'Conversation'} with ${conversation.name}`}
       {...convoEnter(isPhone)}
     >
       <header className="chat-head">
@@ -434,7 +468,10 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
             square={conversation.type === 'group'}
           />
           <span className="chat-head-id">
-            <span className="chat-head-name truncate">{conversation.name}</span>
+            <span className="chat-head-name truncate">
+              {isSecret && <IconLock size={14} className="secret-lock" />}
+              {conversation.name}
+            </span>
             <span className="chat-head-status truncate">{status}</span>
           </span>
         </button>
@@ -445,6 +482,8 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
               <IconClock size={18} />
             </span>
           )}
+          {/* Calls are left to the ordinary chat: they are not covered by the
+              secret chat's keys, and offering them here would imply they were. */}
           {conversation.type === 'direct' && conversation.partner && (
             <>
               <button
@@ -624,7 +663,16 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
             </button>
           )}
 
-          {!firstLoad && windowed.length === 0 && (
+          {/* The start of a secret chat always explains itself. */}
+          {isSecret && !firstLoad && !more && <SecretBanner name={conversation.name} />}
+
+          {isSecret && place.ready && !place.here && (
+            <div className="system-note secret-warn" role="status">
+              This secret chat is on another device. Messages can only be read and sent there.
+            </div>
+          )}
+
+          {!firstLoad && windowed.length === 0 && !isSecret && (
             <div className="empty" style={{ margin: 'auto' }}>
               <svg className="empty-art" viewBox="0 0 200 200" fill="none" aria-hidden="true">
                 <rect x="24" y="30" width="152" height="120" rx="34" fill="var(--clay-surface)" />
@@ -660,6 +708,16 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
               </div>
             ))}
           </AnimatePresence>
+
+          {/* Said in the chat, where it will be seen, rather than tucked into a
+              settings screen nobody opens. */}
+          {isSecret && (keyStatus === 'changed' || keyStatus === 'gone') && (
+            <div className="system-note secret-warn" role="alert">
+              {keyStatus === 'changed'
+                ? `${conversation.name.split(' ')[0]}’s security key has changed since this chat began. Check the safety number before you trust it — or start a new secret chat.`
+                : `The device this chat is bound to no longer publishes its keys. ${conversation.name.split(' ')[0]} may have reinstalled Nook; start a new secret chat to keep talking privately.`}
+            </div>
+          )}
 
           {typers.length > 0 && (
             <motion.div

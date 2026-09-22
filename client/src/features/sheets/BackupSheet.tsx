@@ -128,7 +128,11 @@ export default function BackupSheet() {
       });
   }, [open, mode, source, drive?.connected, driveFiles]);
 
-  const chats = useMemo(() => order.map((id) => conversations[id]).filter(Boolean), [order, conversations]);
+  // Secret chats are backed up whole with their keys, never picked one by one.
+  const chats = useMemo(
+    () => order.map((id) => conversations[id]).filter((c) => c && c.type !== 'secret'),
+    [order, conversations]
+  );
 
   if (!me) return null;
 

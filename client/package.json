@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "preview": "vite preview --port 4173"
+    "preview": "vite preview --port 4173",
+    "e2ee:selftest": "node scripts/e2ee-selftest.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",

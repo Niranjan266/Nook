@@ -13,6 +13,8 @@ import { transcribe, canTranscribe } from '@/lib/transcribe';
 import { lazyChunk, prefetch, whenIdle } from '@/lib/idle';
 import { useStickers } from '@/stores/stickers';
 import type { PublicQuietHours, Conversation as Convo, Sticker } from '@/lib/types';
+import { encryptFile } from '@/lib/e2ee/media';
+import { useSecretPlace } from '@/lib/e2ee/useSecret';
 import {
   IconSend,
   IconPlus,
@@ -71,6 +73,11 @@ export default function Composer({ conversationId }: Props) {
   const enterToSend = useAuth((s) => s.me?.settings.enterToSend ?? true);
   const toast = useUi((s) => s.toast);
   const partner = conversation?.partner;
+  const meId = useAuth((s) => s.me?.id || '');
+  // In a secret chat every attachment is encrypted before it is uploaded, and
+  // snaps and send-later are off: neither has a secret version yet.
+  const place = useSecretPlace(conversation, meId);
+  const isSecret = place.secret;
   const [partnerQuiet, setPartnerQuiet] = useState<PublicQuietHours | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
@@ -282,6 +289,20 @@ export default function Composer({ conversationId }: Props) {
 
     setUploading({ name: file.name, pct: 0 });
     try {
+      if (isSecret) {
+        // Measured before encrypting — afterwards it is just bytes. Only the
+        // ciphertext is uploaded, under a name that says nothing.
+        const [sealed, dims] = await Promise.all([encryptFile(file), measure(file)]);
+        const { media } = await upload(sealed.blob, 'message', (pct) => setUploading({ name: file.name, pct }), 'encrypted.bin');
+        await send({
+          conversationId,
+          type: type === 'snap' ? 'image' : type,
+          media: { url: media.url, key: sealed.key, iv: sealed.iv, mime: file.type, name: file.name, size: file.size, ...dims },
+          body: '',
+          replyTo: replyTo?.id || null,
+        });
+        return;
+      }
       const [{ media }, dims] = await Promise.all([
         upload(file, 'message', (pct) => setUploading({ name: file.name, pct })),
         measure(file),
@@ -431,6 +452,19 @@ export default function Composer({ conversationId }: Props) {
       const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
       setUploading({ name: 'Voice message', pct: 0 });
       try {
+        if (isSecret) {
+          const sealed = await encryptFile(blob);
+          const { media } = await upload(sealed.blob, 'voice', (pct) => setUploading({ name: 'Voice message', pct }), 'encrypted.bin');
+          await send({
+            conversationId,
+            type: 'voice',
+            media: { url: media.url, key: sealed.key, iv: sealed.iv, mime: type, size: blob.size, duration: seconds, waveform: wave },
+            // Inside the ciphertext with everything else; the server never sees it.
+            transcript,
+            replyTo: replyTo?.id || null,
+          });
+          return;
+        }
         const { media } = await upload(blob, 'voice', (pct) => setUploading({ name: 'Voice message', pct }), `voice.${ext}`);
         await send({
           conversationId,
@@ -459,6 +493,26 @@ export default function Composer({ conversationId }: Props) {
    */
   if (conversation && conversation.canMessage === false) {
     return <LockedComposer conversation={conversation} />;
+  }
+
+  /**
+   * A secret chat opened on a device it is not bound to. There is nothing this
+   * device could encrypt with, so there is no text box pretending otherwise.
+   */
+  if (isSecret && place.ready && !place.here) {
+    return (
+      <div className="composer">
+        <div className="locked-composer clay secret-elsewhere">
+          <span className="clay-round" style={{ width: 38, height: 38, flex: 'none', background: 'var(--clay-sunk)', boxShadow: 'none' }}>
+            <IconLock size={17} />
+          </span>
+          <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
+            <span className="list-row-label">This secret chat is on another device</span>
+            <span className="list-row-sub">Its keys never leave that device, so it can only be read and written there.</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -616,6 +670,8 @@ export default function Composer({ conversationId }: Props) {
                     matters because "take a photo now" is not always possible —
                     a laptop with no webcam, a refused permission, or a picture
                     you already have. */}
+                {!isSecret && (
+                <>
                 <button
                   className="list-row"
                   onClick={() => {
@@ -644,6 +700,8 @@ export default function Composer({ conversationId }: Props) {
                     <span className="list-row-sub">From your library, still seen once</span>
                   </span>
                 </button>
+                </>
+                )}
                 <button
                   className="list-row"
                   onClick={() => {
@@ -704,7 +762,7 @@ export default function Composer({ conversationId }: Props) {
               ref={textarea}
               rows={1}
               className="groove"
-              placeholder={editing ? 'Edit your message' : 'Say something'}
+              placeholder={editing ? 'Edit your message' : isSecret ? 'Secret message' : 'Say something'}
               value={text}
               onChange={(e) => {
                 setText(e.target.value);
@@ -761,7 +819,7 @@ export default function Composer({ conversationId }: Props) {
             )}
           </div>
 
-          {text.trim() && !editing && (
+          {text.trim() && !editing && !isSecret && (
             <div style={{ position: 'relative' }}>
               <button
                 className={`clay-round${scheduleOpen ? ' on' : ''}`}

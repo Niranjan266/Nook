@@ -411,6 +411,9 @@ router.post(
   '/:id/pins/:messageId',
   asyncRoute(async (req, res) => {
     const convo = await load(req.params.id, req.user.id);
+    // A pin shows its message to everyone in the bar, in the clear. There is
+    // nothing readable to show in a secret chat, so pins are off there.
+    if (convo.type === 'secret') throw httpError(400, 'Pins are not available in secret chats.');
     const message = await M.findMessage(req.params.messageId);
     if (!message || String(message.conversation) !== String(convo.id))
       throw httpError(404, 'That message is not in this conversation.');

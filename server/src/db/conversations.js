@@ -45,6 +45,9 @@ function baseConversation(row) {
     disappearAfter: row.disappear_after,
     slowMode: row.slow_mode,
     retentionDays: row.retention_days,
+    // Secret chats only: the two bound devices, their public keys, and the
+    // signed handshake. Null everywhere else.
+    secret: parseJson(row.secret, null),
     lastActivity: new Date(row.last_activity),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -270,6 +273,7 @@ export async function createConversation({
   inviteCode = '',
   wallpaper,
   spaceId = null,
+  secret = null,
 }) {
   const id = newId();
   const t = now();
@@ -277,8 +281,8 @@ export async function createConversation({
   await run(
     `INSERT INTO conversations
        (id, type, space_id, name, description, avatar_url, invite_code, created_by,
-        wallpaper, wallpaper_schedule, room_state, last_activity, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, ?, '{}', ?, ?, ?)`,
+        wallpaper, wallpaper_schedule, room_state, secret, last_activity, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, ?, '{}', ?, ?, ?, ?)`,
     [
       id,
       type,
@@ -289,6 +293,7 @@ export async function createConversation({
       createdBy,
       toJson({ ...DEFAULT_WALLPAPER, ...(wallpaper || {}) }),
       toJson(DEFAULT_SCHEDULE),
+      secret ? toJson(secret) : '',
       t,
       t,
       t,

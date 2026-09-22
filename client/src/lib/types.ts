@@ -81,7 +81,9 @@ export type MessageType =
   | 'system'
   | 'call'
   | 'poll'
-  | 'list';
+  | 'list'
+  /** A secret-chat message as the server holds it: ciphertext in `body`. */
+  | 'encrypted';
 
 /**
  * A poll as the server lets this viewer see it. `voters` is always empty on an
@@ -263,6 +265,34 @@ export interface Message {
   /** Why it failed, when the server gave a reason worth showing. */
   failedReason?: string;
   uploadPct?: number;
+
+  /**
+   * Client-only, secret chats. Set once a ciphertext has been dealt with:
+   * 'ok' means `type`, `body` and `media` now hold what was inside it.
+   */
+  secret?: {
+    state: 'ok' | 'failed' | 'elsewhere' | 'unkept' | 'waiting';
+    note?: string;
+    /** How to open the attachment `media.url` points at. */
+    media?: { key: string; iv: string; mime: string };
+    /** The ciphertext as sent, so a retry resends it rather than re-encrypting. */
+    wire?: string;
+  };
+}
+
+/** One end of a secret chat: a person, their device, and its public keys. */
+export interface SecretEnd {
+  userId: string;
+  deviceId: string;
+  identityPub: JsonWebKey;
+  signingPub: JsonWebKey;
+}
+
+export interface SecretInfo {
+  version: number;
+  initiator: SecretEnd;
+  responder: SecretEnd;
+  handshake: { ephemeralPub: JsonWebKey; signature: string; at: string | null } | null;
 }
 
 export interface Pin {
@@ -292,7 +322,9 @@ export interface Wallpaper {
 
 export interface Conversation {
   id: string;
-  type: 'direct' | 'group';
+  type: 'direct' | 'group' | 'secret';
+  /** Secret chats only: the two bound devices, their keys, the handshake. */
+  secret?: SecretInfo | null;
   name: string;
   avatarUrl: string;
   description: string;

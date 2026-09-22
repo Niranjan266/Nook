@@ -99,9 +99,20 @@ export const listSchema = z.object({
     .default([]),
 });
 
+/**
+ * Ciphertext is longer than what it hides — base64 plus a header — so an
+ * 8000-character message encrypts to more than 8000 characters. Encrypted
+ * bodies get their own ceiling instead of silently failing near the top.
+ */
+const PLAIN_MAX = 8000;
+const CIPHER_MAX = 24000;
+
 const baseSendSchema = z.object({
-  type: z.enum(['text', 'image', 'video', 'audio', 'voice', 'file', 'snap', 'sticker', 'poll', 'list']).default('text'),
-  body: z.string().max(8000).optional(),
+  // 'encrypted' is a secret-chat message: `body` is ciphertext the server
+  // stores and relays without reading. What it really is — text, a photo, a
+  // voice note — is inside the ciphertext, where only the two devices see it.
+  type: z.enum(['text', 'image', 'video', 'audio', 'voice', 'file', 'snap', 'sticker', 'poll', 'list', 'encrypted']).default('text'),
+  body: z.string().max(CIPHER_MAX).optional(),
   media: mediaSchema.nullish(),
   replyTo: z.string().max(64).nullable().optional(),
   forwardedFrom: z.string().max(64).nullable().optional(),
@@ -155,6 +166,9 @@ export const sendPayloadSchema = baseSendSchema.superRefine((p, ctx) => {
     if (title) issue('body', 'Stickers do not take a caption.');
     if (p.viewOnce) issue('viewOnce', 'A sticker cannot be view-once.');
   }
+
+  if (p.type !== 'encrypted' && (p.body || '').length > PLAIN_MAX)
+    issue('body', 'That message is too long.');
 });
 
 /**

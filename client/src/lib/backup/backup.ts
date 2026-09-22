@@ -30,7 +30,7 @@ export { BackupError };
 
 export interface ArchivedConversation {
   id: string;
-  type: 'direct' | 'group';
+  type: Conversation['type'];
   name: string;
   avatarUrl: string;
   description: string;
@@ -143,7 +143,9 @@ export async function collectBackup(
     onProgress,
   }: { only?: string[] | null; signal?: AbortSignal; onProgress?: (p: Progress) => void } = {}
 ): Promise<BackupData> {
-  const all = await listConversations();
+  // Secret chats travel in `secret` below: the server only holds their
+  // ciphertext, so archiving it here would save pages nobody can read.
+  const all = (await listConversations()).filter((c) => c.type !== 'secret');
   const chosen = only ? all.filter((c) => only.includes(c.id)) : all;
 
   const data: BackupData = {

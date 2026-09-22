@@ -35,6 +35,9 @@ function baseMessage(row) {
     },
     type: row.type,
     body: row.body,
+    // Secret-chat ciphertext, stored beside `body` so the FTS triggers on
+    // `body` never see it. Opaque to the server.
+    cipher: row.cipher || '',
     media: parseJson(row.media, null),
     linkPreview: parseJson(row.link_preview, null),
     transcript: row.transcript || '',
@@ -376,16 +379,18 @@ export async function createMessageRow(input) {
 
   await run(
     `INSERT INTO messages
-       (id, conversation_id, sender_id, type, body, media, link_preview, transcript,
+       (id, conversation_id, sender_id, type, body, cipher, media, link_preview, transcript,
         reply_to_id, forwarded_from, thread_root_id, call_kind, call_status, call_duration,
         view_once, view_seconds, deleted_for_all, scheduled_for, delivered, expires_at, client_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
     [
       id,
       input.conversationId,
       input.senderId,
       input.type || 'text',
       (input.body || '').slice(0, 8000),
+      // Stored verbatim — truncating ciphertext would only make it undecryptable.
+      input.cipher || '',
       input.media ? toJson(input.media) : null,
       input.linkPreview ? toJson(input.linkPreview) : null,
       input.transcript || '',
@@ -445,7 +450,7 @@ export const setLinkPreview = (id, preview) =>
  */
 export async function deleteForEveryone(id) {
   await run(
-    `UPDATE messages SET deleted_for_all = 1, body = '', media = NULL, link_preview = NULL, transcript = ''
+    `UPDATE messages SET deleted_for_all = 1, body = '', cipher = '', media = NULL, link_preview = NULL, transcript = ''
       WHERE id = ?`,
     [id]
   );

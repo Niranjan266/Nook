@@ -109,8 +109,12 @@ export const previewOf = (m: {
   media?: { name?: string } | null;
   call?: { kind: string } | null;
   deletedForAll?: boolean;
+  secret?: { state: string } | null;
 }) => {
   if (m.deletedForAll) return 'This message was unsent';
+  // Ciphertext, or a secret message this device could not open: say what it
+  // is, never what it looks like.
+  if (m.type === 'encrypted' || (m.secret && m.secret.state !== 'ok')) return 'Secret message';
   switch (m.type) {
     case 'image':
       return 'Photo';

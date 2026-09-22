@@ -16,6 +16,9 @@ import {
 import { useUi } from '@/stores/ui';
 import { watchConversation } from '@/lib/focus';
 import type { Conversation, Message, Person, Reminder, ReminderDue, PollState, ListState } from '@/lib/types';
+import { reveal, revealAll, seal, keepSent, myDeviceId, startSecretChat, resetSecretState } from '@/lib/e2ee/secret';
+import { forgetDecrypted } from '@/lib/e2ee/media';
+import type { SecretInner } from '@/lib/e2ee/localHistory';
 
 interface Presence {
   online: boolean;
@@ -84,6 +87,10 @@ interface ChatState {
   setEditing: (m: Message | null) => void;
 
   openDirect: (userId: string) => Promise<string>;
+  /** Start (or reopen) a secret chat with someone, on one of their devices. */
+  openSecret: (userId: string, partnerDeviceId?: string) => Promise<string>;
+  /** A secret attachment has been opened locally: point the bubble at it. */
+  setSecretMediaUrl: (conversationId: string, messageId: string, url: string) => void;
   createGroup: (input: { name: string; memberIds: string[]; description?: string }) => Promise<string>;
   updatePrefs: (conversationId: string, prefs: Record<string, unknown>) => Promise<void>;
   setDisappearing: (conversationId: string, seconds: number) => Promise<void>;
@@ -154,6 +161,8 @@ interface ChatState {
 
   /** socket entry points */
   onMessage: (m: Message) => void;
+  /** onMessage for a message that is already readable. */
+  applyMessage: (m: Message) => void;
   onThreadReply: (payload: { rootId: string; message: Message; root: Message }) => void;
   onPins: (payload: { conversationId: string; pins: Conversation['pins'] }) => void;
   onMessageUpdate: (m: Message) => void;
@@ -258,6 +267,48 @@ function rollback(set: SetChat, get: () => ChatState, before: Message, guess: Me
   replaceMessage(set, before);
 }
 
+const meIdNow = () => (window as any).__nookMeId as string;
+
+/**
+ * Secret chats never go into the message cache. Their readable copy lives in
+ * the e2ee history store instead, which survives sign-out on purpose and is
+ * what backups carry; a second plaintext copy in the cache would be one more
+ * place for it to leak from and one more place to forget to clear.
+ */
+const cacheable = (conversations: Record<string, Conversation>, id: string) =>
+  conversations[id]?.type !== 'secret';
+
+/** What a secret message's ciphertext should carry, from what the composer passed. */
+function innerOf(input: { type: string; body: string; media?: any; transcript?: string }, quote: Message | null): SecretInner {
+  const inner: SecretInner = { t: input.type };
+  if (input.body) inner.b = input.body;
+  if (input.transcript) inner.tr = input.transcript;
+  if (input.media?.key) {
+    const m = input.media;
+    inner.m = {
+      url: m.url,
+      key: m.key,
+      iv: m.iv,
+      mime: m.mime,
+      name: m.name,
+      size: m.size,
+      width: m.width,
+      height: m.height,
+      duration: m.duration,
+      waveform: m.waveform,
+    };
+  }
+  if (quote) {
+    inner.r = {
+      id: quote.id,
+      b: quote.body ? quote.body.slice(0, 200) : '',
+      t: quote.type,
+      n: quote.sender?.displayName || '',
+    };
+  }
+  return inner;
+}
+
 const sortOrder = (convos: Record<string, Conversation>) =>
   Object.values(convos)
     .sort((a, b) => {
@@ -323,6 +374,8 @@ export const useChat = create<ChatState>((set, get) => ({
 
   reset() {
     clearCacheScope();
+    resetSecretState();
+    forgetDecrypted();
     set({
       conversations: {},
       order: [],
@@ -354,7 +407,7 @@ export const useChat = create<ChatState>((set, get) => ({
     cacheConversations(conversations);
 
     const ids = conversations.flatMap((c) =>
-      c.type === 'direct' && c.partner ? [c.partner.id] : []
+      (c.type === 'direct' || c.type === 'secret') && c.partner ? [c.partner.id] : []
     );
     if (ids.length) {
       getSocket()?.emit('presence:who', ids, (map2: Record<string, Presence>) => {
@@ -379,7 +432,7 @@ export const useChat = create<ChatState>((set, get) => ({
     if (get().loading[conversationId]) return;
     set((s) => ({ loading: { ...s.loading, [conversationId]: true } }));
 
-    if (!more && !get().messages[conversationId]) {
+    if (!more && !get().messages[conversationId] && cacheable(get().conversations, conversationId)) {
       const cached = await readCached<Message>(conversationId);
       if (cached.length) set((s) => ({ messages: { ...s.messages, [conversationId]: cached } }));
     }
@@ -393,6 +446,10 @@ export const useChat = create<ChatState>((set, get) => ({
       const data = await apiGet<{ messages: Message[]; hasMore: boolean }>(
         `/messages/${conversationId}?${query}`
       );
+
+      // Secret chats: open what this device can, before anything is drawn.
+      const convo = get().conversations[conversationId];
+      if (convo?.type === 'secret') data.messages = await revealAll(convo, data.messages, meIdNow());
 
       set((s) => {
         const current = s.messages[conversationId] || [];
@@ -423,7 +480,8 @@ export const useChat = create<ChatState>((set, get) => ({
           loading: { ...s.loading, [conversationId]: false },
         };
       });
-      cacheMessages(conversationId, get().messages[conversationId] || []);
+      if (cacheable(get().conversations, conversationId))
+        cacheMessages(conversationId, get().messages[conversationId] || []);
     } catch {
       set((s) => ({ loading: { ...s.loading, [conversationId]: false } }));
     }
@@ -446,6 +504,100 @@ export const useChat = create<ChatState>((set, get) => ({
   }) {
     const clientId = uid();
     const meId = (window as any).__nookMeId as string;
+
+    const convo = get().conversations[conversationId];
+    if (convo?.type === 'secret') {
+      if (scheduledFor) throw new Error('Secret messages cannot be scheduled.');
+      const quote = replyTo ? (get().messages[conversationId] || []).find((m) => m.id === replyTo) || null : null;
+      // The quote travels inside the ciphertext, named by the real name — the
+      // reader's own nickname for the author would mean nothing to them.
+      const authorName = quote
+        ? (convo.members.find((mm) => mm.user.id === quote.sender.id)?.user as Person | undefined)?.realName ||
+          (convo.members.find((mm) => mm.user.id === quote.sender.id)?.user as Person | undefined)?.displayName ||
+          ''
+        : '';
+      const inner = innerOf({ type, body, media, transcript }, quote && { ...quote, sender: { ...quote.sender, displayName: authorName } });
+      // Checked before sealing: a refusal after encrypting would spend a
+      // counter the partner then has to skip over.
+      if (new TextEncoder().encode(JSON.stringify(inner)).length > 15000)
+        throw new Error('That secret message is too long — try splitting it.');
+      // Encrypted before anything is shown or queued: the ratchet is saved
+      // as it advances, so the wire string is the one thing a retry reuses.
+      const wire = await seal(convo, inner);
+      const createdAt = new Date().toISOString();
+      await keepSent({
+        // Filed under the clientId alias until the server names it; reveal()
+        // re-files it under the real id when the echo arrives.
+        id: `c:${clientId}`,
+        clientId,
+        conversationId,
+        senderId: meId,
+        inner,
+        createdAt,
+        expiresAt: convo.disappearAfter ? new Date(Date.now() + convo.disappearAfter * 1000).toISOString() : null,
+      });
+
+      const shown: Message = {
+        id: clientId,
+        clientId,
+        conversationId,
+        sender: { id: meId },
+        type: 'encrypted',
+        body: wire,
+        media: null,
+        replyTo: null,
+        forwarded: false,
+        mentions: [],
+        reactions: [],
+        deliveredTo: [],
+        readBy: [],
+        starred: false,
+        deletedForAll: false,
+        deletedForMe: false,
+        editedAt: null,
+        viewOnce: null,
+        call: null,
+        expiresAt: null,
+        createdAt,
+        transcript: '',
+        threadRootId: null,
+        replyCount: 0,
+        threadUpdatedAt: null,
+        editCount: 0,
+        linkPreview: null,
+        scheduledFor: null,
+        status: 'pending',
+      };
+      const optimistic = { ...(await reveal(convo, shown, meId, await myDeviceId())), status: 'pending' as const };
+      set((s) => ({
+        messages: { ...s.messages, [conversationId]: [...(s.messages[conversationId] || []), optimistic] },
+        replyTo: null,
+      }));
+
+      const payload: Outgoing = { clientId, conversationId, type: 'encrypted', body: wire, queuedAt: Date.now() };
+      try {
+        const res = await emitAck<{ ok: boolean; message?: Message; error?: string }>('message:send', payload);
+        if (!res?.ok || !res.message) throw new Error(res?.error || 'send failed');
+        get().onMessage({ ...res.message, status: 'sent' });
+      } catch (err: any) {
+        const transient = isTransient(err);
+        if (transient) await enqueue(payload);
+        set((s) => ({
+          messages: {
+            ...s.messages,
+            [conversationId]: (s.messages[conversationId] || []).map((m) =>
+              m.clientId === clientId ? { ...m, status: 'failed', failedReason: err?.message || '' } : m
+            ),
+          },
+        }));
+        if (!transient)
+          useUi.getState().toast(
+            err?.message && err.message !== 'send failed' ? err.message : 'That message could not be sent.',
+            true
+          );
+      }
+      return;
+    }
 
     // A scheduled message doesn't belong in the stream yet — it hasn't happened.
     if (scheduledFor) {
@@ -580,7 +732,11 @@ export const useChat = create<ChatState>((set, get) => ({
     }));
     // Rebuilt from the bubble, so it has to carry everything the first send
     // did — a snap's timer and a voice note's transcript included.
-    const payload: Outgoing = {
+    // A secret message resends its original ciphertext. Re-encrypting would
+    // spend a second counter on the same words and leave a gap for no reason.
+    const payload: Outgoing = msg.secret?.wire
+      ? { clientId, conversationId, type: 'encrypted', body: msg.secret.wire, queuedAt: Date.now() }
+      : {
       clientId,
       conversationId,
       type: msg.type,
@@ -830,6 +986,23 @@ export const useChat = create<ChatState>((set, get) => ({
     });
     get().onConversation(conversation);
     return conversation.id;
+  },
+
+  async openSecret(userId, partnerDeviceId) {
+    const conversation = await startSecretChat(userId, partnerDeviceId);
+    get().onConversation(conversation);
+    return conversation.id;
+  },
+
+  setSecretMediaUrl(conversationId, messageId, url) {
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [conversationId]: (s.messages[conversationId] || []).map((m) =>
+          m.id === messageId && m.media ? { ...m, media: { ...m.media, url, thumbUrl: '' } } : m
+        ),
+      },
+    }));
   },
 
   async createGroup(input) {
@@ -1167,6 +1340,21 @@ export const useChat = create<ChatState>((set, get) => ({
   },
 
   onMessage(m) {
+    if (m.type !== 'encrypted') return get().applyMessage(m);
+    /**
+     * Ciphertext: opened first, then handled like any other arrival. A chat
+     * this device has not loaded yet still gets the message — as a
+     * placeholder that the next load replaces with the real thing.
+     */
+    const convo = get().conversations[m.conversationId];
+    if (!convo) return get().applyMessage({ ...m, type: 'text', body: '', secret: { state: 'waiting', wire: m.body } });
+    myDeviceId()
+      .then((deviceId) => reveal(convo, m, meIdNow(), deviceId))
+      .then((shown) => get().applyMessage(shown))
+      .catch(() => get().applyMessage({ ...m, type: 'text', body: '', secret: { state: 'failed', wire: m.body } }));
+  },
+
+  applyMessage(m) {
     set((s) => {
       const list = s.messages[m.conversationId] || [];
       const withoutOptimistic = list.filter(
@@ -1200,7 +1388,8 @@ export const useChat = create<ChatState>((set, get) => ({
       };
     });
 
-    cacheMessages(m.conversationId, get().messages[m.conversationId] || []);
+    if (cacheable(get().conversations, m.conversationId))
+      cacheMessages(m.conversationId, get().messages[m.conversationId] || []);
 
     // No sound here: notify.messageArrived plays it, honouring the chat's
     // tone and the Settings switches. Both used to fire, so every message
@@ -1211,6 +1400,24 @@ export const useChat = create<ChatState>((set, get) => ({
   },
 
   onMessageUpdate(m) {
+    // Reactions, receipts and unsends of secret messages arrive as ciphertext
+    // again; the kept copy makes reopening them free.
+    if (m.type === 'encrypted' && !m.deletedForMe) {
+      const convo = get().conversations[m.conversationId];
+      if (convo) {
+        myDeviceId()
+          .then((deviceId) => reveal(convo, m, meIdNow(), deviceId))
+          .then((shown) => {
+            // Keep a file already opened on screen rather than flashing back.
+            const current = (get().messages[m.conversationId] || []).find((x) => x.id === m.id);
+            const media =
+              current?.media?.url?.startsWith('blob:') && shown.media ? { ...shown.media, url: current.media.url } : shown.media;
+            get().onMessageUpdate({ ...shown, media });
+          })
+          .catch(() => {});
+        return;
+      }
+    }
     set((s) => {
       const list = s.messages[m.conversationId] || [];
       return {

@@ -9,6 +9,7 @@ import { disappearLabel, lastSeenLabel } from '@/lib/format';
 import { SOUNDS, previewSound } from '@/lib/sounds';
 import { exportConversation } from '@/lib/export';
 import CodeEntry from '@/components/CodeEntry';
+import SecretSection from './SecretSection';
 import type { Person, Conversation as Convo } from '@/lib/types';
 import {
   IconWall,
@@ -56,6 +57,9 @@ export default function ChatInfoSheet() {
   if (!conversation || !me) return null;
 
   const isGroup = conversation.type === 'group';
+  // Secret chats hide what would sit beside the ciphertext in plain text:
+  // the wall and mood, the shared-media list, and exports.
+  const isSecret = conversation.type === 'secret';
   const partner = conversation.partner;
   const partnerPresence = partner ? presence[partner.id] : undefined;
   const isAdmin = conversation.myRole === 'admin';
@@ -87,7 +91,7 @@ export default function ChatInfoSheet() {
   };
 
   return (
-    <Sheet open={open} onClose={closeSheet} title={isGroup ? 'Group' : 'Contact'}>
+    <Sheet open={open} onClose={closeSheet} title={isGroup ? 'Group' : isSecret ? 'Secret chat' : 'Contact'}>
       <div className="stack" style={{ alignItems: 'center', gap: 10, padding: '4px 0 8px' }}>
         <Avatar
           name={conversation.name}
@@ -172,7 +176,39 @@ export default function ChatInfoSheet() {
         </div>
       )}
 
+      {isSecret && <SecretSection conversation={conversation} meId={me.id} />}
+
+      {/* From someone's profile: the private version of this conversation. */}
+      {conversation.type === 'direct' && partner && (
+        <div className="sheet-section">
+          <button
+            className="list-row secret-row"
+            onClick={async () => {
+              try {
+                const id = await useChat.getState().openSecret(partner.id);
+                useChat.getState().setActive(id);
+                closeSheet();
+              } catch (e: any) {
+                toast(e?.message || 'Could not start a secret chat.', true);
+              }
+            }}
+          >
+            <span className="clay-round secret-seal" style={{ width: 34, height: 34, boxShadow: 'none' }}>
+              <IconLock size={16} />
+            </span>
+            <span className="grow">
+              <span className="list-row-label">Start a secret chat</span>
+              <span className="list-row-sub">
+                End-to-end encrypted, between this device and {partner.displayName.split(' ')[0]}’s
+              </span>
+            </span>
+          </button>
+        </div>
+      )}
+
       <div className="sheet-section">
+        {!isSecret && (
+        <>
         <button className="list-row" onClick={() => openSheet('room')}>
           <IconWall size={19} />
           <span className="grow">
@@ -198,6 +234,8 @@ export default function ChatInfoSheet() {
             <span className="list-row-sub">Everything sent here, without scrolling back</span>
           </span>
         </button>
+        </>
+        )}
 
         <button className="list-row" onClick={() => openSheet('wallpaper')}>
           <IconWallpaper size={19} />
@@ -427,6 +465,7 @@ export default function ChatInfoSheet() {
       )}
 
       {/* ── take it with you ─────────────────────────────────────────── */}
+      {!isSecret && (
       <div className="sheet-section">
         <span className="eyebrow">Take it with you</span>
         <button
@@ -475,6 +514,7 @@ export default function ChatInfoSheet() {
           </button>
         )}
       </div>
+      )}
 
       <div className="sheet-section">
         <span className="eyebrow">Careful now</span>

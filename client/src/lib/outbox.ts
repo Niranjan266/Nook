@@ -69,6 +69,9 @@ export function setCacheScope(userId: string | null) {
   scope = userId || 'anon';
 }
 
+/** The signed-in account's scope, for other stores that key by account. */
+export const cacheScope = () => scope;
+
 /**
  * Sign-out: drop everything this account cached, outbox included. On a shared
  * computer the next person should not find the last one's messages sitting in

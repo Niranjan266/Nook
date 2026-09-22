@@ -27,6 +27,7 @@ import { IMPERSONATE_KEY } from '@/lib/adminApi';
 import { initTitle, watchFocus, onBanner } from '@/lib/notify';
 import MessageBanner, { type BannerMessage } from '@/components/MessageBanner';
 import { setCacheScope } from '@/lib/outbox';
+import { publishDevice } from '@/lib/e2ee/secret';
 import { usePhone, useNarrow } from '@/lib/useMediaQuery';
 import { spring } from '@/lib/motion';
 import { IconPlus, IconWarning } from '@/components/Icon';
@@ -337,6 +338,12 @@ function Nook() {
        * unsubscribed forever.
        */
       resumePush().catch(() => {});
+      /**
+       * Make this device's secret-chat keys if it has none, and publish the
+       * public halves. Every start, because it also says "this device is still
+       * in use" — which is how a new secret chat picks the partner's device.
+       */
+      publishDevice().catch(() => {});
     }
   }, [me?.id]);
 

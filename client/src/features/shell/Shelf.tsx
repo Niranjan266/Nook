@@ -153,7 +153,7 @@ export default function Shelf() {
             return (
               <motion.li key={c.id} variants={listItem} layout exit={{ opacity: 0, x: -14 }} transition={spring}>
                 <button
-                  className={`tile${activeId === c.id ? ' active' : ''}${c.unread > 0 ? ' unread' : ''}`}
+                  className={`tile${activeId === c.id ? ' active' : ''}${c.unread > 0 ? ' unread' : ''}${c.type === 'secret' ? ' secret' : ''}`}
                   style={{ ['--tile-tint' as any]: c.wallpaper?.tint || undefined }}
                   onClick={() => pick(c.id)}
                   aria-current={activeId === c.id}
@@ -171,7 +171,12 @@ export default function Shelf() {
 
                   <span className="tile-body">
                     <span className="tile-top">
-                      <span className="tile-name truncate">{c.name}</span>
+                      <span className="tile-name truncate">
+                        {/* A secret chat sits beside the ordinary one with the same
+                            name, so the lock is what tells them apart. */}
+                        {c.type === 'secret' && <IconLock size={13} className="secret-lock" />}
+                        {c.name}
+                      </span>
                       {last && <span className="tile-time tabular">{stamp(last.createdAt)}</span>}
                     </span>
 

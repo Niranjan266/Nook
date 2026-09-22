@@ -102,6 +102,34 @@ const automatic = {
     banner: ({ sender, preview }) => ({ title: who(sender), body: trim(preview, 80) }),
   },
 
+  /**
+   * A message in a secret chat.
+   *
+   * Its own template rather than `message` with a fixed preview, so that it
+   * has no `preview` field at all: whatever a caller passes, there is nothing
+   * here that could carry the text — which the server cannot read anyway —
+   * or the ciphertext, which would be noise on a lock screen and a hint to
+   * anyone looking over a shoulder that it exists.
+   */
+  secretMessage: {
+    id: 'secret-message',
+    label: 'New secret message',
+    kind: 'automatic',
+    fields: ['sender'],
+    push: ({ sender, conversationId, messageId, icon, sound, vibrate }) => ({
+      title: who(sender),
+      body: 'New secret message',
+      tag: `convo-${conversationId}`,
+      conversationId: String(conversationId ?? ''),
+      messageId: String(messageId ?? ''),
+      icon: icon || '/logo.svg',
+      sound,
+      vibrate,
+    }),
+    email: null,
+    banner: ({ sender }) => ({ title: who(sender), body: 'New secret message' }),
+  },
+
   friendRequest: {
     id: 'friend-request',
     label: 'Someone wants to chat',

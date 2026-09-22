@@ -33,6 +33,7 @@ import linkRoutes from './routes/links.js';
 import reminderRoutes from './routes/reminders.js';
 import stickerRoutes from './routes/stickers.js';
 import backupRoutes from './routes/backup.js';
+import e2eeRoutes from './routes/e2ee.js';
 import { startKeepAwake } from './services/keepAwake.js';
 
 const app = express();
@@ -139,6 +140,7 @@ app.use('/api/links', linkRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/stickers', stickerRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/e2ee', e2eeRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

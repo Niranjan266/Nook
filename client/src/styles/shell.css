@@ -971,3 +971,11 @@ button.list-row:active {
   text-align: right;
   margin-top: 2px;
 }
+
+/* A secret chat's tile: the same tile, edged in moss. */
+.tile.secret {
+  background: color-mix(in srgb, var(--moss) 7%, transparent);
+}
+.tile.secret.active::after {
+  background: var(--moss);
+}

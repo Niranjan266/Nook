@@ -142,7 +142,8 @@ export function serializeMessage(m, viewerId) {
     conversationId: String(m.conversation?._id || m.conversation),
     sender: m.sender?.username ? serializeUser(m.sender, viewer) : { id: senderId },
     type: m.type,
-    body: m.deletedForAll || deletedForMe ? '' : m.body || '',
+    // An encrypted message's body is its ciphertext, handed back verbatim.
+    body: m.deletedForAll || deletedForMe ? '' : m.type === 'encrypted' ? m.cipher || '' : m.body || '',
     media:
       m.deletedForAll || deletedForMe || burnt
         ? null
@@ -228,12 +229,35 @@ export function serializeMessage(m, viewerId) {
   };
 }
 
+const serializeEnd = (e) =>
+  e
+    ? {
+        userId: String(e.userId || ''),
+        deviceId: String(e.deviceId || ''),
+        identityPub: e.identityPub || null,
+        signingPub: e.signingPub || null,
+      }
+    : null;
+
+function serializeSecret(s) {
+  return {
+    version: s.v || 1,
+    initiator: serializeEnd(s.initiator),
+    responder: serializeEnd(s.responder),
+    handshake: s.handshake?.ephemeralPub
+      ? { ephemeralPub: s.handshake.ephemeralPub, signature: s.handshake.signature, at: iso(s.handshake.at) }
+      : null,
+  };
+}
+
 export function serializeConversation(c, viewerId) {
   if (!c) return null;
   const viewer = String(viewerId || '');
   const mine = (c.members || []).find((m) => String(m.user?._id || m.user?.id || m.user) === viewer);
   const others = (c.members || []).filter((m) => String(m.user?._id || m.user?.id || m.user) !== viewer);
-  const partner = c.type === 'direct' ? others[0]?.user : null;
+  // A secret chat is a direct chat with keys: same two people, same naming.
+  const oneToOne = c.type === 'direct' || c.type === 'secret';
+  const partner = oneToOne ? others[0]?.user : null;
 
   /**
    * "Locked and not currently open." Everything that would leak the contents
@@ -267,6 +291,13 @@ export function serializeConversation(c, viewerId) {
     createdBy: c.createdBy ? String(c.createdBy) : null,
 
     /**
+     * Secret chats: which device on each side the chat is bound to, the public
+     * keys each had when it began, and the creator's signed handshake. Public
+     * material only, sent to both members so each can check the other.
+     */
+    secret: c.type === 'secret' && c.secret ? serializeSecret(c.secret) : null,
+
+    /**
      * Whether this viewer may write here yet.
      *
      * Only direct chats can be locked; a group you are a member of was already
@@ -274,7 +305,7 @@ export function serializeConversation(c, viewerId) {
      * to show the right thing instead of a text box that will bounce — and the
      * real refusal happens in `createMessage` against the database.
      */
-    canMessage: c.type !== 'direct' || !partner || canWriteTo(viewer, String(partner._id || partner.id)),
+    canMessage: !oneToOne || !partner || canWriteTo(viewer, String(partner._id || partner.id)),
 
     /**
      * A personal wallpaper overrides the room's, for this viewer alone. Both
