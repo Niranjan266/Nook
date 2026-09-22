@@ -30,6 +30,11 @@ export ADMIN_EMAILS=''
 # dotenv fills in anything not set here from server/.env, which holds real
 # mail credentials. Tests must never send real email.
 export MAIL_PROVIDER=console
+# Same for calls: the route must serve plain STUN here, and must never mint
+# real Cloudflare credentials. Empty still counts as set, so dotenv leaves it.
+export CLOUDFLARE_TURN_KEY_ID=
+export CLOUDFLARE_TURN_API_TOKEN=
+export TURN_URL=
 
 rm -f "$DB"*
 node src/index.js > /tmp/nook-test-server.log 2>&1 &
@@ -51,7 +56,7 @@ if [ $# -gt 0 ]; then
   SUITES=()
   for name in "$@"; do SUITES+=("test/$name.mjs"); done
 else
-  SUITES=(test/features.mjs test/security.mjs test/snap.mjs test/notify.mjs test/push.mjs test/google-native.mjs test/notifyprefs.mjs test/templates.mjs test/account.mjs test/snapkeep.mjs)
+  SUITES=(test/features.mjs test/security.mjs test/snap.mjs test/notify.mjs test/push.mjs test/google-native.mjs test/notifyprefs.mjs test/templates.mjs test/account.mjs test/snapkeep.mjs test/turn.mjs)
 fi
 
 FAILED=0

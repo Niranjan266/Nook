@@ -147,3 +147,9 @@ services:
         sync: false
       - key: TURN_CREDENTIAL
         sync: false
+      # Cloudflare Realtime TURN; when set, the server mints short-lived
+      # relay credentials instead of using TURN_URL. See docs/ENV-VARS.md.
+      - key: CLOUDFLARE_TURN_KEY_ID
+        sync: false
+      - key: CLOUDFLARE_TURN_API_TOKEN
+        sync: false

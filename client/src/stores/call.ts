@@ -56,9 +56,11 @@ let callSeq = 0;
 async function iceConfig(): Promise<RTCConfiguration> {
   try {
     const { iceServers } = await apiGet<{ iceServers: RTCIceServer[] }>('/calls/ice');
-    return { iceServers };
+    // As served: the server already dropped what browsers cannot use. 'all'
+    // lets a direct path win and TURN catch whoever is behind a strict NAT.
+    return { iceServers, iceTransportPolicy: 'all' };
   } catch {
-    return { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    return { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], iceTransportPolicy: 'all' };
   }
 }
 
@@ -227,6 +229,8 @@ export const useCall = create<CallState>((set, get) => ({
         else early.push(e.candidate);
       };
       conn.onconnectionstatechange = () => {
+        // No retry: with TURN in the config the relay was already among the
+        // candidates tried, so a failure here is final.
         if (conn.connectionState === 'failed' && pc === conn) {
           set({ error: 'Could not connect — you may both be behind strict firewalls.' });
           get().hangUp('failed');

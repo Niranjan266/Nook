@@ -149,6 +149,18 @@ export const env = {
     turnUrl: process.env.TURN_URL || '',
     turnUsername: process.env.TURN_USERNAME || '',
     turnCredential: process.env.TURN_CREDENTIAL || '',
+
+    /**
+     * Cloudflare Realtime TURN. When both are set, /calls/ice mints
+     * short-lived credentials instead of handing out a static password that
+     * anyone who opens devtools can reuse forever.
+     */
+    cloudflare: {
+      keyId: (process.env.CLOUDFLARE_TURN_KEY_ID || '').trim(),
+      apiToken: (process.env.CLOUDFLARE_TURN_API_TOKEN || '').trim(),
+      // Tests only — points the client at a local mock.
+      apiBase: (process.env.CLOUDFLARE_TURN_API_BASE || 'https://rtc.live.cloudflare.com/v1').replace(/\/+$/, ''),
+    },
   },
 };
 

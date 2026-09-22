@@ -335,6 +335,30 @@ answered, and then stay silent. Fixing that needs a TURN relay, which costs
 money because it carries the actual audio and video. Metered and Twilio both
 sell one; there is no free always-on option worth relying on.
 
+#### Cloudflare TURN (recommended)
+
+| Name | Value |
+|---|---|
+| `CLOUDFLARE_TURN_KEY_ID` | the **Turn Token ID** |
+| `CLOUDFLARE_TURN_API_TOKEN` | the **API Token** — **Secret** |
+
+With both set, the server asks Cloudflare for relay credentials that expire
+after 24 hours, shares one set across every caller, and renews it an hour
+before it runs out. Nothing permanent reaches the browser, unlike `TURN_URL`
+with a fixed password. If Cloudflare is unreachable, calls fall back to STUN
+plus `TURN_URL` (if set), and the server logs it once.
+
+1. Cloudflare dashboard → **Realtime** → **TURN Server** → **Create**.
+2. Give it a name and create it. Copy the **Turn Token ID** and the
+   **API Token** shown — the token is shown only once.
+3. In Render → the API service → **Environment**, add
+   `CLOUDFLARE_TURN_KEY_ID` = the Turn Token ID and
+   `CLOUDFLARE_TURN_API_TOKEN` = the API Token, then save (Render redeploys).
+4. Check: signed in, `GET /api/calls/ice` should list `turn:turn.cloudflare.com`
+   URLs alongside STUN.
+
+`TURN_URL` and friends can stay blank once this is set.
+
 ---
 
 ## Mobile — `mobile/.env` and `mobile/eas.json`

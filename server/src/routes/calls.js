@@ -1,12 +1,21 @@
 import { Router } from 'express';
 import { listCalls } from '../db/misc.js';
 import { asyncRoute, requireAuth } from '../middleware/auth.js';
-import { iceServers } from '../config/env.js';
+import { iceServers } from '../services/turn.js';
 
 const router = Router();
 router.use(requireAuth);
 
-router.get('/ice', (req, res) => res.json({ iceServers: iceServers() }));
+// Behind requireAuth above: these are relay credentials, and a stranger who
+// could mint them would be relaying their traffic on our bill.
+router.get(
+  '/ice',
+  asyncRoute(async (req, res) => {
+    // Credentials — never let a proxy or the browser cache hand them on.
+    res.set('Cache-Control', 'no-store');
+    res.json({ iceServers: await iceServers() });
+  })
+);
 
 router.get(
   '/',
