@@ -157,7 +157,7 @@ export function buildMessage(token, payload, device = {}) {
           channel_id: channel,
           tag: payload.tag || `nook-${payload.conversationId || 'general'}`,
           icon: 'ic_stat_nook',
-          color: '#C0603C',
+          color: '#8B7CFF', // iris: the pebble mark's colour, tints the notification icon
           // Pre-Oreo has no channels, so the sound and buzz ride on the
           // notification. Only for v2 builds: older APKs lack the _v2 sounds.
           ...(v2 && {

@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { spring } from '@/lib/motion';
+import { popFrom, spring } from '@/lib/motion';
 import { safeUrl } from '@/lib/config';
 import { useStickers } from '@/stores/stickers';
 import { useUi } from '@/stores/ui';
@@ -93,12 +93,13 @@ export default function StickerTray({ open, onClose, onPick, onMake, anchor }: P
       {open && (
         <motion.div
           ref={panel}
-          className="emoji-pop sticker-tray clay"
+          className="emoji-pop sticker-tray"
           style={anchor ? { left: Math.max(12, anchor.left), bottom: anchor.bottom } : { left: 12, bottom: 96 }}
-          initial={{ opacity: 0, y: 10, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          transition={spring}
+          // Grows out of the button that opened it, just below-left.
+          variants={popFrom('bottom left')}
+          initial="hidden"
+          animate="show"
+          exit="exit"
           role="dialog"
           aria-label="Your stickers"
         >

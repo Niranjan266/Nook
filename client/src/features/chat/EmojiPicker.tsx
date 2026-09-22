@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { spring } from '@/lib/motion';
+import { popFrom } from '@/lib/motion';
 import { IconSearch, IconClock, IconClose } from '@/components/Icon';
 
 /**
@@ -273,16 +273,17 @@ export default function EmojiPicker({ open, onClose, onPick, anchor }: Props) {
       {open && (
         <motion.div
           ref={panel}
-          className="emoji-pop clay"
+          className="emoji-pop"
           style={
             anchor
               ? { left: Math.max(12, anchor.left), bottom: anchor.bottom }
               : { left: 12, bottom: 96 }
           }
-          initial={{ opacity: 0, y: 10, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          transition={spring}
+          // Grows out of the button that opened it, just below-left.
+          variants={popFrom('bottom left')}
+          initial="hidden"
+          animate="show"
+          exit="exit"
           role="dialog"
           aria-label="Choose an emoji"
         >

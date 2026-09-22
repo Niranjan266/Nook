@@ -46,19 +46,18 @@ export default function RemindersSheet() {
             {r.note || c?.name || 'Conversation'}
           </span>
           <span className="list-row-sub truncate" style={r.gone ? { fontStyle: 'italic' } : undefined}>
-            {r.locked && <IconLock size={11} style={{ verticalAlign: -1, marginRight: 4 }} />}
+            {r.locked && <IconLock size={12} style={{ verticalAlign: -1, marginRight: 'var(--s-1)' }} />}
             {r.senderName && !r.gone && !r.locked ? `${r.senderName}: ` : ''}
             {what}
           </span>
-          <span className="tiny" style={{ color: pending ? 'var(--accent-deep)' : 'var(--ink-faint)', fontWeight: 600 }}>
-            <IconBell size={11} style={{ verticalAlign: -1 }} /> {pending ? '' : 'Reminded '}
+          <span className={`row-when${pending ? ' on' : ''}`}>
+            <IconBell size={12} /> {pending ? '' : 'Reminded '}
             {whenFull(pending ? r.remindAt : r.firedAt || r.remindAt)}
           </span>
         </button>
         {pending && (
           <button
-            className="clay-round"
-            style={{ width: 32, height: 32, color: 'var(--rust)' }}
+            className="row-action danger"
             onClick={() =>
               cancelReminder(r.id)
                 .then(() => toast('Reminder cancelled'))
@@ -66,7 +65,7 @@ export default function RemindersSheet() {
             }
             aria-label="Cancel this reminder"
           >
-            <IconTrash size={15} />
+            <IconTrash size={18} />
           </button>
         )}
       </div>
@@ -77,7 +76,7 @@ export default function RemindersSheet() {
     <Sheet open={open} onClose={closeSheet} title="Reminders">
       <div className="sheet-section">
         {upcoming.length === 0 && (
-          <p className="small muted">
+          <p className="sheet-note">
             Nothing waiting. Open a message's menu and choose <strong>Remind me</strong> to have it brought back
             later.
           </p>

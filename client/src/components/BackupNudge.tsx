@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUi } from '@/stores/ui';
-import { spring } from '@/lib/motion';
+import { toastDrop } from '@/lib/motion';
 import { readPrefs, writePrefs, backupDue } from '@/lib/backup/prefs';
 import { bindDriveReturn, driveErrorText, DRIVE_RETURN_KEY } from '@/lib/backup/drive';
 import { IconArchive, IconClose } from '@/components/Icon';
@@ -68,15 +68,15 @@ export default function BackupNudge({ userId }: { userId: string }) {
     <AnimatePresence>
       {due && !sheet && (
         <motion.div
-          className="notify-nudge backup-nudge clay"
-          initial={{ opacity: 0, y: -24, x: '-50%' }}
-          animate={{ opacity: 1, y: 0, x: '-50%' }}
-          exit={{ opacity: 0, y: -24, x: '-50%' }}
-          transition={spring}
+          className="notify-nudge backup-nudge"
+          variants={toastDrop}
+          initial="hidden"
+          animate="show"
+          exit="exit"
           role="dialog"
           aria-label="Back up your chats"
         >
-          <span className="clay-round" style={{ width: 40, height: 40, flex: 'none' }}>
+          <span className="notify-nudge-icon">
             <IconArchive size={18} />
           </span>
           <span className="grow stack" style={{ gap: 2, minWidth: 0 }}>
@@ -92,7 +92,7 @@ export default function BackupNudge({ userId }: { userId: string }) {
             </button>
           </span>
           <button className="notify-nudge-x" onClick={later} aria-label="Dismiss">
-            <IconClose size={15} />
+            <IconClose size={16} />
           </button>
         </motion.div>
       )}

@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChat } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
 import Avatar from '@/components/Avatar';
 import { stamp, previewOf } from '@/lib/format';
-import { listStagger, listItem, spring } from '@/lib/motion';
+import { listStagger, listItem, spring, springs, popIn } from '@/lib/motion';
 import { usePhone } from '@/lib/useMediaQuery';
-import { ThemeToggle } from './DockRail';
+import { ThemeToggle, Badge } from './DockRail';
+import Logo from '@/components/Logo';
 import {
   IconPlus,
   IconSearch,
@@ -31,6 +32,13 @@ const BUILT_IN: { id: Tab; label: string }[] = [
   { id: 'archived', label: 'Archived' },
 ];
 
+/**
+ * The list staggers in once per session. The shelf remounts every time a
+ * phone comes back from a conversation, and a list that re-deals itself on
+ * every return reads as a reload rather than a place you came back to.
+ */
+let dealt = false;
+
 export default function Shelf() {
   const { conversations, order, activeId, setActive, presence, typing } = useChat();
   const { openSheet, setShelf } = useUi();
@@ -40,6 +48,11 @@ export default function Shelf() {
   const isPhone = usePhone();
 
   const meId = (window as any).__nookMeId as string;
+  const me = useAuth((s) => s.me);
+  const [firstDeal] = useState(() => !dealt);
+  useEffect(() => {
+    dealt = true;
+  }, []);
 
   const list = useMemo(() => {
     let items = order.map((id) => conversations[id]).filter(Boolean);
@@ -77,72 +90,71 @@ export default function Shelf() {
       transition={spring}
     >
       <div className="shelf-head">
-        <h1 className="shelf-title">Nook</h1>
-        {/* On a desk the rail carries it; the phone dock has no room left. */}
-        {isPhone && <ThemeToggle />}
-        <button
-          className="clay-round"
-          onClick={() => openSheet('new-chat')}
-          aria-label="New conversation"
-          data-tour="new-chat"
-        >
-          <IconPlus />
-        </button>
+        <div className="shelf-brand">
+          {isPhone && <Logo size={34} tile={false} />}
+          <h1 className="shelf-title">Chats</h1>
+        </div>
+        {/* On a desk the rail carries it; the phone bar has no room left. */}
+        {isPhone && <ThemeToggle className="clay-round" />}
+        {isPhone ? (
+          me && (
+            <button className="shelf-me" onClick={() => openSheet('settings')} aria-label="Your profile">
+              <Avatar name={me.displayName} src={me.avatarUrl} id={me.id} accent={me.accent} size={38} />
+            </button>
+          )
+        ) : (
+          <button className="clay-round" onClick={() => openSheet('new-chat')} aria-label="New conversation">
+            <IconPlus />
+          </button>
+        )}
       </div>
 
-      <div className="shelf-search">
-        <label className="row" style={{ position: 'relative' }}>
-          <span className="sr-only">Filter conversations</span>
-          <IconSearch
-            size={17}
-            style={{ position: 'absolute', left: 14, color: 'var(--ink-faint)', pointerEvents: 'none' }}
-          />
-          <input
-            className="groove"
-            style={{ paddingLeft: 40 }}
-            placeholder="Find a conversation"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-      </div>
+      <label className="shelf-search">
+        <span className="sr-only">Filter conversations</span>
+        <IconSearch size={20} className="shelf-search-icon" />
+        <input
+          className="groove"
+          placeholder="Find a conversation"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
 
       <div className="shelf-tabs" role="tablist" data-tour="chats">
-        {BUILT_IN.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`shelf-tab${tab === t.id ? ' on' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-        {folders.map((f) => (
-          <button
-            key={f.id}
-            role="tab"
-            aria-selected={tab === f.id}
-            className={`shelf-tab${tab === f.id ? ' on' : ''}`}
-            onClick={() => setTab(f.id)}
-            title={`${f.conversations.length} in this folder`}
-          >
-            {f.emoji ? `${f.emoji} ` : ''}
-            {f.name}
-          </button>
-        ))}
+        {[...BUILT_IN, ...folders.map((f) => ({ id: f.id, label: `${f.emoji ? `${f.emoji} ` : ''}${f.name}`, count: f.conversations.length }))].map(
+          (t: { id: Tab; label: string; count?: number }) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              className={`shelf-tab${tab === t.id ? ' on' : ''}`}
+              onClick={() => setTab(t.id)}
+              title={t.count !== undefined ? `${t.count} in this folder` : undefined}
+            >
+              {/* One pill for the whole row, so the choice slides across. */}
+              {tab === t.id && <motion.span layoutId="shelf-tab-pill" className="shelf-tab-pill" transition={springs.pop} />}
+              <span>{t.label}</span>
+            </button>
+          )
+        )}
         <button
-          className="shelf-tab"
+          className="shelf-tab shelf-tab-icon"
           onClick={() => openSheet('folders')}
           aria-label="Manage folders"
           title="Folders"
         >
-          <IconFolder size={15} />
+          <span>
+            <IconFolder size={16} />
+          </span>
         </button>
       </div>
 
-      <motion.ul className="shelf-list" variants={listStagger} initial="hidden" animate="show">
+      <motion.ul
+        className="shelf-list"
+        variants={listStagger}
+        initial={firstDeal ? 'hidden' : false}
+        animate="show"
+      >
         <AnimatePresence initial={false}>
           {list.map((c) => {
             const online = c.partner ? presence[c.partner.id]?.online : false;
@@ -151,7 +163,15 @@ export default function Shelf() {
             const lastIsMine = last?.sender?.id === meId;
 
             return (
-              <motion.li key={c.id} variants={listItem} layout exit={{ opacity: 0, x: -14 }} transition={spring}>
+              // layout: a new message bumping a chat to the top slides it
+              // there, and the others make room, instead of a jump cut.
+              <motion.li
+                key={c.id}
+                variants={listItem}
+                layout="position"
+                exit={{ opacity: 0, x: -14, transition: { duration: 0.16 } }}
+                transition={{ layout: springs.gentle }}
+              >
                 <button
                   className={`tile${activeId === c.id ? ' active' : ''}${c.unread > 0 ? ' unread' : ''}${c.type === 'secret' ? ' secret' : ''}`}
                   style={{ ['--tile-tint' as any]: c.wallpaper?.tint || undefined }}
@@ -163,7 +183,7 @@ export default function Shelf() {
                     src={c.avatarUrl}
                     id={c.partner?.id || c.id}
                     accent={c.partner?.accent}
-                    size={46}
+                    size={50}
                     online={online}
                     showDot
                     square={c.type === 'group'}
@@ -182,22 +202,19 @@ export default function Shelf() {
 
                     <span className="tile-bottom">
                       {someoneTyping ? (
-                        <span className="tile-preview truncate" style={{ color: 'var(--moss-deep)', fontWeight: 600 }}>
+                        <span className="tile-preview tile-typing truncate">
                           typing…
                         </span>
                       ) : (
                         <>
                           {lastIsMine && last && (
-                            <span
-                              className={`ticks${last.readBy.length > 0 ? ' read' : ''}`}
-                              style={{ color: last.readBy.length ? 'var(--clay-blue)' : 'var(--ink-faint)' }}
-                            >
+                            <span className={`tile-ticks${last.readBy.length > 0 ? ' read' : ''}`}>
                               {last.status === 'pending' ? (
-                                <IconClockSmall size={12} />
+                                <IconClockSmall size={14} />
                               ) : last.readBy.length || last.deliveredTo.length ? (
-                                <IconTickDouble size={15} />
+                                <IconTickDouble size={16} />
                               ) : (
-                                <IconTick size={15} />
+                                <IconTick size={16} />
                               )}
                             </span>
                           )}
@@ -211,11 +228,11 @@ export default function Shelf() {
                       )}
 
                       <span className="tile-marks">
-                        {c.locked && <IconLock size={13} style={{ color: 'var(--ink-faint)' }} />}
-                        {c.disappearAfter > 0 && <IconClock size={13} style={{ color: 'var(--ink-faint)' }} />}
-                        {c.muted && <IconBellOff size={13} style={{ color: 'var(--ink-faint)' }} />}
-                        {c.pinned && <IconPin size={13} style={{ color: 'var(--ink-faint)' }} />}
-                        {c.unread > 0 && <span className="chip">{c.unread > 99 ? '99+' : c.unread}</span>}
+                        {c.locked && <IconLock size={14} />}
+                        {c.disappearAfter > 0 && <IconClock size={14} />}
+                        {c.muted && <IconBellOff size={14} />}
+                        {c.pinned && <IconPin size={14} />}
+                        {c.unread > 0 && <Badge n={c.unread} />}
                       </span>
                     </span>
                   </span>
@@ -226,11 +243,11 @@ export default function Shelf() {
         </AnimatePresence>
 
         {list.length === 0 && (
-          <li className="stack" style={{ gap: 12, padding: '32px 16px', textAlign: 'center', alignItems: 'center' }}>
-            <span className="clay-round" style={{ width: 54, height: 54, color: 'var(--ink-faint)' }}>
+          <li className="shelf-empty">
+            <span className="shelf-empty-art">
               <IconUsers />
             </span>
-            <p className="small muted" style={{ maxWidth: 220 }}>
+            <p>
               {query
                 ? 'Nothing matches that.'
                 : tab === 'archived'
@@ -247,6 +264,21 @@ export default function Shelf() {
           </li>
         )}
       </motion.ul>
+
+      {isPhone && (
+        <motion.button
+          className="fab"
+          onClick={() => openSheet('new-chat')}
+          aria-label="New conversation"
+          data-tour="new-chat"
+          variants={popIn}
+          initial="hidden"
+          animate="show"
+          whileTap={{ scale: 0.92 }}
+        >
+          <IconPlus size={26} />
+        </motion.button>
+      )}
     </motion.aside>
   );
 }

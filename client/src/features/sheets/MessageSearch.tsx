@@ -3,7 +3,9 @@ import { api, ApiError } from '@/lib/api';
 import { useChat, selectActive } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
+import { motion } from 'framer-motion';
 import Sheet from '@/components/Sheet';
+import { springs } from '@/lib/motion';
 import Avatar from '@/components/Avatar';
 import Blur from '@/components/Blur';
 import { stamp, previewOf } from '@/lib/format';
@@ -254,7 +256,8 @@ export function SearchChips({ kind, onChange }: { kind: SearchKind; onChange: (k
           aria-pressed={kind === id}
           onClick={() => onChange(id)}
         >
-          {label}
+          {kind === id && <motion.span layoutId="search-kind-pill" className="shelf-tab-pill" transition={springs.pop} />}
+          <span>{label}</span>
         </button>
       ))}
     </div>
@@ -286,10 +289,10 @@ export function SearchResults({
 
   return (
     <div className="sheet-section search-results" aria-busy={loading}>
-      {!active && <p className="small muted">{idleHint}</p>}
-      {active && loading && !results.length && <p className="small muted">Looking…</p>}
-      {active && error && <p className="small" style={{ color: 'var(--rust)' }}>{error}</p>}
-      {active && !loading && !error && !results.length && <p className="small muted">{EMPTY_LABEL[kind]}</p>}
+      {!active && <p className="sheet-note">{idleHint}</p>}
+      {active && loading && !results.length && <p className="sheet-note">Looking…</p>}
+      {active && error && <p className="sheet-note bad">{error}</p>}
+      {active && !loading && !error && !results.length && <p className="sheet-note">{EMPTY_LABEL[kind]}</p>}
 
       {grid && results.length > 0 && (
         <div className="search-grid">
@@ -410,6 +413,7 @@ export default function ChatSearchSheet() {
 
   return (
     <Sheet open={open} onClose={closeSheet} title="Search this chat">
+      <div className="search-head">
       <SearchBox value={q} onChange={setQ} placeholder={`Search in ${conversation?.name || 'this chat'}`} />
       <SearchChips kind={kind} onChange={setKind} />
       {conversation?.type === 'group' && people.length > 1 && (
@@ -425,6 +429,7 @@ export default function ChatSearchSheet() {
           </select>
         </label>
       )}
+      </div>
       <SearchResults
         state={state}
         query={q}

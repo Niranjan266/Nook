@@ -125,22 +125,88 @@ async function send({ to, subject, html, text }) {
 const esc = (s) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/* ── the look ───────────────────────────────────────────────────────────────
+   Midnight Pebble, in the one form email can carry. Built with tables and
+   inline styles on purpose: Outlook renders HTML through Word, which ignores
+   flexbox, grid, box-shadow and most of border-radius, and Gmail strips
+   <style> blocks on some clients — so the layout is a table and every rule is
+   an attribute.
+
+   Light only. The app is dark-first, but mail clients "helpfully" invert dark
+   designs in ways nobody can predict (Outlook recolours, Gmail half-inverts),
+   so a fixed lavender page with a white card is the one version that looks
+   the same everywhere. `color-scheme: light only` asks clients to leave it.
+
+   Where Outlook squares the pill corners, what's left is a flat iris button —
+   plainer, still unmistakably a button. That is the trade for reliability.
+   ────────────────────────────────────────────────────────────────────────── */
+
+const PAGE = '#F4F2FB';
+const CARD = '#FFFFFF';
+/** Borders use a flat hex, never rgba(): Outlook drops a colour function it
+    does not understand and falls back to a heavy black line. */
+const LINE = '#E4E0F3';
+const WELL = '#F4F2FB';
+const INK = '#1F1B2E';
+const MUTED = '#5E5875';
+const IRIS = '#5443D6';
+const IRIS_SOFT = '#E6E2FF';
+
+/**
+ * Fredoka is a web font and almost no mail client will fetch it, so the stack
+ * is really about the fallbacks: Nunito where it is installed, Arial Rounded
+ * on Macs and most Windows machines, then plain Arial — all of which keep the
+ * soft, round feel well enough at heading sizes.
+ */
+const DISPLAY = "'Fredoka','Nunito','Arial Rounded MT Bold',Arial,sans-serif";
+const BODY = "'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const MONO = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+
+// The logo is a PNG served by the web app: Gmail and Outlook show no SVG.
+const logoUrl = (appUrl) => `${String(appUrl).replace(/\/+$/, '')}/email-logo.png`;
+
+/** The mark above the card. Shared so every Nook email opens the same way. */
+const brand = (appUrl) => `
+      <tr><td align="center" style="padding:0 0 20px">
+        <img src="${logoUrl(appUrl)}" width="56" height="56" alt="Nook"
+             style="display:block;border:0;width:56px;height:56px">
+      </td></tr>`;
+
+/** The white card. Outlook drops the radius; the 1px line survives. */
+const cardOpen = (pad = '36px 32px') =>
+  `<tr><td bgcolor="${CARD}" style="background:${CARD};border:1px solid ${LINE};border-radius:24px;padding:${pad}">`;
+
+/** A small uppercase line above a heading. */
+const eyebrow = (text) =>
+  `<div style="font-family:${BODY};font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:${IRIS};font-weight:800">${text}</div>`;
+
+/** Recovery and verification: one heading, one sentence, one code. The
+    code cell is padded less on the right because letter-spacing leaves a
+    gap after the last digit, and the pair should look centred. */
 const shell = (heading, lead, code) => `
-<div style="background:#E9E1D6;padding:40px 16px;font-family:ui-sans-serif,system-ui,sans-serif">
-  <div style="max-width:440px;margin:0 auto;background:#F4EEE6;border-radius:28px;padding:36px;
-              box-shadow:0 18px 40px rgba(30,26,23,.10)">
-    <div style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#5C5349">Nook</div>
-    <h1 style="margin:14px 0 8px;font-size:26px;color:#1E1A17;line-height:1.2">${heading}</h1>
-    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#5C5349">${lead}</p>
-    <div style="display:inline-block;background:#F4EEE6;border:2px solid #1E1A17;border-radius:8px;
-                box-shadow:4px 4px 0 #1E1A17;padding:14px 22px;font-family:ui-monospace,monospace;
-                font-size:30px;letter-spacing:.32em;color:#1E1A17">${code}</div>
-    <p style="margin:24px 0 0;font-size:13px;color:#5C5349">
-      This code expires in 15 minutes. If you didn't ask for it, you can ignore this email —
-      nothing has changed on your account.
-    </p>
-  </div>
-</div>`;
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="background:${PAGE};padding:40px 16px">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="max-width:440px;font-family:${BODY}">
+      ${brand(env.appUrl)}
+      ${cardOpen()}
+        ${eyebrow('Nook')}
+        <h1 style="margin:12px 0 8px;font-family:${DISPLAY};font-size:26px;font-weight:600;color:${INK};line-height:1.2">${heading}</h1>
+        <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:${MUTED}">${lead}</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+          <tr><td align="center" bgcolor="${WELL}"
+                  style="background:${WELL};border:1px solid ${LINE};border-radius:16px;padding:16px 14px 16px 24px;
+                         font-family:${MONO};font-size:30px;font-weight:700;letter-spacing:.32em;color:${INK}">${code}</td></tr>
+        </table>
+        <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:${MUTED}">
+          This code expires in 15 minutes. If you didn't ask for it, you can ignore this email —
+          nothing has changed on your account.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`;
 
 export function sendRecoveryCode({ to, code, displayName }) {
   return send({
@@ -177,116 +243,78 @@ export function sendEmailVerification({ to, code, displayName }) {
   });
 }
 
-/* ── welcome ────────────────────────────────────────────────────────────────
-   Built with tables and inline styles on purpose. Outlook renders HTML through
-   Word, which ignores flexbox, grid, and most of `border-radius`; Gmail strips
-   <style> blocks entirely on some clients. So the layout is a table, every
-   rule is an attribute, and the design survives by leaning on the parts of the
-   Clay/Slab system that translate: flat warm fills, the 2px ink border and the
-   hard offset shadow — the latter faked with a nested table cell, since
-   box-shadow does not render in Outlook either.
-   ────────────────────────────────────────────────────────────────────────── */
-
-const BISQUE = '#E9E1D6';
-const SURFACE = '#F4EEE6';
-const INK = '#1E1A17';
-const MUTED = '#5C5349';
-const TERRACOTTA = '#C0603C';
-/** Flattened equivalent of rgba(30,26,23,.09) over SURFACE — see note below. */
-const HAIRLINE = '#DED5C8';
+/* ── welcome ──────────────────────────────────────────────────────────────── */
 
 /**
- * A Slab button.
- *
- * The app's Slab has a hard 4px offset shadow. There is no way to reproduce
- * that in email that renders the same everywhere: `box-shadow` is ignored by
- * Outlook, and the usual `transform: translate` trick is ignored too — which
- * would collapse the shadow layer directly under the button and, in a few
- * clients, shift the layout instead. A faithful-but-unpredictable button is
- * worse than a simplified reliable one, so the shadow is dropped here and the
- * Slab is carried by what does travel: the flat terracotta fill and the 2px
- * ink border. Outlook also squares off `border-radius`, which is harmless —
- * Slab corners are nearly square by design anyway.
+ * The primary button: an iris pill with white text.
  *
  * The `<a>` is padded rather than the `<td>` so the whole button is clickable
- * in clients that shrink anchor hit areas to the text.
+ * in clients that shrink anchor hit areas to the text. bgcolor as well as the
+ * style, because some Outlook builds only honour the attribute.
  */
 const slab = (href, label) => `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
   <tr>
-    <td align="center" bgcolor="${TERRACOTTA}"
-        style="border:2px solid ${INK};border-radius:8px">
-      <a href="${href}" style="display:inline-block;padding:13px 26px;color:#FFF6EF;
-         text-decoration:none;font-weight:700;font-size:15px;letter-spacing:-0.01em">${label}</a>
+    <td align="center" bgcolor="${IRIS}" style="background:${IRIS};border-radius:999px">
+      <a href="${href}" style="display:inline-block;padding:14px 30px;color:#FFFFFF;border-radius:999px;
+         font-family:${BODY};text-decoration:none;font-weight:800;font-size:15px">${label}</a>
     </td>
   </tr>
 </table>`;
 
-/**
- * Borders use a flat hex, not rgba(). Outlook drops any declaration containing
- * a colour function it does not understand, and the fallback there is not "no
- * border" but the browser default — a black line four times too heavy.
- */
 const row = (label, value) => `
 <tr>
-  <td style="padding:9px 0;border-bottom:1px solid ${HAIRLINE}">
-    <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${MUTED}">${label}</span><br>
-    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;color:${INK}">${value}</span>
+  <td style="padding:12px 0;border-bottom:1px solid ${LINE}">
+    <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${MUTED};font-weight:700">${label}</span><br>
+    <span style="font-family:${MONO};font-size:16px;color:${INK}">${value}</span>
   </td>
 </tr>`;
 
 /**
- * One "try this first" line: a numbered clay token beside a short title and
+ * One "try this first" line: a numbered pebble beside a short title and
  * sentence. A table per row, because a two-column layout is the one thing
  * every client agrees on only when it is a table.
  */
 const tip = (n, title, body) => `
 <tr>
-  <td valign="top" width="44" style="padding:0 0 18px">
+  <td valign="top" width="48" style="padding:0 0 20px">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-      <tr><td align="center" valign="middle" width="32" height="32" bgcolor="${BISQUE}"
-              style="border:2px solid ${INK};border-radius:10px;font-size:14px;font-weight:800;color:${TERRACOTTA}">${n}</td></tr>
+      <tr><td align="center" valign="middle" width="32" height="32" bgcolor="${IRIS_SOFT}"
+              style="background:${IRIS_SOFT};border-radius:16px;font-family:${DISPLAY};font-size:15px;font-weight:700;color:${IRIS}">${n}</td></tr>
     </table>
   </td>
-  <td valign="top" style="padding:0 0 18px">
-    <div style="font-size:15px;font-weight:700;color:${INK};line-height:1.35">${title}</div>
+  <td valign="top" style="padding:0 0 20px">
+    <div style="font-size:15px;font-weight:800;color:${INK};line-height:1.35">${title}</div>
     <div style="font-size:14px;line-height:1.6;color:${MUTED}">${body}</div>
   </td>
 </tr>`;
 
 function welcomeHtml({ displayName, username, nookId, appUrl }) {
-  // The logo is a PNG served by the web app: Gmail and Outlook show no SVG.
-  const logo = `${appUrl.replace(/\/+$/, '')}/email-logo.png`;
   const download = `${appUrl.replace(/\/+$/, '')}/download`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
 <title>Welcome to Nook</title></head>
-<body style="margin:0;padding:0;background:${BISQUE}">
+<body style="margin:0;padding:0;background:${PAGE}">
 <!-- Shown in the inbox list under the subject, so it does the work of a subtitle. -->
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">
   Your corner of the internet is ready, ${esc(displayName)}. Here's your Nook ID and three things to try first.
 </div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-       style="background:${BISQUE};padding:36px 14px">
+       style="background:${PAGE};padding:40px 16px">
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-           style="max-width:480px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+           style="max-width:480px;font-family:${BODY}">
 
-      <!-- brand -->
-      <tr><td align="center" style="padding:0 0 18px">
-        <img src="${logo}" width="64" height="64" alt="Nook"
-             style="display:block;border:0;width:64px;height:64px">
-      </td></tr>
+      ${brand(appUrl)}
 
       <!-- the card -->
-      <tr><td style="background:${SURFACE};border:2px solid ${INK};border-radius:28px;padding:34px 30px">
+      ${cardOpen()}
 
-        <div style="font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:${TERRACOTTA};font-weight:700">
-          Welcome to Nook
-        </div>
-        <h1 style="margin:12px 0 10px;font-size:30px;line-height:1.12;color:${INK};letter-spacing:-0.02em">
+        ${eyebrow('Welcome to Nook')}
+        <h1 style="margin:12px 0 12px;font-family:${DISPLAY};font-size:30px;font-weight:600;line-height:1.15;color:${INK}">
           Hi ${esc(displayName)}, your corner is ready.
         </h1>
         <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:${MUTED}">
@@ -294,21 +322,21 @@ function welcomeHtml({ displayName, username, nookId, appUrl }) {
           No feed, no reels, no strangers, no ads — just your people.
         </p>
 
-        <!-- account details, as a sunken panel -->
+        <!-- account details, in a lavender well -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-               style="background:${BISQUE};border-radius:18px;margin:0 0 26px">
-          <tr><td style="padding:6px 18px 8px">
+               bgcolor="${WELL}" style="background:${WELL};border-radius:20px;margin:0 0 28px">
+          <tr><td style="padding:8px 20px">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               ${row('Your username', '@' + esc(username))}
-              <tr><td style="padding:9px 0">
-                <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${MUTED}">Your Nook ID</span><br>
-                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:20px;font-weight:700;color:${TERRACOTTA};letter-spacing:.04em">${esc(nookId)}</span>
+              <tr><td style="padding:12px 0">
+                <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${MUTED};font-weight:700">Your Nook ID</span><br>
+                <span style="font-family:${MONO};font-size:20px;font-weight:700;color:${IRIS};letter-spacing:.04em">${esc(nookId)}</span>
               </td></tr>
             </table>
           </td></tr>
         </table>
 
-        <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:${MUTED};margin:0 0 14px">
+        <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:${MUTED};font-weight:800;margin:0 0 16px">
           Three things to try first
         </div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px">
@@ -319,14 +347,14 @@ function welcomeHtml({ displayName, username, nookId, appUrl }) {
 
         ${slab(appUrl, 'Open Nook')}
 
-        <p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:${MUTED}">
-          On Android? <a href="${download}" style="color:${TERRACOTTA};font-weight:700;text-decoration:underline">Get the app</a>
+        <p style="margin:20px 0 0;font-size:14px;line-height:1.6;color:${MUTED}">
+          On Android? <a href="${download}" style="color:${IRIS};font-weight:800;text-decoration:underline">Get the app</a>
           for notifications that arrive even when your phone is locked.
         </p>
       </td></tr>
 
       <!-- footer -->
-      <tr><td style="padding:22px 18px 0;font-size:12px;line-height:1.65;color:${MUTED};text-align:center">
+      <tr><td style="padding:24px 20px 0;font-size:12px;line-height:1.65;color:${MUTED};text-align:center">
         Your email is only ever used to get you back in if you forget your password.
         Nook has no ads and nothing to sell.<br>
         Didn't sign up? Someone typed your address by mistake — ignore this and no account is attached to you.
@@ -413,22 +441,23 @@ export function sendBroadcast({ to, displayName, subject, heading, body, format 
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
 <title>${esc(subject)}</title></head>
-<body style="margin:0;padding:0;background:${BISQUE}">
+<body style="margin:0;padding:0;background:${PAGE}">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-       style="background:${BISQUE};padding:40px 16px">
+       style="background:${PAGE};padding:40px 16px">
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-           style="max-width:460px;background:${SURFACE};border-radius:28px;padding:36px;
-                  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
-      <tr><td>
-        <div style="font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:${MUTED}">Nook</div>
-        <h1 style="margin:14px 0 14px;font-size:26px;line-height:1.2;color:${INK};letter-spacing:-0.02em">
+           style="max-width:480px;font-family:${BODY}">
+      ${brand(env.appUrl)}
+      ${cardOpen()}
+        ${eyebrow('Nook')}
+        <h1 style="margin:12px 0 16px;font-family:${DISPLAY};font-size:26px;font-weight:600;line-height:1.2;color:${INK}">
           ${esc(greeting)}
         </h1>
         ${paragraphs(body)}
         ${slab(env.appUrl, 'Open Nook')}
-        <p style="margin:26px 0 0;padding-top:20px;border-top:1px solid ${HAIRLINE};
+        <p style="margin:28px 0 0;padding-top:20px;border-top:1px solid ${LINE};
                   font-size:13px;line-height:1.6;color:${MUTED}">
           You are getting this because you have a Nook account. It is not marketing and there is
           nothing to unsubscribe from — we only write when there is something you need to know.

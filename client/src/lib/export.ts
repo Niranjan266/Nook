@@ -91,30 +91,35 @@ export async function exportConversation(conversation: Conversation) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escape(conversation.name)} — Nook export</title>
 <style>
-  :root{--bg:#E9E1D6;--surface:#F4EEE6;--raised:#FAF6F0;--ink:#1E1A17;--soft:#5C5349;--faint:#8B8073;--accent:#C0603C}
-  @media (prefers-color-scheme:dark){:root{--bg:#201D1A;--surface:#2B2724;--raised:#35302B;--ink:#EFE6DA;--soft:#A79C8E;--faint:#7D7367;--accent:#D97A53}}
+  /* A standalone file, so the palette is written out rather than borrowed
+     from tokens.css: Midnight Pebble, light by default, night if the
+     reader's system is dark. Their bubbles quiet, yours volt. */
+  :root{--bg:#F4F2FB;--surface:#FFFFFF;--surface-2:#ECE9F8;--ink:#1F1B2E;--ink-2:#5E5875;--ink-3:#8E88A4;
+        --mine:#C8F545;--mine-ink:#1F1B2E;--shadow:0 6px 20px rgba(84,67,214,.08)}
+  @media (prefers-color-scheme:dark){:root{--bg:#0E0D14;--surface:#18161F;--surface-2:#22202C;--ink:#F4F2FA;
+        --ink-2:#A9A4BA;--ink-3:#7D7890;--mine-ink:#0E0D14;--shadow:inset 0 0 0 1px #2A2735}}
   *{box-sizing:border-box}
   body{margin:0;padding:32px 16px 64px;background:var(--bg);color:var(--ink);
-       font:15px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+       font:15px/1.55 'Nunito',ui-rounded,system-ui,-apple-system,sans-serif}
   .wrap{max-width:720px;margin:0 auto}
   header{text-align:center;margin-bottom:32px}
-  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
-  .sub{color:var(--soft);font-size:13px}
-  .day{text-align:center;margin:26px 0 14px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
-       color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:6px;
-       padding:3px 10px;display:inline-block;position:relative;left:50%;transform:translateX(-50%)}
-  .msg{max-width:78%;margin:8px 0;padding:9px 14px;border-radius:20px;background:var(--raised);
-       box-shadow:3px 3px 9px rgba(30,26,23,.10)}
-  .msg.mine{margin-left:auto;background:var(--accent);color:#FDF8F2}
-  .who{font-size:11px;font-weight:700;opacity:.75;display:flex;gap:8px;align-items:baseline;margin-bottom:2px}
-  .who time{font-family:ui-monospace,monospace;font-weight:400;font-size:10px;opacity:.8;margin-left:auto}
-  .quote{border-left:3px solid currentColor;opacity:.72;padding:3px 9px;margin:3px 0 6px;font-size:13px}
+  h1{font-family:'Fredoka',ui-rounded,system-ui,sans-serif;font-weight:600;font-size:26px;margin:0 0 4px}
+  .sub{color:var(--ink-2);font-size:13px}
+  .day{text-align:center;margin:24px 0 12px;font-size:12px;font-weight:700;color:var(--ink-2);
+       background:var(--surface-2);border-radius:999px;padding:2px 12px;display:inline-block;
+       position:relative;left:50%;transform:translateX(-50%)}
+  .msg{max-width:78%;margin:8px 0;padding:8px 14px;border-radius:24px 24px 24px 6px;background:var(--surface);
+       box-shadow:var(--shadow)}
+  .msg.mine{margin-left:auto;border-radius:24px 24px 6px 24px;background:var(--mine);color:var(--mine-ink);box-shadow:none}
+  .who{font-size:12px;font-weight:700;opacity:.75;display:flex;gap:8px;align-items:baseline;margin-bottom:2px}
+  .who time{font-variant-numeric:tabular-nums;font-weight:400;font-size:11px;opacity:.8;margin-left:auto}
+  .quote{border-left:3px solid currentColor;opacity:.72;padding:2px 8px;margin:2px 0 6px;font-size:13px}
   .body{word-wrap:break-word;overflow-wrap:anywhere}
   .edited{font-size:11px;opacity:.7;font-style:italic}
   .gone{opacity:.6}
   .file{color:inherit}
   .reactions{margin-top:4px;font-size:13px}
-  footer{margin-top:48px;text-align:center;color:var(--faint);font-size:12px;line-height:1.7}
+  footer{margin-top:48px;text-align:center;color:var(--ink-2);font-size:12px;line-height:1.7}
 </style>
 </head><body><div class="wrap">
 <header>

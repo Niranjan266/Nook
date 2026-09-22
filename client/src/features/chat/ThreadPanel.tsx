@@ -4,7 +4,7 @@ import { useChat, selectActive } from '@/stores/chat';
 import { useAuth } from '@/stores/auth';
 import Avatar from '@/components/Avatar';
 import { clock, linkify } from '@/lib/format';
-import { sheetSlide, sheetSlideUp, bubbleIn } from '@/lib/motion';
+import { sheetSlide, sheetSlideUp, bubbleSend, bubbleReceive } from '@/lib/motion';
 import { usePhone } from '@/lib/useMediaQuery';
 import { IconClose, IconSend, IconThread } from '@/components/Icon';
 
@@ -86,11 +86,11 @@ export default function ThreadPanel() {
               </button>
             </header>
 
-            <div className="sheet-body" style={{ gap: 10 }}>
+            <div className="sheet-body thread-body">
               {/* The message the tangent came off. */}
               {root && (
-                <div className="clay" style={{ padding: '11px 14px', boxShadow: 'var(--clay-in)' }}>
-                  <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+                <div className="thread-root">
+                  <div className="thread-root-head">
                     <Avatar
                       name={root.sender.displayName || '?'}
                       src={root.sender.avatarUrl}
@@ -104,14 +104,14 @@ export default function ThreadPanel() {
                     <span className="grow" />
                     <time className="tiny faint">{clock(root.createdAt)}</time>
                   </div>
-                  <p style={{ fontSize: 'var(--t-sm)', lineHeight: 1.5 }}>{root.body || root.type}</p>
+                  <p className="thread-root-body">{root.body || root.type}</p>
                 </div>
               )}
 
               <div className="rule" />
 
               {replies.length === 0 && (
-                <p className="small muted" style={{ textAlign: 'center', padding: '18px 0' }}>
+                <p className="small muted thread-empty">
                   No replies yet. Anything you say here stays out of the main conversation.
                 </p>
               )}
@@ -121,9 +121,9 @@ export default function ThreadPanel() {
                 return (
                   <motion.div
                     key={m.id}
-                    className={`msg${mine ? ' mine' : ''}`}
-                    style={{ maxWidth: '92%', position: 'relative' }}
-                    variants={bubbleIn}
+                    className={`msg run-start${mine ? ' mine' : ''}`}
+                    style={{ maxWidth: '92%' }}
+                    variants={mine ? bubbleSend : bubbleReceive}
                     initial="hidden"
                     animate="show"
                   >
@@ -134,7 +134,7 @@ export default function ThreadPanel() {
                           src={m.sender.avatarUrl}
                           id={m.sender.id}
                           accent={m.sender.accent}
-                          size={26}
+                          size={28}
                         />
                       </span>
                     )}
@@ -160,8 +160,8 @@ export default function ThreadPanel() {
               <div ref={bottom} />
             </div>
 
-            <div className="sheet-foot">
-              <div className="composer-input" style={{ flex: 1 }}>
+            <div className="sheet-foot thread-foot">
+              <div className="composer-input">
                 <textarea
                   rows={1}
                   className="groove"

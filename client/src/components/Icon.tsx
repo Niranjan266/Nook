@@ -476,3 +476,10 @@ export const IconChecklist = (p: Props) => (
     <path d="M12 7h8M12 14h8M12 19.5h5" />
   </Svg>
 );
+
+/** A row that opens somewhere else. Decorative: the row's label says where. */
+export const IconChevron = (p: Props) => (
+  <Svg size={18} {...p}>
+    <path d="m9.5 6 6 6-6 6" />
+  </Svg>
+);

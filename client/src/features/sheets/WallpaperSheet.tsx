@@ -5,7 +5,7 @@ import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
 import Sheet from '@/components/Sheet';
 import { upload } from '@/lib/api';
-import { WALLPAPER_PRESETS, dominantColor, prepareWallpaper } from '@/lib/color';
+import { WALLPAPER_PRESETS, dominantColor, prepareWallpaper, readableOn } from '@/lib/color';
 import { spring } from '@/lib/motion';
 import { IconImage, IconCheck, IconUsers, IconUser, IconRefresh } from '@/components/Icon';
 import { cssUrl } from '@/lib/config';
@@ -177,13 +177,13 @@ export default function WallpaperSheet() {
         style={{
           position: 'relative',
           height: 180,
-          borderRadius: 'var(--r-clay-lg)',
+          borderRadius: 'var(--r-sheet)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-end',
-          gap: 8,
-          padding: 14,
+          gap: 'var(--s-2)',
+          padding: 'var(--s-3)',
         }}
       >
         <div className={`wallpaper${preset ? ` wp-${preset}` : ''}`} style={{ ...previewStyle, ['--wp-dim' as any]: dim }} />
@@ -203,8 +203,8 @@ export default function WallpaperSheet() {
             position: 'relative',
             alignSelf: 'flex-end',
             maxWidth: '72%',
-            background: tint || 'var(--accent)',
-            color: '#FDF8F2',
+            background: tint || 'var(--primary)',
+            color: tint ? readableOn(tint) : 'var(--on-primary)',
           }}
           layout
           transition={spring}
@@ -241,7 +241,7 @@ export default function WallpaperSheet() {
             <span>{isGroup ? 'Everyone' : 'Both of us'}</span>
           </button>
         </div>
-        <p className="small muted" style={{ margin: 0 }}>
+        <p className="small muted">
           {scope === 'mine'
             ? 'Only you will see this. No one is asked, and it changes nothing for anyone else.'
             : isGroup
@@ -255,10 +255,10 @@ export default function WallpaperSheet() {
       </div>
 
       {conversation.myWallpaper && (
+        <div className="sheet-group">
         <button className="list-row" onClick={clearMine} disabled={busy}>
           <span
-            className="clay-round"
-            style={{ width: 40, height: 40, background: 'var(--clay-sunk)', boxShadow: 'none' }}
+            className="row-icon"
           >
             <IconRefresh size={18} />
           </span>
@@ -267,19 +267,21 @@ export default function WallpaperSheet() {
             <span className="list-row-sub">Drops your personal one and goes back to the shared look</span>
           </span>
         </button>
+        </div>
       )}
 
       <div className="sheet-section">
         <span className="eyebrow">Built in</span>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--s-2)' }}>
           {WALLPAPER_PRESETS.map((p) => (
             <button
               key={p.id}
               className={`wp-${p.id}`}
               style={{
                 aspectRatio: '3 / 4',
-                borderRadius: 'var(--r-clay-sm)',
-                boxShadow: preset === p.id && !url ? '0 0 0 3px var(--ink)' : 'var(--clay-1)',
+                borderRadius: 'var(--r-sm)',
+                // A gap ring, the same as the accent swatches in Settings.
+                boxShadow: preset === p.id && !url ? '0 0 0 3px var(--surface), 0 0 0 5px var(--ink)' : 'var(--edge), var(--shadow-1)',
                 position: 'relative',
               }}
               onClick={() => {
@@ -300,26 +302,28 @@ export default function WallpaperSheet() {
         </div>
       </div>
 
+      <div className="sheet-group">
       <button className="list-row" onClick={() => fileInput.current?.click()} disabled={busy}>
-        <span className="clay-round" style={{ width: 40, height: 40, background: 'var(--clay-sunk)', boxShadow: 'none' }}>
-          <IconImage size={19} />
+        <span className="row-icon">
+          <IconImage size={20} />
         </span>
         <span className="grow">
           <span className="list-row-label">Upload your own</span>
           <span className="list-row-sub">We pull the main colour out of it automatically</span>
         </span>
       </button>
+      </div>
 
       <div className="sheet-section">
         <span className="eyebrow">Readability</span>
-        <label className="stack" style={{ gap: 6 }}>
+        <label className="stack" style={{ gap: 'var(--s-2)' }}>
           <span className="small muted row" style={{ justifyContent: 'space-between' }}>
             <span>Dim</span>
             <span className="tabular">{Math.round(dim * 100)}%</span>
           </span>
           <input type="range" min={0} max={0.85} step={0.05} value={dim} onChange={(e) => setDim(Number(e.target.value))} />
         </label>
-        <label className="stack" style={{ gap: 6 }}>
+        <label className="stack" style={{ gap: 'var(--s-2)' }}>
           <span className="small muted row" style={{ justifyContent: 'space-between' }}>
             <span>Blur</span>
             <span className="tabular">{blur}px</span>
@@ -330,20 +334,15 @@ export default function WallpaperSheet() {
 
       <div className="sheet-section">
         <span className="eyebrow">Bubble tint</span>
-        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          {['', '#C0603C', '#57694A', '#CE9535', '#47606F', '#A33F2F', tint].filter((v, i, a) => a.indexOf(v) === i).map((c) => (
+        <div className="swatches" style={{ padding: '0 var(--s-1)' }}>
+          {['', '#8B7CFF', '#3DD6A8', '#FFB36B', '#6AA8FF', '#FF8FA3', tint].filter((v, i, a) => a.indexOf(v) === i).map((c) => (
             <button
               key={c || 'default'}
               onClick={() => setTint(c)}
               aria-label={c || 'Default'}
               aria-pressed={tint === c}
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 12,
-                background: c || 'var(--accent)',
-                boxShadow: tint === c ? '0 0 0 3px var(--ink)' : 'var(--clay-1)',
-              }}
+              className="swatch"
+              style={{ background: c || 'var(--primary)' }}
             />
           ))}
         </div>

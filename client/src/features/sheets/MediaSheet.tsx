@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useChat, selectActive } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
+import { motion } from 'framer-motion';
 import Sheet from '@/components/Sheet';
+import { springs } from '@/lib/motion';
 import Blur from '@/components/Blur';
 import { get } from '@/lib/api';
 import { bytes, stamp } from '@/lib/format';
@@ -78,7 +80,7 @@ export default function MediaSheet() {
 
   return (
     <Sheet open={open} onClose={closeSheet} title="Shared">
-      <div className="shelf-tabs" style={{ padding: 0 }}>
+      <div className="shelf-tabs" role="tablist" style={{ margin: 0, padding: 'var(--s-1) 0' }}>
         {(
           [
             ['media', `Photos & video${media.length ? ` (${media.length})` : ''}`],
@@ -93,15 +95,16 @@ export default function MediaSheet() {
             role="tab"
             aria-selected={tab === id}
           >
-            {label}
+            {tab === id && <motion.span layoutId="media-tab-pill" className="shelf-tab-pill" transition={springs.pop} />}
+            <span>{label}</span>
           </button>
         ))}
       </div>
 
-      {loading && <p className="small muted">Looking back through the conversation…</p>}
+      {loading && <p className="sheet-note">Looking back through the conversation…</p>}
 
       {!loading && shown.length === 0 && (
-        <p className="small muted">
+        <p className="sheet-note">
           {tab === 'media'
             ? 'No photos or video shared here yet.'
             : tab === 'files'
@@ -111,7 +114,7 @@ export default function MediaSheet() {
       )}
 
       {tab === 'media' && shown.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+        <div className="search-grid">
           {shown.map((m) => (
             <button
               key={m.id}
@@ -119,14 +122,7 @@ export default function MediaSheet() {
                 setLightbox({ messageId: m.id });
                 closeSheet();
               }}
-              style={{
-                position: 'relative',
-                aspectRatio: '1',
-                borderRadius: 12,
-                overflow: 'hidden',
-                background: 'var(--clay-sunk)',
-                boxShadow: 'var(--clay-1)',
-              }}
+              className="search-tile"
               title={stamp(m.createdAt)}
             >
               <Blur hash={m.media?.blurhash} />
@@ -134,15 +130,15 @@ export default function MediaSheet() {
                 src={safeUrl(m.media?.thumbUrl || m.media?.url)}
                 alt=""
                 loading="lazy"
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </button>
           ))}
         </div>
       )}
 
-      {tab !== 'media' &&
-        shown.map((m) => (
+      {tab !== 'media' && shown.length > 0 && (
+        <div className="sheet-group">
+        {shown.map((m) => (
           <a
             key={m.id}
             className="list-row"
@@ -150,10 +146,9 @@ export default function MediaSheet() {
             download={m.media?.name}
             target="_blank"
             rel="noreferrer"
-            style={{ color: 'inherit', textDecoration: 'none' }}
           >
-            <span className="clay-round" style={{ width: 38, height: 38 }}>
-              {tab === 'files' ? <IconFile size={17} /> : <IconMic size={17} />}
+            <span className="row-icon">
+              {tab === 'files' ? <IconFile size={18} /> : <IconMic size={18} />}
             </span>
             <span className="grow">
               <span className="list-row-label truncate">
@@ -163,9 +158,11 @@ export default function MediaSheet() {
                 {bytes(m.media?.size)} · {stamp(m.createdAt)}
               </span>
             </span>
-            <IconDownload size={17} style={{ opacity: 0.6 }} />
+            <IconDownload size={18} className="chev" />
           </a>
         ))}
+        </div>
+      )}
     </Sheet>
   );
 }

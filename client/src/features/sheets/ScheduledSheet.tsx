@@ -25,7 +25,7 @@ export default function ScheduledSheet() {
     <Sheet open={open} onClose={closeSheet} title="Scheduled">
       <div className="sheet-section">
         {scheduled.length === 0 && (
-          <p className="small muted">
+          <p className="sheet-note">
             Nothing waiting. Write a message, then use the clock next to the send button to pick when it
             arrives.
           </p>
@@ -52,18 +52,17 @@ export default function ScheduledSheet() {
               >
                 <span className="list-row-label truncate">{c?.name || 'Conversation'}</span>
                 <span className="list-row-sub truncate">{m.body}</span>
-                <span className="tiny" style={{ color: 'var(--accent-deep)', fontWeight: 600 }}>
-                  <IconSchedule size={11} style={{ verticalAlign: -1 }} />{' '}
+                <span className="row-when on">
+                  <IconSchedule size={12} />{' '}
                   {m.scheduledFor ? new Date(m.scheduledFor).toLocaleString() : ''}
                 </span>
               </button>
               <button
-                className="clay-round"
-                style={{ width: 32, height: 32, color: 'var(--rust)' }}
+                className="row-action danger"
                 onClick={() => cancelScheduled(m.id).then(() => toast('Cancelled'))}
                 aria-label="Cancel this scheduled message"
               >
-                <IconTrash size={15} />
+                <IconTrash size={18} />
               </button>
             </div>
           );

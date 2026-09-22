@@ -6,6 +6,8 @@ import { openAfterSignIn } from '@/lib/links';
 import { IconWarning } from '@/components/Icon';
 import type { Me } from '@/lib/types';
 import { DoorBackdrop, SubmitFace, ThemeToggle, enterAt, successBeat, useErrorShake } from './FrontDoor';
+import Logo from '@/components/Logo';
+import { springs } from '@/lib/motion';
 
 /**
  * The page behind a guest link: a name, and you are in.
@@ -74,8 +76,12 @@ export default function GuestDoor({ code, onDone }: { code: string; onDone: () =
       <div className="door-stack">
         <div className="door-mark">
           <div className="door-mark-in">
-            <img src="/logo.svg" alt="" width={88} height={88} />
-            <span className="door-wordmark">Nook</span>
+            <div className="door-bob">
+              <Logo size={104} tile={false} animate={!reduce} />
+            </div>
+            <div className="door-words">
+              <span className="door-wordmark">Nook</span>
+            </div>
           </div>
         </div>
         <div className="door-rise">
@@ -106,8 +112,8 @@ export default function GuestDoor({ code, onDone }: { code: string; onDone: () =
                     key={error}
                     className="field-error"
                     role="status"
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0, transition: { duration: 0.2 } }}
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1, transition: springs.pop }}
                     exit={{ opacity: 0, transition: { duration: 0.1 } }}
                   >
                     <IconWarning size={15} />

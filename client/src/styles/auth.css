@@ -1,10 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    The Front Door.
 
-   Deliberately not a split screen. One narrow clay column sitting low in the
-   viewport, an oversized mark above it, drifting clay blobs behind. On arrival
-   the mark drops in, the card rises and its fields follow one by one — all of
+   Deliberately not a split screen. One narrow column sitting low in the
+   viewport, the mark above it, soft blobs drifting behind. On arrival the
+   pebbles pop in, the card rises and its fields follow 40ms apart — all of
    it in well under a second, and none of it ever blocks a tap.
+
+   Semantic tokens only: the admin can swap the whole design set on <html>,
+   and this screen has to follow without an edit.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .door {
@@ -19,12 +22,13 @@
   overflow: hidden;
   overflow: clip;
   /* the Android app draws under the status bar; keep clear of it */
-  padding: max(var(--s-5), env(safe-area-inset-top)) max(var(--s-5), env(safe-area-inset-right))
-    max(var(--s-5), env(safe-area-inset-bottom)) max(var(--s-5), env(safe-area-inset-left));
-  background: var(--clay-bg);
+  padding: max(var(--s-6), env(safe-area-inset-top)) max(var(--s-5), env(safe-area-inset-right))
+    max(var(--s-6), env(safe-area-inset-bottom)) max(var(--s-5), env(safe-area-inset-left));
+  background: var(--bg);
+  color: var(--ink);
 }
 
-/* ── drifting clay blobs, CSS only ──────────────────────────────────────────
+/* ── drifting blobs, CSS only ───────────────────────────────────────────────
    Each blob is its own radial gradient rather than a flat shape under one big
    blur filter. A filter over moving children has to be re-rasterised every
    frame; a soft gradient that only translates is pure compositor work, which
@@ -35,15 +39,12 @@
   inset: -20%;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.9;
+  /* Night swallows colour less than paper does, so the same hues need less
+     of themselves to be felt — the card must stay the brightest thing. */
+  opacity: 0.5;
 }
-
-/* Dark clay reflects far less light — dial the blobs back or the panel drowns. */
-:root[data-theme='dark'] .door-blobs {
-  opacity: 0.55;
-}
-:root[data-theme='dark'] .door::after {
-  opacity: 0.2;
+:root[data-theme='light'] .door-blobs {
+  opacity: 0.8;
 }
 .door-blobs span {
   position: absolute;
@@ -57,16 +58,16 @@
   height: 46vmax;
   left: 2%;
   top: 4%;
-  background: radial-gradient(closest-side, var(--terracotta), transparent);
-  opacity: 0.3;
+  background: radial-gradient(closest-side, var(--iris), transparent);
+  opacity: 0.32;
 }
 .door-blobs span:nth-child(2) {
   width: 44vmax;
   height: 38vmax;
   right: 4%;
   top: 22%;
-  background: radial-gradient(closest-side, var(--moss), transparent);
-  opacity: 0.26;
+  background: radial-gradient(closest-side, var(--primary), transparent);
+  opacity: 0.18;
   animation-duration: 44s;
   animation-delay: -8s;
 }
@@ -75,8 +76,8 @@
   height: 34vmax;
   left: 30%;
   bottom: -6%;
-  background: radial-gradient(closest-side, var(--ochre), transparent);
-  opacity: 0.26;
+  background: radial-gradient(closest-side, var(--peach), transparent);
+  opacity: 0.2;
   animation-duration: 52s;
   animation-delay: -20s;
 }
@@ -85,8 +86,8 @@
   height: 28vmax;
   right: 26%;
   bottom: 6%;
-  background: radial-gradient(closest-side, var(--clay-blue), transparent);
-  opacity: 0.22;
+  background: radial-gradient(closest-side, var(--iris), transparent);
+  opacity: 0.16;
   animation-duration: 38s;
   animation-delay: -14s;
 }
@@ -103,19 +104,21 @@
   }
 }
 
-/* paper grain so the clay doesn't read as flat CSS */
+/* A faint grain over the blobs. Not texture for its own sake: a soft
+   gradient on an 8-bit screen bands into visible rings, and a little noise
+   dithers them back into a smooth wash. */
 .door::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  opacity: 0.4;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E");
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
 }
 
 /* ── light / dark, top right ────────────────────────────────────────────────
-   A round clay button, like every icon action in the app. Both icons are
+   A round icon button, like every icon action in the app. Both icons are
    always there; the one that is not wanted rotates away and fades. */
 
 .door-theme {
@@ -123,35 +126,34 @@
   z-index: 3;
   top: max(var(--s-4), calc(env(safe-area-inset-top) + var(--s-2)));
   right: max(var(--s-4), calc(env(safe-area-inset-right) + var(--s-2)));
-  width: 44px;
-  height: 44px;
+  width: var(--tap);
+  height: var(--tap);
   display: grid;
   place-items: center;
   border-radius: var(--r-pill);
-  background: var(--clay-surface);
-  box-shadow: var(--clay-1);
+  background: var(--surface);
+  box-shadow: var(--edge), var(--shadow-1);
   color: var(--ink);
   transition:
-    box-shadow var(--dur) var(--ease-out),
-    transform var(--dur) var(--ease-clay);
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 .door-theme:hover {
-  box-shadow: var(--clay-2);
-  transform: translateY(-1.5px);
+  box-shadow: var(--edge), var(--shadow-2);
 }
 .door-theme:active {
-  box-shadow: var(--clay-in);
-  transform: scale(0.94);
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
 }
 .door-theme:focus-visible {
-  outline: 2.5px solid var(--accent);
+  outline: 2px solid var(--iris);
   outline-offset: 3px;
 }
 .door-theme svg {
   grid-area: 1 / 1;
   transition:
-    transform 420ms var(--ease-clay),
-    opacity 220ms var(--ease-out);
+    transform 420ms var(--ease-spring),
+    opacity var(--dur-base) var(--ease-out);
 }
 /* In light, offer the moon; in dark, offer the sun — the icon is the
    destination, which is what a tap will do. */
@@ -179,7 +181,7 @@
   align-items: center;
 }
 
-/* ── the mark, oversized, above the panel ───────────────────────────────── */
+/* ── the mark, above the panel ──────────────────────────────────────────── */
 
 .door-mark {
   position: relative;
@@ -189,27 +191,49 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--s-3);
+  gap: var(--s-2);
 }
-.door-mark img {
+.door-mark svg {
+  display: block;
   width: 104px;
   height: 104px;
-  filter: drop-shadow(10px 14px 22px rgba(30, 26, 23, 0.22));
+  /* The iris pebble's own colour as its shadow: depth that belongs to it,
+     rather than a grey smudge under it. */
+  filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--iris) 34%, transparent));
 }
-:root[data-theme='dark'] .door-mark img {
-  filter: drop-shadow(10px 14px 22px rgba(0, 0, 0, 0.5));
+/* After arriving, the pair breathes — a 4px float, slow enough to feel like
+   resting rather than waiting. On the wrapper, so it never fights Logo's own
+   pop-in or the tilt toward the cursor. */
+.door-bob {
+  animation: door-bob 6s var(--ease-in-out) 1.2s infinite;
+}
+@keyframes door-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.door-words {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
 }
 .door-wordmark {
   font-family: var(--font-display);
   font-size: var(--t-2xl);
-  font-weight: 700;
-  letter-spacing: -0.035em;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 .door-tagline {
   font-size: var(--t-sm);
-  color: var(--ink-soft);
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  color: var(--ink-2);
 }
 
 /* ── the panel itself ───────────────────────────────────────────────────── */
@@ -220,23 +244,25 @@
 .door-panel {
   position: relative;
   width: 100%;
-  padding: var(--s-6);
-  background: var(--clay-raised);
-  border-radius: var(--r-clay-xl);
-  box-shadow: var(--clay-3);
+  padding: var(--s-7) var(--s-6) var(--s-6);
+  background: var(--surface);
+  /* the radius is set inline so framer can correct it while the card scales;
+     this is only the value before first paint */
+  border-radius: var(--r-card);
+  box-shadow: var(--lift);
 }
 
 /* ── the entrance ───────────────────────────────────────────────────────────
    Only while .intro is on the door, which the component drops after ~900ms.
-   Mark drops (0–460ms), card rises (60–520ms), fields follow 40ms apart and
-   the last settles by ~680ms. Opacity and transform only; the inputs are
-   live from the first frame. */
+   The words drop (0–460ms) while Logo pops its pebbles on springs, the card
+   rises (60–520ms), fields follow 40ms apart and the last settles by ~680ms.
+   Opacity and transform only; the inputs are live from the first frame. */
 
-.door.intro .door-mark-in {
-  animation: door-drop 460ms var(--ease-clay) both;
+.door.intro .door-words {
+  animation: door-drop 460ms var(--ease-spring) 80ms both;
 }
 .door.intro .door-rise {
-  animation: door-rise 460ms var(--ease-clay) 60ms both;
+  animation: door-rise 460ms var(--ease-spring) 60ms both;
 }
 .door.intro .door-in {
   animation: door-field 320ms var(--ease-out) calc(150ms + var(--i, 0) * 40ms) both;
@@ -245,7 +271,7 @@
 @keyframes door-drop {
   from {
     opacity: 0;
-    transform: translateY(-26px) scale(0.9);
+    transform: translateY(-12px);
   }
   to {
     opacity: 1;
@@ -255,7 +281,7 @@
 @keyframes door-rise {
   from {
     opacity: 0;
-    transform: translateY(26px) scale(0.97);
+    transform: translateY(28px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -265,7 +291,7 @@
 @keyframes door-field {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -287,13 +313,15 @@
   font-family: var(--font-display);
   font-size: var(--t-xl);
   font-weight: 600;
-  letter-spacing: -0.025em;
-  margin-bottom: 4px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--s-1);
 }
 .door-sub {
   font-size: var(--t-sm);
-  color: var(--ink-soft);
-  margin-bottom: var(--s-5);
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: 0 0 var(--s-6);
 }
 
 .door-fields {
@@ -302,34 +330,80 @@
   gap: var(--s-4);
 }
 
-/* ── fields: the label lifts and warms when its groove has focus ────────── */
+/* ── fields ─────────────────────────────────────────────────────────────────
+   Pills a little taller than the app's (56px), because a sign-in form is the
+   one place every field is typed into. The label warms to the primary ink
+   when its field has focus. */
 
+.door .groove {
+  min-height: 56px;
+  padding: 0 var(--s-5);
+  font-size: var(--t-base);
+}
 .door .field > .field-label {
+  padding-left: var(--s-5);
+  margin-bottom: var(--s-2);
   transition:
-    transform var(--dur) var(--ease-clay),
-    color var(--dur) var(--ease-out);
+    transform var(--dur-base) var(--ease-spring),
+    color var(--dur-fast) var(--ease-out);
 }
 .door .field:focus-within > .field-label {
-  transform: translateY(-2px);
-  color: var(--accent-deep);
+  color: var(--primary-ink);
 }
-:root[data-theme='dark'] .door .field:focus-within > .field-label {
-  color: var(--accent);
+.door .groove:focus {
+  box-shadow: 0 0 0 2px var(--iris), var(--ring);
 }
-/* A soft halo outside the hard ring, so focus reads from across the room
-   without adding a second outline. Behind @supports because color-mix with a
-   var() fails at compute time, not parse time — no fallback would kick in. */
-@supports (color: color-mix(in srgb, red, blue)) {
-  .door .groove:focus {
-    box-shadow:
-      var(--clay-in-deep),
-      0 0 0 2.5px var(--accent),
-      0 0 0 7px color-mix(in srgb, var(--accent) 20%, transparent);
+
+/*
+ * Floating labels. The label sits inside the empty pill like a placeholder,
+ * and lifts to the top edge once the field has focus or a value — so every
+ * field keeps its name while being typed in, and the form is a column of
+ * pills rather than pills with captions.
+ *
+ * Only where :has() exists. Without it a label cannot know whether its field
+ * is empty, and a label stuck inside a filled field would sit on the text —
+ * so older engines keep the label above the pill, which is still correct.
+ */
+@supports selector(:has(*)) {
+  .door label.field {
+    position: relative;
+  }
+  .door label.field > .field-label {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding-left: var(--s-5);
+    font-size: var(--t-base);
+    font-weight: 600;
+    color: var(--ink-2);
+    pointer-events: none;
+    transform-origin: var(--s-5) 50%;
+  }
+  .door label.field > .groove {
+    padding-top: var(--s-5);
+  }
+  .door label.field:has(> .groove:focus) > .field-label,
+  .door label.field:has(> .groove:not(:placeholder-shown)) > .field-label {
+    font-weight: 700;
+    transform: translateY(-11px) scale(0.8);
+  }
+  /* The example text only once the label has made room for it. */
+  .door label.field > .groove::placeholder {
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+  .door label.field > .groove:focus::placeholder {
+    opacity: 1;
   }
 }
 
 .door-actions {
-  margin-top: var(--s-5);
+  margin-top: var(--s-6);
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
@@ -340,16 +414,35 @@
   gap: var(--s-3);
 }
 
+/* ── errors and notices: a soft pill of their own colour ────────────────── */
+
+.door .field-error {
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin: var(--s-4) 0 0;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger-ink);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  line-height: 1.45;
+}
+.door .field-error svg {
+  flex: none;
+  margin-top: 2px;
+}
+/* the success note after "send me a code" */
+.door .field-notice {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success-ink);
+}
+
 /* ── the submit button: label, dots and check share one cell ─────────────── */
 
 .door-submit {
-  min-height: 48px;
-}
-/* Pressing sinks the slab into its shadow and gives a hair — the scale is
-   what a thumb feels, the translate is the material. */
-.door .slab:active:not(:disabled) {
-  transform: translate(3px, 3px) scale(0.98);
-  box-shadow: 1px 1px 0 var(--ink);
+  min-height: 52px;
+  font-size: var(--t-base);
 }
 /* Working is not disabled: it must not grey out mid-request as if it broke. */
 .door-submit.is-busy:disabled {
@@ -366,8 +459,8 @@
 .door-face > span:not(.sr-only) {
   grid-area: 1 / 1;
   transition:
-    opacity 160ms var(--ease-out),
-    transform 260ms var(--ease-clay);
+    opacity var(--dur-fast) var(--ease-out),
+    transform 260ms var(--ease-spring);
 }
 .door-face-label {
   text-align: center;
@@ -376,7 +469,7 @@
 .door-face-done {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   opacity: 0;
   transform: scale(0.6);
 }
@@ -393,14 +486,21 @@
   opacity: 1;
   transform: none;
 }
-.door-face-done {
-  transform: scale(0.4) rotate(-25deg);
+
+/* The check draws itself: pathLength is 1, so the dash is the whole stroke. */
+.door-face-done path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.door-face[data-state='done'] .door-face-done path {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 300ms var(--ease-out) 60ms;
 }
 
 .door-face-dots i {
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
   background: currentColor;
 }
 .door-face[data-state='busy'] .door-face-dots i {
@@ -420,7 +520,7 @@
     opacity: 0.45;
   }
   30% {
-    transform: translateY(-5px);
+    transform: translateY(-4px);
     opacity: 1;
   }
 }
@@ -432,22 +532,25 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  column-gap: 6px;
+  column-gap: var(--s-1);
+  margin-top: var(--s-1);
   font-size: var(--t-sm);
-  color: var(--ink-soft);
+  color: var(--ink-2);
 }
 .door-switch button {
   /* text links, but a thumb-sized target around them */
-  min-height: 44px;
-  padding: 0 4px;
-  font-weight: 600;
-  color: var(--accent-deep);
+  min-height: var(--tap);
+  padding: 0 var(--s-1);
+  font-weight: 700;
+  color: var(--primary-ink);
   text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1.5px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 4px;
+  text-decoration-thickness: 2px;
+  transition: text-decoration-color var(--dur-fast) var(--ease-out);
 }
-:root[data-theme='dark'] .door-switch button {
-  color: var(--accent);
+.door-switch button:hover {
+  text-decoration-color: currentColor;
 }
 
 .door-note {
@@ -457,75 +560,64 @@
   grid-column: 1;
   align-self: end;
   justify-self: center;
-  max-width: 380px;
+  max-width: 360px;
+  margin: 0;
   padding-top: var(--s-6);
   text-align: center;
   font-size: var(--t-xs);
-  color: var(--ink-faint);
+  color: var(--ink-2);
   line-height: 1.6;
-}
-
-/* the success note after "send me a code" */
-.field-notice {
-  color: var(--moss-deep);
-}
-:root[data-theme='dark'] .field-notice {
-  color: var(--moss);
 }
 
 /* username availability, inline */
 .door-avail {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 7px;
-  padding-left: 4px;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  padding-left: var(--s-5);
   font-size: var(--t-sm);
-  font-weight: 500;
+  font-weight: 700;
 }
 .door-avail.ok {
-  color: var(--moss-deep);
+  color: var(--success-ink);
 }
 .door-avail.no {
-  color: var(--rust);
-}
-/* moss-deep is tuned for pale clay; on charcoal it sinks. */
-:root[data-theme='dark'] .door-avail.ok {
-  color: var(--moss);
+  color: var(--danger-ink);
 }
 
-/* strength: four slab segments */
+/* strength: four rounded segments */
 .strength {
   display: flex;
-  gap: 5px;
-  margin-top: 9px;
+  gap: var(--s-1);
+  margin: var(--s-2) var(--s-5) 0;
 }
 .strength i {
-  height: 6px;
+  height: 4px;
   flex: 1;
-  border-radius: 2px;
-  border: 1.5px solid var(--ink);
-  background: transparent;
-  transition: background var(--dur) var(--ease-out);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  transition: background var(--dur-base) var(--ease-out);
 }
 .strength i.on {
-  background: var(--moss);
+  background: var(--success);
 }
 .strength i.warn {
-  background: var(--ochre);
+  background: var(--peach);
 }
 
-/* six-digit code entry */
+/* six-digit code entry: round-cornered tiles, one digit each */
 .code-row {
   display: flex;
   gap: var(--s-2);
   justify-content: space-between;
 }
-.code-row input {
+.door .code-row input {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  aspect-ratio: 3 / 4;
+  min-height: 56px;
+  aspect-ratio: auto;
+  border-radius: var(--r-sm);
   text-align: center;
   font-family: var(--font-mono);
   font-size: var(--t-lg);
@@ -538,76 +630,54 @@
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: var(--clay-surface);
+  background: var(--surface);
   pointer-events: none;
 }
 .door-leaf.left {
-  border-right: 2px solid var(--clay-edge);
-}
-
-@media (max-width: 520px) {
-  .door {
-    grid-template-rows: 1fr auto auto;
-    padding: max(var(--s-4), env(safe-area-inset-top)) max(var(--s-4), env(safe-area-inset-right))
-      max(var(--s-4), env(safe-area-inset-bottom)) max(var(--s-4), env(safe-area-inset-left));
-  }
-  .door-panel {
-    padding: var(--s-5) var(--s-4);
-  }
-  .door-mark img {
-    width: 76px;
-    height: 76px;
-  }
-  .door-mark {
-    margin-bottom: var(--s-5);
-  }
-  .door-note {
-    padding-top: var(--s-5);
-  }
-  /* the toggle sits in the corner; keep the mark clear of it on short phones */
-  .door-stack {
-    padding-top: var(--s-6);
-  }
-}
-
-@media (max-width: 380px) {
-  .code-row {
-    gap: 6px;
-  }
-  .door-wordmark {
-    font-size: var(--t-xl);
-  }
+  border-right: 1px solid var(--line);
 }
 
 /* ── "or", and Continue with Google ────────────────────────────────────────
-   The button is a Slab in the quiet variant: it must read as clearly
-   secondary to the primary action above it, while still being obviously
-   pressable. Google's mark is the only foreign element on the screen, and
-   their brand terms require it.
+   A clean secondary pill: our shape and type, outlined rather than filled so
+   it reads as clearly second to the primary above it. Google's four-colour G
+   is the only foreign element on the screen, and their terms require it.
    ────────────────────────────────────────────────────────────────────────── */
 
 .door-or {
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  margin: var(--s-4) 0 var(--s-3);
-  color: var(--ink-faint);
+  margin: var(--s-1) 0;
+  color: var(--ink-2);
   font-size: var(--t-xs);
-  letter-spacing: 0.14em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-/* clay-edge, not a fixed ink tint — it has a dark value, a hard rgba does not */
 .door-or::before,
 .door-or::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--clay-edge);
+  background: var(--line);
 }
 
-.google-btn {
+.door .google-btn {
   gap: var(--s-3);
-  min-height: 48px;
+  min-height: 52px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  font-weight: 700;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.door .google-btn:hover {
+  filter: none;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1.5px transparent;
 }
 .google-btn svg {
   flex: 0 0 auto;
@@ -627,49 +697,116 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin: 14px auto 0;
-  padding: 10px 16px;
-  min-height: 44px;
+  gap: var(--s-2);
+  margin: var(--s-3) auto 0;
+  padding: var(--s-2) var(--s-4);
+  min-height: var(--tap);
   max-width: 100%;
   border-radius: var(--r-pill);
-  background: var(--clay-surface);
-  box-shadow: var(--clay-1);
+  background: var(--surface);
+  box-shadow: var(--edge), var(--shadow-1);
   color: var(--ink);
-  font-size: 0.86rem;
+  font-size: var(--t-sm);
+  font-weight: 700;
   text-align: center;
   transition:
-    box-shadow var(--dur) var(--ease-out),
-    transform var(--dur) var(--ease-out);
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 .door-app:hover {
-  box-shadow: var(--clay-2);
-  transform: translateY(-1px);
+  box-shadow: var(--edge), var(--shadow-2);
 }
 .door-app:active {
-  box-shadow: var(--clay-in);
-  transform: translateY(0);
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
+}
+
+/* ── phones ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 520px) {
+  .door {
+    grid-template-rows: 1fr auto auto;
+    padding: max(var(--s-4), env(safe-area-inset-top)) max(var(--s-4), env(safe-area-inset-right))
+      max(var(--s-4), env(safe-area-inset-bottom)) max(var(--s-4), env(safe-area-inset-left));
+  }
+  .door-panel {
+    padding: var(--s-6) var(--s-5) var(--s-5);
+  }
+  .door-mark svg {
+    width: 96px;
+    height: 96px;
+  }
+  .door-mark {
+    margin-bottom: var(--s-5);
+  }
+  .door-note {
+    padding-top: var(--s-5);
+  }
+  /* the toggle sits in the corner; keep the mark clear of it on short phones */
+  .door-stack {
+    padding-top: var(--s-7);
+  }
+}
+
+/*
+ * Full-bleed below 420px. A floating card with a 16px gutter each side leaves
+ * a phone's fields cramped for no gain, so the card dissolves into the page:
+ * no fill, no shadow, its content running to the same gutter as the mark.
+ * The fields then need to stand on the page by themselves — on lavender paper
+ * that means the surface colour and a soft shadow rather than the well tone.
+ */
+@media (max-width: 419.98px) {
+  .door-panel {
+    padding: var(--s-2) 0 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .door-rise {
+    padding: 0 var(--s-1);
+  }
+  :root[data-theme='light'] .door .groove {
+    background: var(--surface);
+    box-shadow: var(--edge), var(--shadow-1);
+  }
+  :root[data-theme='light'] .door .groove:focus {
+    box-shadow: 0 0 0 2px var(--iris), var(--ring);
+  }
+  .door .google-btn {
+    background: transparent;
+  }
+  .door-heading,
+  .door-sub {
+    text-align: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .code-row {
+    gap: var(--s-1);
+  }
+  .door-wordmark {
+    font-size: var(--t-xl);
+  }
 }
 
 /* ── reduced motion ─────────────────────────────────────────────────────────
    base.css already collapses every animation and transition to ~0ms. This
-   goes further for the door: the blobs stop existing as motion at all, and
-   the entrance becomes a plain appearance rather than a frozen first frame. */
+   goes further for the door: the blobs and the bob stop existing as motion
+   at all, and the entrance becomes a plain appearance rather than a frozen
+   first frame. */
 
 @media (prefers-reduced-motion: reduce) {
-  .door-blobs span {
+  .door-blobs span,
+  .door-bob {
     animation: none;
   }
-  .door.intro .door-mark-in,
+  .door.intro .door-words,
   .door.intro .door-rise,
   .door.intro .door-in {
     animation-name: door-fade;
   }
-  .door .field:focus-within > .field-label {
-    transform: none;
-  }
-  .door .slab:active:not(:disabled) {
-    transform: translate(3px, 3px);
+  .door label.field > .field-label {
+    transition: none;
   }
   .door-theme svg,
   .door-theme[data-dark='false'] .door-theme-sun,
@@ -680,6 +817,9 @@
   .door-face-dots,
   .door-face-done {
     transform: none;
+  }
+  .door-face-done path {
+    stroke-dashoffset: 0;
   }
 }
 @keyframes door-fade {

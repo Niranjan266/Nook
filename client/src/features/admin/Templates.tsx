@@ -18,6 +18,7 @@
 import { useEffect, useState } from 'react';
 import { adminGet, adminPost, type AdminUser } from '@/lib/adminApi';
 import { IconWarning, IconCheck, IconSend } from '@/components/Icon';
+import Logo from '@/components/Logo';
 
 interface TemplateInfo {
   id: string;
@@ -159,7 +160,7 @@ export default function Templates({ people }: { people: AdminUser[] }) {
       {/* ── the blanks ─────────────────────────────────────────────────── */}
       {chosen?.fields.map((field) => (
         <label key={field} className="field">
-          <span>{LABELS[field] || field}</span>
+          <span className="field-label">{LABELS[field] || field}</span>
           {LONG.has(field) ? (
             <textarea
               className="admin-textarea groove"
@@ -192,10 +193,7 @@ export default function Templates({ people }: { people: AdminUser[] }) {
           */}
           <div className="admin-notif">
             <div className="admin-notif-icon" aria-hidden="true">
-              <svg viewBox="0 0 96 96" width="26" height="26">
-                <rect x="6" y="6" width="84" height="84" rx="26" fill="#EDE3D6" />
-                <path d="M32 74 V46 a16 16 0 0 1 32 0 V74 Z" fill="#C0603C" />
-              </svg>
+              <Logo size={26} />
             </div>
             <div className="admin-notif-text">
               <b>{preview.push?.title || '—'}</b>
@@ -205,7 +203,7 @@ export default function Templates({ people }: { people: AdminUser[] }) {
 
           {preview.email ? (
             <>
-              <div className="admin-preview-brand" style={{ marginTop: 18 }}>
+              <div className="admin-preview-brand" style={{ marginTop: 16 }}>
                 In an inbox
               </div>
               <div className="admin-mail">
@@ -215,7 +213,7 @@ export default function Templates({ people }: { people: AdminUser[] }) {
               </div>
             </>
           ) : (
-            <p className="admin-note" style={{ marginTop: 14 }}>
+            <p className="admin-note" style={{ marginTop: 12 }}>
               This kind does not send an email — it is too small to be worth an inbox.
             </p>
           )}
@@ -224,7 +222,7 @@ export default function Templates({ people }: { people: AdminUser[] }) {
 
       {/* ── where it goes ──────────────────────────────────────────────── */}
       <div className="field">
-        <span>Send by</span>
+        <span className="field-label">Send by</span>
         <div className="admin-sorts" role="group" aria-label="Channels">
           <button className={`admin-sort${push ? ' on' : ''}`} onClick={() => setPush(!push)}>
             {push ? '✓ ' : ''}Notification
@@ -241,7 +239,7 @@ export default function Templates({ people }: { people: AdminUser[] }) {
       </div>
 
       <label className="field">
-        <span>To</span>
+        <span className="field-label">To</span>
         <select className="groove" value={to} onChange={(e) => setTo(e.target.value)}>
           <option value="all">Everyone ({email ? mailable.length : reachable.length})</option>
           {reachable.map((p) => (

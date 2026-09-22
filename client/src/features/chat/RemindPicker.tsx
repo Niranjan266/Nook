@@ -101,8 +101,7 @@ export default function RemindPicker({
 
       {existing && (
         <button
-          className="list-row"
-          style={{ color: 'var(--rust)' }}
+          className="list-row danger"
           onClick={() =>
             cancelReminder(existing.id)
               .then(() => {

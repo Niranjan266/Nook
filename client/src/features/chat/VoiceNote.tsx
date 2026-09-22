@@ -35,6 +35,7 @@ const savePosition = (id: string, seconds: number) => {
 
 export default function VoiceNote({ url, waveform, length = 0, transcript, messageId }: Props) {
   const audio = useRef<HTMLAudioElement>(null);
+  const wave = useRef<HTMLDivElement>(null);
   const settings = useAuth((s) => s.me?.settings);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -98,6 +99,29 @@ export default function VoiceNote({ url, waveform, length = 0, transcript, messa
     if (audio.current) audio.current.playbackRate = speed;
   }, [speed]);
 
+  /**
+   * The playhead, every frame while playing. timeupdate fires about four times
+   * a second, which made the played colour jump a bar at a time; this writes
+   * one CSS variable per frame instead — a clip, not a render.
+   */
+  useEffect(() => {
+    const el = audio.current;
+    const box = wave.current;
+    if (!el || !box) return;
+    const paint = (p: number) => box.style.setProperty('--p', `${(p * 100).toFixed(2)}%`);
+    if (!playing) {
+      paint(progress);
+      return;
+    }
+    let raf = 0;
+    const frame = () => {
+      if (el.duration) paint(el.currentTime / el.duration);
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, progress]);
+
   const toggle = () => {
     const el = audio.current;
     if (!el) return;
@@ -120,12 +144,11 @@ export default function VoiceNote({ url, waveform, length = 0, transcript, messa
   const cycleSpeed = () => setSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1));
 
   return (
-    <div className="stack" style={{ gap: 4 }}>
+    <div className="stack" style={{ gap: 'var(--s-1)' }}>
       <div className="voice">
         <audio ref={audio} src={url} preload="metadata" />
         <button
-          className="clay-round"
-          style={{ width: 38, height: 38 }}
+          className="voice-play"
           onClick={toggle}
           aria-label={playing ? 'Pause voice message' : 'Play voice message'}
         >
@@ -133,6 +156,7 @@ export default function VoiceNote({ url, waveform, length = 0, transcript, messa
         </button>
 
         <div
+          ref={wave}
           className="wave"
           onClick={seek}
           role="slider"
@@ -142,12 +166,14 @@ export default function VoiceNote({ url, waveform, length = 0, transcript, messa
           aria-valuenow={Math.round(progress * 100)}
           tabIndex={0}
         >
-          {bars.map((h, i) => (
-            <i
-              key={i}
-              className={i / bars.length <= progress ? 'played' : ''}
-              style={{ height: `${Math.max(12, Math.min(100, h * 100))}%` }}
-            />
+          {/* The same bars twice: at rest, and the played copy clipped to
+              the playhead over them. */}
+          {['rest', 'played'].map((layer) => (
+            <span key={layer} className={`wave-bars${layer === 'played' ? ' played' : ''}`} aria-hidden="true">
+              {bars.map((h, i) => (
+                <i key={i} style={{ height: `${Math.max(12, Math.min(100, h * 100))}%` }} />
+              ))}
+            </span>
           ))}
         </div>
 

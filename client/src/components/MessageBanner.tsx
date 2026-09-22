@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { spring } from '@/lib/motion';
+import { springs } from '@/lib/motion';
 import Avatar from '@/components/Avatar';
 import { IconClose } from '@/components/Icon';
 
@@ -62,7 +62,7 @@ export default function MessageBanner({
           initial={{ y: -90, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -90, opacity: 0 }}
-          transition={spring}
+          transition={springs.pop}
           // Flick it up to dismiss — the gesture people already have for this.
           drag="y"
           dragConstraints={{ top: 0, bottom: 0 }}

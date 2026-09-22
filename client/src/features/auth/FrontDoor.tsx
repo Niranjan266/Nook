@@ -14,10 +14,11 @@ import { useAuth } from '@/stores/auth';
 import { useUi } from '@/stores/ui';
 import { get, post, setToken, ApiError } from '@/lib/api';
 import { API_BASE } from '@/lib/config';
-import { quick } from '@/lib/motion';
+import { quick, springs, dur } from '@/lib/motion';
 import { IconCheck, IconWarning, IconDownload, IconSun, IconMoon } from '@/components/Icon';
 import { startGoogleSignIn, bindDeepLinks } from '@/lib/native';
 import type { Me } from '@/lib/types';
+import Logo from '@/components/Logo';
 
 type Step = 'in' | 'up' | 'recover' | 'reset';
 
@@ -26,12 +27,12 @@ type Step = 'in' | 'up' | 'recover' | 'reset';
  *
  * Their brand guidelines require the four-colour "G" on a sign-in control, and
  * it is the one part of this screen that cannot be redrawn in our palette. The
- * rest of the button is ours — Slab shape, our type, our spacing — so it reads
+ * rest of the button is ours — our pill, our type, our spacing — so it reads
  * as a Nook control that happens to carry Google's mark, rather than Google's
  * button dropped into someone else's design.
  */
-const GoogleMark = () => (
-  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+export const GoogleMark = () => (
+  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
     <path
       fill="#4285F4"
       d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"
@@ -91,10 +92,29 @@ export const successBeat = (reduce: boolean | null) =>
 export const enterAt = (i: number) => ({ '--i': i }) as CSSProperties;
 
 /**
- * The card resizes with a spring rather than the app's default, which is
- * tuned for bubbles: a whole card overshooting reads as wobble, not weight.
+ * The card resizes on the gentle spring rather than the app's default, which
+ * is tuned for bubbles: a whole card overshooting reads as wobble, not weight.
  */
-const layoutSpring: Transition = { type: 'spring', stiffness: 460, damping: 42, mass: 0.9 };
+const layoutSpring: Transition = springs.gentle;
+
+/**
+ * A length token, in pixels, kept current. Framer can only correct a corner
+ * radius it can do arithmetic on, so the card's radius has to reach it as a
+ * number — read from the token rather than written here, so a design swap on
+ * <html> (theme or design set) re-rounds the card with everything else.
+ */
+function useTokenPx(name: string, fallback: number) {
+  const read = () =>
+    parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
+  const [px, setPx] = useState(read);
+  useEffect(() => {
+    const mo = new MutationObserver(() => setPx(read()));
+    mo.observe(document.documentElement, { attributes: true });
+    return () => mo.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name]);
+  return px;
+}
 
 /** A short, decaying shake. Horizontal only — a nod "no", never a jolt. */
 const SHAKE = { x: [0, -9, 8, -5, 3, 0], transition: { duration: 0.36, ease: 'easeOut' } };
@@ -112,7 +132,7 @@ export function useErrorShake(error: string, reduce: boolean | null) {
   return controls;
 }
 
-/** Slow clay blobs behind everything. Transform-only, so the GPU does it. */
+/** Slow soft blobs behind everything. Transform-only, so the GPU does it. */
 export const DoorBackdrop = () => (
   <div className="door-blobs" aria-hidden="true">
     <span />
@@ -188,8 +208,12 @@ export function SubmitFace({
         <i />
         <i />
       </span>
+      {/* Drawn here rather than taken from Icon: pathLength="1" is what
+          lets the CSS draw the stroke on, whatever the path's real length. */}
       <span className="door-face-done" aria-hidden="true">
-        <IconCheck size={22} strokeWidth={2.6} />
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
+          <path d="m5 12.5 4.5 4.5L19 7.5" pathLength={1} />
+        </svg>
       </span>
       <span className="sr-only" aria-live="polite">
         {state === 'busy' ? busyLabel : state === 'done' ? 'Signed in' : ''}
@@ -208,7 +232,7 @@ const stepSlide: Variants = {
   show: {
     opacity: 1,
     x: 0,
-    transition: { x: { type: 'spring', stiffness: 420, damping: 36 }, opacity: { duration: 0.2 } },
+    transition: { x: springs.sheet, opacity: { duration: dur.base } },
   },
   exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -28 : 28, transition: quick }),
 };
@@ -216,7 +240,7 @@ const stepSlide: Variants = {
 /** Reduced motion: the same change, without the travel. */
 const stepFade: Variants = {
   hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { duration: 0.16 } },
+  show: { opacity: 1, transition: { duration: dur.fast } },
   exit: { opacity: 0, transition: { duration: 0.1 } },
 };
 
@@ -249,6 +273,7 @@ export default function FrontDoor() {
   }, []);
 
   const shake = useErrorShake(error, reduce);
+  const cardRadius = useTokenPx('--r-card', 22);
   const layoutOn = !reduce;
   const layoutT = { layout: layoutSpring };
 
@@ -420,8 +445,13 @@ export default function FrontDoor() {
         const res = await post<{ message: string }>('/auth/recover', {
           username: username.trim().toLowerCase(),
         });
-        setNotice(res.message);
+        // go() clears the notice and a step change never clears `busy`, so
+        // the order matters: switch first, then say the code was sent, and
+        // free the button — it stayed on its working dots and the reset form
+        // could never be sent.
         go('reset');
+        setNotice(res.message);
+        setBusy(false);
       } else {
         const data = await post<{ accessToken: string }>('/auth/recover/reset', {
           username: username.trim().toLowerCase(),
@@ -468,14 +498,14 @@ export default function FrontDoor() {
             re-centres, and the mark should glide with it, not jump. */}
         <motion.div className="door-mark" layout={layoutOn ? 'position' : false} transition={layoutT}>
           <div className="door-mark-in">
-            <motion.img
-              src="/logo.svg"
-              alt=""
-              width={104}
-              height={104}
-              style={{ rotateX: rx, rotateY: ry, transformPerspective: 900 }}
-            />
-            <div className="stack" style={{ alignItems: 'center', gap: 2 }}>
+            <motion.div style={{ rotateX: rx, rotateY: ry, transformPerspective: 900, lineHeight: 0 }}>
+              {/* The pebbles pop in on their own springs (Logo's animate),
+                  then the wrapper lets them float. */}
+              <div className="door-bob">
+                <Logo size={104} tile={false} animate={!reduce} />
+              </div>
+            </motion.div>
+            <div className="door-words">
               <span className="door-wordmark">Nook</span>
               <span className="door-tagline">Your corner of the internet.</span>
             </div>
@@ -493,7 +523,7 @@ export default function FrontDoor() {
             transition={layoutT}
             // Set inline so framer can correct the corners while the card
             // scales; a radius only in CSS would squash mid-resize.
-            style={{ borderRadius: 38 }}
+            style={{ borderRadius: cardRadius }}
           >
             <form onSubmit={submit} noValidate>
               <div className="door-steps">
@@ -644,9 +674,9 @@ export default function FrontDoor() {
                   <motion.p
                     key={error ? `e:${error}` : `n:${notice}`}
                     className={`field-error${notice && !error ? ' field-notice' : ''}`}
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 0.9, 0.3, 1] } }}
-                    exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1, transition: springs.pop }}
+                    exit={{ opacity: 0, transition: { duration: dur.press } }}
                     layout={layoutOn ? 'position' : false}
                     transition={layoutT}
                     role="status"

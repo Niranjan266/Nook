@@ -52,7 +52,7 @@ export default function PinBar({
           }}
         >
           <span className="pin-bar-label">
-            <IconPin size={10} style={{ verticalAlign: -1 }} /> Pinned
+            <IconPin size={12} /> Pinned
             {pins.length > 1 ? ` · ${(index % pins.length) + 1} of ${pins.length}` : ''}
           </span>
           <span className="pin-bar-text truncate">
@@ -62,7 +62,6 @@ export default function PinBar({
 
         <button
           className="clay-round"
-          style={{ width: 32, height: 32 }}
           onClick={() =>
             unpin(conversation.id, current.messageId)
               .then(() => toast('Unpinned'))

@@ -19,6 +19,7 @@
  */
 import { AnimatePresence, motion, useReducedMotion, useSpring, useTransform, type MotionValue } from 'framer-motion';
 import { IconTrash, IconSend, IconLock, IconMic } from '@/components/Icon';
+import { press } from '@/lib/motion';
 
 export const CANCEL_AT = -110;
 export const LOCK_AT = -72;
@@ -92,7 +93,7 @@ export default function RecordingBar({ seconds, levels, level, mode, dragX, drag
           initial={reduce ? false : { scale: 0, rotate: -40 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: 'spring', stiffness: 520, damping: 22 }}
-          whileTap={{ scale: 0.9 }}
+          whileTap={press}
         >
           <IconTrash />
         </motion.button>
@@ -187,7 +188,7 @@ export default function RecordingBar({ seconds, levels, level, mode, dragX, drag
           aria-label={holding ? 'Recording — let go to send' : 'Send voice message'}
           animate={{ scale: holding ? 1.28 : 1 }}
           transition={{ type: 'spring', stiffness: 460, damping: 24 }}
-          whileTap={holding ? undefined : { scale: 0.92 }}
+          whileTap={holding ? undefined : press}
         >
           <AnimatePresence initial={false} mode="wait">
             <motion.span

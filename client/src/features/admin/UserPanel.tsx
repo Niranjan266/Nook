@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { spring } from '@/lib/motion';
+import { sheetSlide } from '@/lib/motion';
 import {
   adminGet,
   adminPost,
@@ -97,10 +97,8 @@ export default function UserPanel({
       />
       <motion.aside
         className="admin-drawer"
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={spring}
+        // The app's side-sheet motion: in on the sheet spring, out faster.
+        {...sheetSlide}
         role="dialog"
         aria-label="Account"
       >
@@ -129,7 +127,7 @@ export default function UserPanel({
               >
                 {!user.avatarUrl && user.displayName.slice(0, 1).toUpperCase()}
               </span>
-              <span className="stack" style={{ gap: 2, minWidth: 0 }}>
+              <span className="stack" style={{ gap: 4, minWidth: 0 }}>
                 <h2>{user.displayName}</h2>
                 <span className="tiny faint">
                   @{user.username} · <code>{user.nookId}</code>
@@ -247,7 +245,7 @@ export default function UserPanel({
                     spellCheck={false}
                     aria-label="Type the username to confirm deletion"
                   />
-                  <div className="row" style={{ gap: 6 }}>
+                  <div className="row" style={{ gap: 8 }}>
                     <button className="clay-btn grow" onClick={() => setConfirmingDelete(false)}>
                       Cancel
                     </button>

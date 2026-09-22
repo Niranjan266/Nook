@@ -20,6 +20,7 @@ import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { motion, AnimatePresence, useReducedMotion, type Transition } from 'framer-motion';
 import { useUi } from '@/stores/ui';
+import { springs } from '@/lib/motion';
 import '@/styles/tour.css';
 
 interface Step {
@@ -332,7 +333,7 @@ export default function Tour() {
   const pos = placeCard(rect, card, view.w, view.h);
 
   const move: Transition =
-    reduced || !settled ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 32, mass: 0.9 };
+    reduced || !settled ? { duration: 0 } : springs.sheet;
 
   return createPortal(
     <AnimatePresence>

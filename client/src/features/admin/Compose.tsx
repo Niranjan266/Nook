@@ -105,7 +105,7 @@ export default function Compose({ people }: { people: AdminUser[] }) {
       </div>
 
       {channel === 'push' && (
-        <p className="tiny faint" style={{ margin: '2px 0 0' }}>
+        <p className="tiny faint" style={{ margin: 0 }}>
           A phone or Chrome notification and nothing else — it leaves no message behind. Only reaches
           people who turned notifications on.
         </p>
@@ -224,7 +224,7 @@ export default function Compose({ people }: { people: AdminUser[] }) {
       </label>
 
       {channel === 'email' && format === 'html' && (
-        <p className="tiny faint" style={{ margin: '-2px 0 0' }}>
+        <p className="tiny faint" style={{ margin: 0 }}>
           Sent exactly as written — no Nook wrapper. Use{' '}
           <code>{'{{name}}'}</code>, <code>{'{{email}}'}</code>, <code>{'{{app_url}}'}</code> and{' '}
           <code>{'{{year}}'}</code> and they will be filled in per person. A plain-text version is
@@ -301,7 +301,7 @@ export default function Compose({ people }: { people: AdminUser[] }) {
             This {channel === 'email' ? 'emails' : channel === 'push' ? 'notifies' : 'messages'}{' '}
             <strong>{audienceCount} people</strong> and cannot be taken back.
           </p>
-          <div className="row" style={{ gap: 6 }}>
+          <div className="row" style={{ gap: 8 }}>
             <button className="clay-btn grow" onClick={() => setConfirming(false)} disabled={busy}>
               Cancel
             </button>

@@ -3,9 +3,9 @@
  *
  * Plain 2D canvas, no libraries and no model: the look is built from a few
  * cheap passes rather than anything clever. Soften, cut the colours down to a
- * handful of flat tones, warm them toward the clay palette, soften again so
- * the tone edges read as pressed clay rather than a GIF, then mask, add a
- * cream die-cut edge and a soft shadow. Split in two so typing a caption only
+ * handful of flat tones, lean them toward Nook's palette, soften again so
+ * the tone edges read as soft moulded shapes rather than a GIF (the "clay
+ * sticker" look), then mask, add a pale die-cut edge and a soft shadow. Split in two so typing a caption only
  * re-runs the cheap half.
  */
 
@@ -28,18 +28,21 @@ const BORDER = 16;
 const INNER = STICKER_SIZE - 2 * (PAD + BORDER);
 const TONES = 6;
 
-const CREAM = '#faf6f0';
-const CAPTION_INK = '#3a2a20';
+// Baked into the image, so these are the fixed palette (tokens.css), not
+// theme tokens: a sticker looks the same in every chat and every theme.
+const CREAM = '#fbfaff';
+const CAPTION_INK = '#1f1b2e';
 
-/** terracotta, moss, ochre, clay blue, rust, cream, warm ink — from tokens.css. */
-const CLAY: [number, number, number][] = [
-  [192, 96, 60],
-  [87, 105, 74],
-  [206, 149, 53],
-  [71, 96, 111],
-  [163, 63, 47],
-  [244, 238, 230],
-  [46, 38, 32],
+/** volt, mint, sky, rose, peach, iris, paper, night — the fixed palette. */
+const PALETTE: [number, number, number][] = [
+  [200, 245, 69],
+  [61, 214, 168],
+  [106, 168, 255],
+  [255, 143, 163],
+  [255, 179, 107],
+  [139, 124, 255],
+  [244, 242, 250],
+  [31, 27, 46],
 ];
 
 /**
@@ -123,20 +126,20 @@ function posterize(c: HTMLCanvasElement) {
     centres = centres.map((c0, k) => (sums[k][3] ? sums[k].slice(0, 3).map((v) => v / sums[k][3]) : c0));
   }
 
-  // Each tone leans a little toward its nearest clay colour, then warms: less
-  // blue, a touch more red, and never quite black — clay has no true black.
+  // Each tone leans a little toward its nearest palette colour and is lifted
+  // a touch — never quite black, so the shapes stay soft rather than inked.
   const tinted = centres.map((c0) => {
-    let near = CLAY[0];
+    let near = PALETTE[0];
     let nearD = Infinity;
-    for (const p of CLAY) {
+    for (const p of PALETTE) {
       const dd = dist2(c0, 0, p);
       if (dd < nearD) (nearD = dd), (near = p);
     }
     const mix = c0.map((v, i) => v * 0.76 + near[i] * 0.24);
     return [
-      Math.min(255, Math.max(34, mix[0] * 1.05 + 6)),
-      Math.min(255, Math.max(28, mix[1] * 1.0 + 2)),
-      Math.min(255, Math.max(22, mix[2] * 0.88)),
+      Math.min(255, Math.max(31, mix[0] * 1.02 + 3)),
+      Math.min(255, Math.max(27, mix[1] * 1.02 + 3)),
+      Math.min(255, Math.max(46, mix[2] * 1.02 + 6)),
     ];
   });
 
@@ -191,8 +194,8 @@ export function prepareArt(source: CanvasImageSource, crop: StickerCrop, shape: 
   ctx.fillStyle = hi;
   ctx.fillRect(0, 0, INNER, INNER);
   const lo = ctx.createLinearGradient(0, 0, INNER, INNER);
-  lo.addColorStop(0.55, 'rgba(30,26,23,0)');
-  lo.addColorStop(1, 'rgba(30,26,23,0.45)');
+  lo.addColorStop(0.55, 'rgba(14,13,20,0)');
+  lo.addColorStop(1, 'rgba(14,13,20,0.45)');
   ctx.fillStyle = lo;
   ctx.fillRect(0, 0, INNER, INNER);
 
@@ -256,18 +259,18 @@ export function composeSticker(art: HTMLCanvasElement, caption = '', out = makeC
   ectx.globalCompositeOperation = 'source-in';
   ectx.fillStyle = CREAM;
   ectx.fillRect(0, 0, STICKER_SIZE, STICKER_SIZE);
-  // The edge is clay too: lit top-left, a shade deeper bottom-right.
+  // The edge is moulded too: lit top-left, a shade deeper bottom-right.
   ectx.globalCompositeOperation = 'source-atop';
   const puff = ectx.createLinearGradient(0, 0, STICKER_SIZE, STICKER_SIZE);
   puff.addColorStop(0, 'rgba(255,255,255,0.6)');
-  puff.addColorStop(1, 'rgba(176,150,120,0.45)');
+  puff.addColorStop(1, 'rgba(139,124,255,0.28)');
   ectx.fillStyle = puff;
   ectx.fillRect(0, 0, STICKER_SIZE, STICKER_SIZE);
 
   const octx = ctxOf(out);
   octx.clearRect(0, 0, out.width, out.height);
   octx.save();
-  octx.shadowColor = 'rgba(30, 26, 23, 0.32)';
+  octx.shadowColor = 'rgba(14, 13, 20, 0.34)';
   octx.shadowBlur = 14;
   octx.shadowOffsetX = 3;
   octx.shadowOffsetY = 6;

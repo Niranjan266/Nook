@@ -44,7 +44,7 @@ export default function Blur({ hash, className }: { hash?: string; className?: s
         width: '100%',
         height: '100%',
         opacity: ok ? 1 : 0,
-        transition: 'opacity 200ms ease',
+        transition: 'opacity var(--dur-base) var(--ease-out)',
       }}
     />
   );

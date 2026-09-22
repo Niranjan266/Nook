@@ -73,7 +73,7 @@ export default function CodeEntry({
     title || (confirm ? (stage === 'enter' ? 'Choose a code' : 'Enter it again') : 'Enter your code');
 
   return (
-    <div className="code-entry stack" style={{ alignItems: 'center', gap: 14 }}>
+    <div className="code-entry stack" style={{ alignItems: 'center', gap: 'var(--s-4)' }}>
       <div className="stack" style={{ alignItems: 'center', gap: 4 }}>
         <h3 style={{ margin: 0 }}>{heading}</h3>
         {(mismatch || error || hint) && (
@@ -132,7 +132,7 @@ function PinPad({
   });
 
   return (
-    <div className="stack" style={{ alignItems: 'center', gap: 16 }}>
+    <div className="stack" style={{ alignItems: 'center', gap: 'var(--s-4)' }}>
       <div className="pin-dots" aria-hidden>
         {Array.from({ length: PIN_MAX }).map((_, i) => (
           <span key={i} className={`pin-dot${i < value.length ? ' on' : ''}`} />
@@ -247,7 +247,7 @@ function PatternPad({ onDone, busy }: { onDone: (code: string) => void; busy?: b
             y1={l.from.y}
             x2={l.to.x}
             y2={l.to.y}
-            stroke="var(--accent)"
+            stroke="var(--primary)"
             strokeWidth={5}
             strokeLinecap="round"
             opacity={0.85}

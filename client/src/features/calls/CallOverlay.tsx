@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCall } from '@/stores/call';
 import Avatar from '@/components/Avatar';
 import { duration } from '@/lib/format';
-import { spring } from '@/lib/motion';
+import { spring, springs, press } from '@/lib/motion';
 import {
   IconMic,
   IconMicOff,
@@ -74,19 +74,21 @@ export default function CallOverlay() {
         <audio ref={attachRemote} autoPlay playsInline />
         <motion.div
           className="call-pill"
+          // x keeps it centred: Framer owns the transform, so a CSS
+          // translateX(-50%) would be overwritten by the drop-in.
+          style={{ x: '-50%' }}
           initial={{ y: -60, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={spring}
+          transition={springs.pop}
+          whileTap={press}
           onClick={() => call.setMinimised(false)}
           role="button"
           tabIndex={0}
         >
-          <Avatar name={call.peer?.displayName || ''} src={call.peer?.avatarUrl} id={call.peer?.id} size={30} />
+          <Avatar name={call.peer?.displayName || ''} src={call.peer?.avatarUrl} id={call.peer?.id} size={36} />
           <span className="stack" style={{ gap: 0 }}>
-            <span className="small" style={{ fontWeight: 600 }}>
-              {call.peer?.displayName}
-            </span>
-            <span className="call-timer tabular tiny">{duration(elapsed)}</span>
+            <span className="call-pill-name">{call.peer?.displayName}</span>
+            <span className="call-timer">{duration(elapsed)}</span>
           </span>
           <button
             className="hang-sm"
@@ -144,15 +146,25 @@ export default function CallOverlay() {
             </div>
           ) : (
             <div className={`call-orb${call.phase === 'ringing' ? ' ringing' : ''}`}>
-              <Avatar
-                name={call.peer?.displayName || '?'}
-                src={call.peer?.avatarUrl}
-                id={call.peer?.id}
-                accent={call.peer?.accent}
-                size={168}
-              />
+              <span className="call-face">
+                {/* While it rings, rings breathe out of the caller. */}
+                {call.phase === 'ringing' && (
+                  <span className="call-rings" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                )}
+                <Avatar
+                  name={call.peer?.displayName || '?'}
+                  src={call.peer?.avatarUrl}
+                  id={call.peer?.id}
+                  accent={call.peer?.accent}
+                  size={168}
+                />
+              </span>
               <span className="call-name">{call.peer?.displayName}</span>
-              {call.peer?.username && <span className="muted small">@{call.peer.username}</span>}
+              {call.peer?.username && <span className="call-handle">@{call.peer.username}</span>}
             </div>
           )}
         </div>

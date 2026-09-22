@@ -29,25 +29,17 @@ import MessageBanner, { type BannerMessage } from '@/components/MessageBanner';
 import { setCacheScope } from '@/lib/outbox';
 import { publishDevice } from '@/lib/e2ee/secret';
 import { usePhone, useNarrow } from '@/lib/useMediaQuery';
-import { spring } from '@/lib/motion';
+import { toastDrop } from '@/lib/motion';
 import { IconPlus, IconWarning } from '@/components/Icon';
+import Logo from '@/components/Logo';
 
 function Empty() {
   const openSheet = useUi((s) => s.openSheet);
   return (
     <section className="surface">
       <div className="empty">
-        <svg className="empty-art" viewBox="0 0 200 200" fill="none" aria-hidden="true">
-          <rect x="18" y="26" width="164" height="132" rx="38" fill="var(--clay-surface)" />
-          <path d="M72 146V98a28 28 0 0 1 56 0v48Z" fill="var(--accent)" opacity="0.92" />
-          <rect x="72" y="140" width="56" height="6" fill="var(--ink)" opacity="0.15" />
-          <path
-            d="M46 60h30M46 74h18"
-            stroke="var(--clay-edge)"
-            strokeWidth="6"
-            strokeLinecap="round"
-          />
-        </svg>
+        {/* The mark, resting: an empty room is still Nook's room. */}
+        <Logo size={96} tile={false} className="empty-art" />
         <h3>Pick a conversation</h3>
         <p>
           Or start a new one. Nook only needs a username — no phone number, no address book upload, no
@@ -112,14 +104,7 @@ function OfflineBar() {
   return (
     <AnimatePresence>
       {showOffline && (
-        <motion.div
-          className="toast bad"
-          style={{ position: 'fixed', top: 12, left: '50%', zIndex: 130 }}
-          initial={{ opacity: 0, y: -20, x: '-50%' }}
-          animate={{ opacity: 1, y: 0, x: '-50%' }}
-          exit={{ opacity: 0, y: -20, x: '-50%' }}
-          transition={spring}
-        >
+        <motion.div className="toast bad offline" variants={toastDrop} initial="hidden" animate="show" exit="exit">
           <IconWarning size={16} />
           Reconnecting — anything you send is queued
         </motion.div>
@@ -225,21 +210,21 @@ function Booting() {
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className="center" style={{ height: '100dvh', flexDirection: 'column', gap: 18 }}>
-      <motion.img
-        src="/logo.svg"
-        alt="Nook"
-        width={72}
-        height={72}
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: [0.5, 1, 0.5], scale: 1 }}
-        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-      />
+    <div className="center" style={{ height: '100dvh', flexDirection: 'column', gap: 'var(--s-5)' }}>
+      {/* The pebbles arrive one after the other, then the pair breathes while
+          it waits. Opacity only, so it never gates what comes next. */}
+      <motion.div
+        style={{ lineHeight: 0 }}
+        animate={{ opacity: [1, 0.55, 1] }}
+        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: 0.9 }}
+      >
+        <Logo size={72} title="Nook" animate />
+      </motion.div>
       {slow && (
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14, textAlign: 'center', maxWidth: 280 }}
+          style={{ margin: 0, color: 'var(--ink-2)', fontSize: 'var(--t-sm)', textAlign: 'center', maxWidth: 280 }}
           role="status"
         >
           Waking Nook up — the first open after a quiet spell can take a moment.
@@ -419,7 +404,7 @@ function Nook() {
 
   return (
     <>
-      <div className="shell">
+      <div className={`shell${isPhone && showSurface && conversation ? ' in-convo' : ''}`}>
         <DockRail />
 
         <AnimatePresence initial={false}>{showShelf && <Shelf key="shelf" />}</AnimatePresence>

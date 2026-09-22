@@ -11,7 +11,7 @@ import PinBar from './PinBar';
 import CodeEntry from '@/components/CodeEntry';
 import { MOOD_EMOJI, MOOD_LABEL, daysUntil } from '@/lib/rooms';
 import { dayLabel, sameDay, lastSeenLabel } from '@/lib/format';
-import { spring, convoEnter } from '@/lib/motion';
+import { spring, convoEnter, popFrom, press, reactionPop } from '@/lib/motion';
 import { usePhone } from '@/lib/useMediaQuery';
 import {
   IconBack,
@@ -158,20 +158,21 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
   }, [rawList]);
 
   /** Run grouping, worked out once per list change rather than on every render. */
-  const rows = useMemo(
-    () =>
-      windowed.map((m, i) => {
-        const prev = windowed[i - 1];
-        const next = windowed[i + 1];
-        const newDay = !prev || !sameDay(prev.createdAt, m.createdAt);
-        const gap =
-          !prev ||
-          prev.sender.id !== m.sender.id ||
-          new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > GAP_MINUTES * 60000;
-        return { m, newDay, runStart: newDay || gap, lastOfRun: !next || next.sender.id !== m.sender.id };
-      }),
-    [windowed]
-  );
+  const rows = useMemo(() => {
+    const out = windowed.map((m, i) => {
+      const prev = windowed[i - 1];
+      const newDay = !prev || !sameDay(prev.createdAt, m.createdAt);
+      const gap =
+        !prev ||
+        prev.sender.id !== m.sender.id ||
+        new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > GAP_MINUTES * 60000;
+      return { m, newDay, runStart: newDay || gap, lastOfRun: true };
+    });
+    // A run ends wherever the next one starts — after a pause or at midnight
+    // too — so the avatar always sits on the bubble that closes the run.
+    for (let i = 0; i < out.length - 1; i++) out[i].lastOfRun = out[i + 1].runStart;
+    return out;
+  }, [windowed]);
 
   useEffect(() => {
     setLockError('');
@@ -413,7 +414,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
       <motion.section className="surface" {...convoEnter(isPhone)}>
         <div className="lock-gate">
           <div className="stack" style={{ alignItems: 'center', gap: 18, width: '100%' }}>
-            <span className="clay-round" style={{ width: 66, height: 66 }}>
+            <span className="clay-round lock-gate-seal">
               <IconLock size={27} />
             </span>
             <CodeEntry
@@ -456,13 +457,13 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
           <IconBack />
         </button>
 
-        <button className="row" style={{ gap: 12, flex: 1, minWidth: 0 }} onClick={() => openSheet('chat-info')}>
+        <button className="chat-head-who" onClick={() => openSheet('chat-info')}>
           <Avatar
             name={conversation.name}
             src={conversation.avatarUrl}
             id={conversation.partner?.id || conversation.id}
             accent={conversation.partner?.accent}
-            size={42}
+            size={40}
             online={partnerPresence?.online}
             showDot
             square={conversation.type === 'group'}
@@ -478,7 +479,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
 
         <div className={`chat-head-actions${conversation.type === 'direct' && conversation.partner ? ' has-calls' : ''}`}>
           {conversation.disappearAfter > 0 && (
-            <span className="clay-round" style={{ width: 38, height: 38, color: 'var(--ochre-deep)' }} title="Disappearing messages are on">
+            <span className="clay-round chat-head-timer" title="Disappearing messages are on">
               <IconClock size={18} />
             </span>
           )}
@@ -572,35 +573,16 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
         <AnimatePresence>
           {wp.proposal && wp.proposal.by !== meId && (
             <motion.div
-              className="clay clay-2"
-              style={{
-                position: 'absolute',
-                zIndex: 4,
-                top: 12,
-                left: '50%',
-                translateX: '-50%',
-                padding: '10px 12px',
-                display: 'flex',
-                gap: 12,
-                alignItems: 'center',
-                maxWidth: 'calc(100% - 32px)',
-              }}
+              className="wp-banner"
+              style={{ x: '-50%' }}
               initial={{ opacity: 0, y: -18 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -18 }}
               transition={spring}
             >
               <span
-                className={`${wp.proposal.preset ? `wp-${wp.proposal.preset}` : ''}`}
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 12,
-                  flex: 'none',
-                  backgroundImage: wp.proposal.url ? cssUrl(wp.proposal.url) : undefined,
-                  backgroundSize: 'cover',
-                  boxShadow: 'var(--clay-in)',
-                }}
+                className={`wp-banner-swatch${wp.proposal.preset ? ` wp-${wp.proposal.preset}` : ''}`}
+                style={{ backgroundImage: wp.proposal.url ? cssUrl(wp.proposal.url) : undefined }}
               />
               <span className="stack" style={{ minWidth: 0 }}>
                 <span className="small" style={{ fontWeight: 600 }}>
@@ -613,7 +595,6 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
               </button>
               <button
                 className="clay-round"
-                style={{ width: 34, height: 34 }}
                 onClick={() => respondWallpaper(conversation.id, false)}
                 aria-label="Keep current wallpaper"
               >
@@ -628,7 +609,8 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
         <AnimatePresence>
           {pendingMine && (
             <motion.div
-              className="clay clay-2 wp-pending"
+              className="wp-pending"
+              style={{ x: '-50%' }}
               initial={{ opacity: 0, y: -18 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -18 }}
@@ -656,7 +638,7 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
           {more && (
             <button
               className="clay-btn"
-              style={{ alignSelf: 'center', marginBottom: 12 }}
+              style={{ alignSelf: 'center', marginBottom: 'var(--s-3)' }}
               onClick={() => loadMessages(conversation.id, { more: true })}
             >
               Load earlier messages
@@ -675,12 +657,12 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
           {!firstLoad && windowed.length === 0 && !isSecret && (
             <div className="empty" style={{ margin: 'auto' }}>
               <svg className="empty-art" viewBox="0 0 200 200" fill="none" aria-hidden="true">
-                <rect x="24" y="30" width="152" height="120" rx="34" fill="var(--clay-surface)" />
-                <path d="M74 138V96a26 26 0 0 1 52 0v42Z" fill="var(--accent)" opacity="0.9" />
+                <rect x="24" y="30" width="152" height="120" rx="34" fill="var(--surface)" />
+                <path d="M74 138V96a26 26 0 0 1 52 0v42Z" fill="var(--primary)" opacity="0.9" />
                 <rect x="74" y="132" width="52" height="6" fill="var(--ink)" opacity="0.16" />
-                <circle cx="100" cy="168" r="5" fill="var(--clay-edge)" />
-                <circle cx="118" cy="168" r="5" fill="var(--clay-edge)" />
-                <circle cx="82" cy="168" r="5" fill="var(--clay-edge)" />
+                <circle cx="100" cy="168" r="5" fill="var(--line)" />
+                <circle cx="118" cy="168" r="5" fill="var(--line)" />
+                <circle cx="82" cy="168" r="5" fill="var(--line)" />
               </svg>
               <h3>Nothing here yet</h3>
               <p>
@@ -719,30 +701,35 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
             </div>
           )}
 
-          {typers.length > 0 && (
-            <motion.div
-              className="typing"
-              initial={{ opacity: 0, scale: 0.9, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={spring}
-              aria-label="typing"
-            >
-              <i />
-              <i />
-              <i />
-            </motion.div>
-          )}
+          {/* Grows out of its own tail corner, the way a bubble arrives. */}
+          <AnimatePresence>
+            {typers.length > 0 && (
+              <motion.div
+                key="typing"
+                className="typing"
+                variants={popFrom('bottom left')}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                aria-label="typing"
+              >
+                <i />
+                <i />
+                <i />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <AnimatePresence>
           {!atBottom && (
             <motion.button
               className="clay-round jump"
-              initial={{ opacity: 0, y: 14, scale: 0.85 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 14, scale: 0.85 }}
-              transition={spring}
+              variants={popFrom('bottom center')}
+              initial="hidden"
+              animate="show"
+              exit="exit"
+              whileTap={press}
               onClick={() => {
                 // The one scroll that should glide (the stream itself no longer
                 // smooth-scrolls every write; see chat.css).
@@ -752,7 +739,20 @@ export default function Conversation({ conversation }: { conversation: Convo }) 
               aria-label="Jump to latest"
             >
               <IconDown />
-              {conversation.unread > 0 && <span className="chip" style={{ position: 'absolute', top: -6, right: -6 }}>{conversation.unread}</span>}
+              <AnimatePresence>
+                {conversation.unread > 0 && (
+                  <motion.span
+                    key="unread"
+                    className="chip jump-count"
+                    variants={reactionPop}
+                    initial="hidden"
+                    animate="show"
+                    exit="exit"
+                  >
+                    {conversation.unread}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </motion.button>
           )}
         </AnimatePresence>

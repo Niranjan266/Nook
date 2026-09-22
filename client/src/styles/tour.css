@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Guided tour — a dimmed room with one lamp on, and a slab card to read by
+   Guided tour — a dimmed room with one lamp on, and a card to read by
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Above sheets and calls, below toasts — a toast mid-tour should still be read. */
@@ -7,10 +7,7 @@
   position: fixed;
   inset: 0;
   z-index: 110;
-  --tour-dim: rgba(24, 19, 15, 0.62);
-}
-:root[data-theme='dark'] .tour {
-  --tour-dim: rgba(0, 0, 0, 0.7);
+  --tour-dim: var(--scrim);
 }
 
 /* The cut-out: an empty box whose enormous shadow is the dim. One element,
@@ -24,18 +21,21 @@
   will-change: transform;
 }
 
+/* The lamp's edge: a soft primary halo, not a drawn border. */
 .tour-ring {
   position: absolute;
-  inset: -3px;
-  border: 3px solid var(--accent);
+  inset: 0;
   border-radius: inherit;
+  box-shadow:
+    0 0 0 3px var(--primary),
+    0 0 24px color-mix(in srgb, var(--primary) 45%, transparent);
 }
 .tour-ring.pulse::after {
   content: '';
   position: absolute;
-  inset: -3px;
-  border: 2px solid var(--accent);
+  inset: 0;
   border-radius: inherit;
+  box-shadow: 0 0 0 2px var(--primary);
   animation: tour-pulse 1.8s var(--ease-out) infinite;
 }
 @keyframes tour-pulse {
@@ -49,18 +49,16 @@
   }
 }
 
-/* A slab, not clay: this is something you press through, not part of the room. */
 .tour-card {
   position: absolute;
   left: 0;
   top: 0;
-  width: min(320px, calc(100vw - 24px));
-  padding: 14px 16px 14px;
-  background: var(--clay-raised);
+  width: min(320px, calc(100vw - 2 * var(--s-3)));
+  padding: var(--s-4) var(--s-5) var(--s-4);
+  background: var(--surface);
   color: var(--ink);
-  border: var(--slab-border);
-  border-radius: var(--r-clay-sm);
-  box-shadow: var(--slab-shadow-lg);
+  border-radius: var(--r-card);
+  box-shadow: var(--lift);
   outline: none;
   will-change: transform;
 }
@@ -73,7 +71,9 @@
   margin-bottom: var(--s-2);
 }
 .tour-top .eyebrow {
-  color: var(--ink-faint);
+  color: var(--ink-2);
+  letter-spacing: 0.06em;
+  font-weight: 700;
 }
 
 .tour-dots {
@@ -81,34 +81,33 @@
   gap: 6px;
 }
 .tour-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: var(--r-pill);
-  background: var(--clay-edge);
+  background: var(--line);
   transition:
-    transform var(--dur) var(--ease-clay),
-    background-color var(--dur) var(--ease-out);
+    transform var(--dur-base) var(--ease-spring),
+    background-color var(--dur-base) var(--ease-out);
 }
 .tour-dot.done {
-  background: var(--ink-faint);
+  background: var(--ink-3);
 }
 .tour-dot.on {
-  background: var(--accent);
-  transform: scale(1.45);
+  background: var(--primary);
+  transform: scale(1.5);
 }
 
 .tour-title {
-  margin: 0 0 4px;
+  margin: 0 0 var(--s-1);
   font-family: var(--font-display);
   font-size: var(--t-lg);
   font-weight: 600;
-  letter-spacing: -0.02em;
 }
 .tour-body {
   margin: 0;
-  color: var(--ink-soft);
+  color: var(--ink-2);
   font-size: var(--t-base);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .tour-foot {
@@ -121,18 +120,16 @@
   flex: 1;
 }
 .tour-skip {
-  padding: 6px 4px;
-  color: var(--ink-soft);
+  min-height: 36px;
+  padding: 0 var(--s-2);
+  margin-left: calc(-1 * var(--s-2));
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
   font-size: var(--t-sm);
-  font-weight: 500;
+  font-weight: 700;
 }
 .tour-skip:hover {
   color: var(--ink);
-}
-.tour-skip:focus-visible,
-.tour-card .slab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -140,6 +137,6 @@
     display: none;
   }
   .tour-dot {
-    transition: background-color var(--dur) var(--ease-out);
+    transition: background-color var(--dur-base) var(--ease-out);
   }
 }

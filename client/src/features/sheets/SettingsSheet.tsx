@@ -6,7 +6,8 @@ import Sheet from '@/components/Sheet';
 import Avatar from '@/components/Avatar';
 import { upload, post, put, patch, get } from '@/lib/api';
 import { prepareAvatar } from '@/lib/color';
-import { popIn } from '@/lib/motion';
+import { popFrom } from '@/lib/motion';
+import { revealTheme } from '@/features/shell/DockRail';
 import { enablePush, disablePush, pushState } from '@/lib/push';
 import { askToNotify } from '@/lib/notify';
 import { toClock, fromClock, isQuietNow } from '@/lib/rooms';
@@ -38,16 +39,23 @@ import {
   IconUsers,
   IconDownload,
   IconPlay,
+  IconChevron,
 } from '@/components/Icon';
 import { startTour } from '@/components/Tour';
 import BackupSection from './BackupSection';
 
+/*
+ * The ids are the stored (and server-validated) names from the old palette;
+ * tokens.css maps each to its new hue. 'terracotta' was everyone's default,
+ * so it became the default: volt at night, iris by day — its swatch follows
+ * the theme through --swatch-default.
+ */
 const ACCENTS = [
-  { id: 'terracotta', label: 'Terracotta', hex: '#C0603C' },
-  { id: 'moss', label: 'Moss', hex: '#57694A' },
-  { id: 'ochre', label: 'Ochre', hex: '#CE9535' },
-  { id: 'clay-blue', label: 'Slate', hex: '#47606F' },
-  { id: 'rust', label: 'Rust', hex: '#A33F2F' },
+  { id: 'terracotta', label: 'Nook', hex: 'var(--swatch-default)' },
+  { id: 'moss', label: 'Mint', hex: '#3DD6A8' },
+  { id: 'ochre', label: 'Peach', hex: '#FFB36B' },
+  { id: 'clay-blue', label: 'Sky', hex: '#6AA8FF' },
+  { id: 'rust', label: 'Rose', hex: '#FF8FA3' },
 ] as const;
 
 export default function SettingsSheet() {
@@ -289,7 +297,7 @@ export default function SettingsSheet() {
 
   return (
     <Sheet open={open} onClose={closeSheet} title="You">
-      <div className="stack" style={{ alignItems: 'center', gap: 10 }}>
+      <div className="sheet-hero">
         {/*
           Tapping the picture used to jump straight to the OS file browser,
           which is the wrong door on a phone: the picture you want is usually
@@ -305,37 +313,17 @@ export default function SettingsSheet() {
             aria-expanded={picMenu}
           >
             <Avatar name={me.displayName} src={me.avatarUrl} id={me.id} accent={accent} size={92} />
-            <span
-              className="clay-round"
-              style={{ width: 32, height: 32, position: 'absolute', right: -2, bottom: -2 }}
-            >
+            <span className="avatar-badge">
               <IconCamera size={16} />
             </span>
-            {avatarBusy && (
-              <span
-                className="clay-round"
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  width: 92,
-                  height: 92,
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: 'rgba(30, 26, 23, 0.45)',
-                  color: '#F7F2EA',
-                  fontSize: 12,
-                }}
-              >
-                Saving…
-              </span>
-            )}
+            {avatarBusy && <span className="avatar-busy">Saving…</span>}
           </button>
 
           <AnimatePresence>
             {picMenu && (
               <motion.div
                 className="attach-menu"
-                variants={popIn}
+                variants={popFrom('top center')}
                 initial="hidden"
                 animate="show"
                 exit="exit"
@@ -352,7 +340,7 @@ export default function SettingsSheet() {
                     setPicMenu(false);
                   }}
                 >
-                  <IconCamera size={18} />
+                  <IconCamera size={20} />
                   <span className="grow">
                     <span className="list-row-label">Take a photo</span>
                   </span>
@@ -364,7 +352,7 @@ export default function SettingsSheet() {
                     setPicMenu(false);
                   }}
                 >
-                  <IconImage size={18} />
+                  <IconImage size={20} />
                   <span className="grow">
                     <span className="list-row-label">Choose a photo</span>
                     <span className="list-row-sub">Cropped to a square automatically</span>
@@ -378,7 +366,7 @@ export default function SettingsSheet() {
                       setPicMenu(false);
                     }}
                   >
-                    <IconTrash size={18} />
+                    <IconTrash size={20} />
                     <span className="grow">
                       <span className="list-row-label">Remove picture</span>
                       <span className="list-row-sub">Go back to your initials</span>
@@ -391,10 +379,10 @@ export default function SettingsSheet() {
         </div>
 
         {editingName ? (
-          <div className="stack" style={{ gap: 8, width: '100%' }}>
+          <div className="stack" style={{ gap: 'var(--s-2)', width: '100%' }}>
             <input className="groove" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} aria-label="Display name" />
             <input className="groove" value={about} onChange={(e) => setAbout(e.target.value)} maxLength={140} aria-label="About" placeholder="Somewhere quiet." />
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <button className="clay-btn grow" onClick={() => setEditingName(false)}>
                 Cancel
               </button>
@@ -404,24 +392,24 @@ export default function SettingsSheet() {
             </div>
           </div>
         ) : (
-          <button className="stack" style={{ alignItems: 'center', gap: 2 }} onClick={() => setEditingName(true)}>
+          <button className="sheet-hero-edit" onClick={() => setEditingName(true)}>
             <h3>{me.displayName}</h3>
             <span className="small muted">
               @{me.username}
               {me.nookId ? ` · ${me.nookId}` : ''}
             </span>
-            <span className="tiny faint">{me.about || 'Add something about you'}</span>
+            <span className="small muted">{me.about || 'Add something about you'}</span>
           </button>
         )}
       </div>
 
       <div className="sheet-section">
         <span className="eyebrow">Your Nook ID</span>
-        <p className="tiny faint" style={{ marginBottom: 6 }}>
+        <p className="tiny faint">
           This is yours permanently and cannot be changed. Share it and people can always find you —
           even after you change your username.
         </p>
-        <div className="row" style={{ gap: 6 }}>
+        <div className="row" style={{ gap: 'var(--s-2)' }}>
           <code className="nook-id grow">{me.nookId || '—'}</code>
           <button className="clay-btn" onClick={copyNookId} aria-label="Copy your Nook ID">
             {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
@@ -449,15 +437,15 @@ export default function SettingsSheet() {
               }}
             />
             {handleNote && (
-              <p className="tiny" style={{ margin: '4px 0 0', color: handleNote.startsWith('✓') ? 'var(--moss)' : 'var(--rust)' }}>
+              <p className={`tiny ${handleNote.startsWith('✓') ? 'note-ok' : 'bad'}`} style={{ padding: '0 var(--s-4)' }}>
                 {handleNote}
               </p>
             )}
-            <p className="tiny faint" style={{ margin: '4px 0 6px' }}>
+            <p className="tiny faint">
               3–20 characters: letters, numbers, dots and underscores. Your old username becomes free
               for anyone else to take, so tell people your Nook ID if you want to stay findable.
             </p>
-            <div className="row" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <button className="clay-btn grow" onClick={() => setEditingHandle(false)}>
                 Cancel
               </button>
@@ -479,33 +467,32 @@ export default function SettingsSheet() {
               setEditingHandle(true);
             }}
           >
-            <IconUser size={19} />
+            <IconUser size={20} />
             <span className="grow">
               <span className="list-row-label">@{me.username}</span>
               <span className="list-row-sub">Change your username</span>
             </span>
+            <IconChevron className="chev" />
           </button>
         )}
       </div>
 
       <div className="sheet-section">
         <span className="eyebrow">Email</span>
-        <p className="tiny faint" style={{ marginBottom: 6 }}>
+        <p className="tiny faint">
           Optional, and only ever used to get you back in if you forget your password. Confirming it
           also lets a Google sign-in recognise this account as yours.
         </p>
 
         {me.email && !emailStep && (
-          <p className="small" style={{ margin: '0 0 6px' }}>
-            {me.email}{' '}
+          <p className="small row" style={{ gap: 'var(--s-2)', padding: '0 var(--s-4)', flexWrap: 'wrap' }}>
+            {me.email}
             {me.emailVerified ? (
-              <span className="chip" style={{ color: 'var(--moss)' }}>
+              <span className="chip chip-quiet ok">
                 <IconCheck size={13} /> Confirmed
               </span>
             ) : (
-              <span className="chip" style={{ color: 'var(--ochre)' }}>
-                Not confirmed
-              </span>
+              <span className="chip chip-quiet warn">Not confirmed</span>
             )}
           </p>
         )}
@@ -521,11 +508,11 @@ export default function SettingsSheet() {
               inputMode="numeric"
               autoFocus
             />
-            <p className="tiny faint" style={{ margin: '4px 0 6px' }}>
+            <p className="tiny faint">
               We sent a six-digit code to {emailDraft}. It expires in 15 minutes.
               {emailChannel === 'console' && ' No mail provider is configured, so it was printed to the server log.'}
             </p>
-            <div className="row" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <button className="clay-btn grow" onClick={() => setEmailStep(null)}>
                 Cancel
               </button>
@@ -547,7 +534,7 @@ export default function SettingsSheet() {
               spellCheck={false}
               autoFocus
             />
-            <div className="row" style={{ gap: 6, marginTop: 6 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <button className="clay-btn grow" onClick={() => setEmailStep(null)}>
                 Cancel
               </button>
@@ -565,7 +552,7 @@ export default function SettingsSheet() {
                 setEmailStep('edit');
               }}
             >
-              <IconBell size={19} />
+              <IconBell size={20} />
               <span className="grow">
                 <span className="list-row-label">{me.email ? 'Change email' : 'Add an email'}</span>
                 <span className="list-row-sub">For account recovery only</span>
@@ -575,7 +562,7 @@ export default function SettingsSheet() {
             {/* Only while it is unverified — once confirmed there is nothing
                 left to do, and a button that does nothing is worse than none. */}
             {me.email && !me.emailVerified && (
-              <button className="clay-btn" style={{ marginTop: 6 }} onClick={verifyExisting} disabled={emailBusy}>
+              <button className="clay-btn" onClick={verifyExisting} disabled={emailBusy}>
                 {emailBusy ? 'Sending…' : 'Verify this email'}
               </button>
             )}
@@ -585,13 +572,16 @@ export default function SettingsSheet() {
 
       <div className="sheet-section">
         <span className="eyebrow">Look</span>
-        <div className="row" style={{ gap: 6 }}>
+        <div className="seg" role="radiogroup" aria-label="Theme">
           {(['light', 'dark', 'system'] as const).map((t) => (
             <button
               key={t}
-              className={`clay-btn grow${theme === t ? ' on' : ''}`}
-              onClick={() => {
-                setTheme(t);
+              role="radio"
+              aria-checked={theme === t}
+              className={`seg-item${theme === t ? ' on' : ''}`}
+              onClick={(e) => {
+                // The circle grows from the button you pressed.
+                revealTheme(t, setTheme, e.currentTarget);
                 patchMe({ settings: { ...me.settings, theme: t } }).catch(() => {});
               }}
               style={{ textTransform: 'capitalize' }}
@@ -602,25 +592,22 @@ export default function SettingsSheet() {
           ))}
         </div>
 
-        <div className="row" style={{ gap: 8, marginTop: 6 }}>
+        <div className="swatches" role="group" aria-label="Accent colour">
           {ACCENTS.map((a) => (
             <button
               key={a.id}
+              className="swatch"
               onClick={() => {
                 setAccent(a.id);
                 patchMe({ accent: a.id }).catch(() => {});
               }}
               aria-label={a.label}
               aria-pressed={accent === a.id}
+              title={a.label}
               style={{
-                width: 38,
-                height: 38,
-                borderRadius: 12,
                 background: a.hex,
-                boxShadow: accent === a.id ? '0 0 0 3px var(--ink)' : 'var(--clay-1)',
-                display: 'grid',
-                placeItems: 'center',
-                color: '#fff',
+                // The default swatch is iris by day, the only one dark enough for white.
+                color: a.id === 'terracotta' ? 'var(--swatch-default-ink)' : 'var(--night)',
               }}
             >
               {accent === a.id && <IconCheck size={16} />}
@@ -631,17 +618,17 @@ export default function SettingsSheet() {
         {/* The sheet leaves first — the tour points at the shell behind it. */}
         <button
           className="list-row"
-          style={{ marginTop: 6 }}
           onClick={() => {
             closeSheet();
             startTour(260);
           }}
         >
-          <IconPlay size={19} />
+          <IconPlay size={20} />
           <span className="grow">
             <span className="list-row-label">Take the tour</span>
             <span className="list-row-sub">A one-minute walk around Nook</span>
           </span>
+          <IconChevron className="chev" />
         </button>
       </div>
 
@@ -652,7 +639,7 @@ export default function SettingsSheet() {
           className="list-row"
           onClick={() => patchMe({ privacy: { ...me.privacy, readReceipts: !me.privacy.readReceipts } })}
         >
-          <IconCheck size={19} />
+          <IconCheck size={20} />
           <span className="grow">
             <span className="list-row-label">Send read receipts</span>
             <span className="list-row-sub">Turn off and you stop seeing theirs too</span>
@@ -660,14 +647,14 @@ export default function SettingsSheet() {
           <span className="toggle" role="switch" aria-checked={me.privacy.readReceipts} />
         </button>
 
-        <div className="list-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+        <div className="list-row stacked">
           <span className="list-row-label">Who sees your last seen</span>
-          <div className="row" style={{ gap: 6 }}>
+          <div className="choice-row">
             {(['everyone', 'contacts', 'nobody'] as const).map((v) => (
               <button
                 key={v}
-                className={`clay-btn grow${me.privacy.lastSeen === v ? ' on' : ''}`}
-                style={{ padding: '7px 11px', fontSize: 'var(--t-sm)', textTransform: 'capitalize' }}
+                className={`clay-btn slab-sm${me.privacy.lastSeen === v ? ' on' : ''}`}
+                style={{ textTransform: 'capitalize' }}
                 onClick={() => patchMe({ privacy: { ...me.privacy, lastSeen: v } })}
               >
                 {v}
@@ -683,7 +670,7 @@ export default function SettingsSheet() {
         */}
         {!isNativeApp() && /Android/i.test(navigator.userAgent) && (
           <a className="list-row" href="/download" target="_blank" rel="noreferrer">
-            <IconDownload size={19} />
+            <IconDownload size={20} />
             <span className="grow">
               <span className="list-row-label">Get the Android app</span>
               <span className="list-row-sub">
@@ -694,7 +681,7 @@ export default function SettingsSheet() {
         )}
 
         <button className="list-row" onClick={togglePush}>
-          <IconBell size={19} />
+          <IconBell size={20} />
           <span className="grow">
             <span className="list-row-label">Push notifications</span>
             <span className="list-row-sub">
@@ -719,7 +706,7 @@ export default function SettingsSheet() {
                 })
               }
             >
-              <IconChat size={19} />
+              <IconChat size={20} />
               <span className="grow">
                 <span className="list-row-label">Show the message</span>
                 <span className="list-row-sub">
@@ -743,7 +730,7 @@ export default function SettingsSheet() {
                 })
               }
             >
-              <IconUsers size={19} />
+              <IconUsers size={20} />
               <span className="grow">
                 <span className="list-row-label">Group messages</span>
                 <span className="list-row-sub">A busy group can be a lot of buzzing</span>
@@ -759,7 +746,7 @@ export default function SettingsSheet() {
                 })
               }
             >
-              <IconUser size={19} />
+              <IconUser size={20} />
               <span className="grow">
                 <span className="list-row-label">Friend requests</span>
                 <span className="list-row-sub">When someone asks to chat with you</span>
@@ -781,7 +768,7 @@ export default function SettingsSheet() {
                 if (next) void buzz('message');
               }}
             >
-              <IconMic size={19} />
+              <IconMic size={20} />
               <span className="grow">
                 <span className="list-row-label">Vibrate</span>
                 <span className="list-row-sub">
@@ -796,14 +783,14 @@ export default function SettingsSheet() {
               sounds already existed and still win; this is the default behind
               them, which is what most people actually want to change.
             */}
-            <div className="sheet-section" style={{ paddingTop: 4 }}>
-              <span className="eyebrow">Notification sound</span>
-              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <div className="list-row stacked">
+              <span className="list-row-label">Notification sound</span>
+              <div className="row" style={{ gap: 'var(--s-2)', flexWrap: 'wrap' }}>
                 {SOUNDS.map((s) => (
                   <button
                     key={s.id}
                     className={`chip${(me.settings.notifySound || 'default') === s.id ? '' : ' chip-quiet'}`}
-                    style={{ height: 34 }}
+                    style={{ height: 32, padding: '0 var(--s-3)', fontSize: 'var(--t-sm)' }}
                     onClick={() => {
                       patchMe({ settings: { ...me.settings, notifySound: s.id } });
                       previewSound(s.id);
@@ -815,7 +802,7 @@ export default function SettingsSheet() {
                   </button>
                 ))}
               </div>
-              <p className="tiny faint" style={{ margin: '6px 0 0' }}>
+              <p className="tiny muted">
                 Tap one to hear it. A chat with its own sound keeps it. When Nook is closed the
                 phone uses its system notification sound — browsers do not let an app choose that.
               </p>
@@ -826,10 +813,8 @@ export default function SettingsSheet() {
 
       {/* ── quiet hours: a contract, not a personal mute ──────────────── */}
       <div className="sheet-section">
-        <span className="eyebrow row" style={{ gap: 8 }}>
-          <IconMoon2 size={15} /> Quiet hours
-        </span>
-        <p className="tiny faint" style={{ paddingLeft: 4, lineHeight: 1.6 }}>
+        <span className="eyebrow">Quiet hours</span>
+        <p className="tiny faint">
           Not a do-not-disturb that only protects you. The people you talk to see this window
           <strong> before they send</strong>, so the norm is social rather than technical.
         </p>
@@ -839,7 +824,7 @@ export default function SettingsSheet() {
           onClick={() => saveQuiet({ enabled: !quiet.enabled })}
           aria-pressed={quiet.enabled}
         >
-          <IconMoon2 size={19} />
+          <IconMoon2 size={20} />
           <span className="grow">
             <span className="list-row-label">
               {quiet.enabled ? `Quiet ${toClock(quiet.start)}–${toClock(quiet.end)}` : 'Off'}
@@ -855,7 +840,7 @@ export default function SettingsSheet() {
 
         {quiet.enabled && (
           <>
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <label className="field grow">
                 <span className="field-label">From</span>
                 <input
@@ -877,7 +862,7 @@ export default function SettingsSheet() {
             </div>
 
             <button className="list-row" onClick={() => saveQuiet({ visible: !quiet.visible })}>
-              <IconUser size={19} />
+              <IconUser size={20} />
               <span className="grow">
                 <span className="list-row-label">Let people see the window</span>
                 <span className="list-row-sub">
@@ -897,7 +882,7 @@ export default function SettingsSheet() {
           className="list-row"
           onClick={() => patchMe({ settings: { ...me.settings, badgeCount: !me.settings.badgeCount } })}
         >
-          <IconBell size={19} />
+          <IconBell size={20} />
           <span className="grow">
             <span className="list-row-label">Unread count on the app icon</span>
             <span className="list-row-sub">Off by default — a number that only goes up is a slot machine</span>
@@ -909,7 +894,7 @@ export default function SettingsSheet() {
           className="list-row"
           onClick={() => patchMe({ settings: { ...me.settings, swipeToReply: !me.settings.swipeToReply } })}
         >
-          <IconReply size={19} />
+          <IconReply size={20} />
           <span className="grow">
             <span className="list-row-label">Swipe a message to reply</span>
           </span>
@@ -920,7 +905,7 @@ export default function SettingsSheet() {
           className="list-row"
           onClick={() => patchMe({ settings: { ...me.settings, linkPreviews: !me.settings.linkPreviews } })}
         >
-          <IconFile size={19} />
+          <IconFile size={20} />
           <span className="grow">
             <span className="list-row-label">Show link previews</span>
             <span className="list-row-sub">Fetched by our server, so your device never touches the link</span>
@@ -932,7 +917,7 @@ export default function SettingsSheet() {
           className="list-row"
           onClick={() => patchMe({ settings: { ...me.settings, skipSilence: !me.settings.skipSilence } })}
         >
-          <IconMic size={19} />
+          <IconMic size={20} />
           <span className="grow">
             <span className="list-row-label">Skip silence in voice notes</span>
             <span className="list-row-sub">A four-minute ramble in about ninety seconds</span>
@@ -940,14 +925,13 @@ export default function SettingsSheet() {
           <span className="toggle" role="switch" aria-checked={me.settings.skipSilence} />
         </button>
 
-        <div className="list-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+        <div className="list-row stacked">
           <span className="list-row-label">Voice note speed</span>
-          <div className="row" style={{ gap: 6 }}>
+          <div className="choice-row">
             {[1, 1.5, 2].map((v) => (
               <button
                 key={v}
-                className={`clay-btn grow${me.settings.voiceSpeed === v ? ' on' : ''}`}
-                style={{ padding: '7px 11px', fontSize: 'var(--t-sm)' }}
+                className={`clay-btn slab-sm${me.settings.voiceSpeed === v ? ' on' : ''}`}
                 onClick={() => patchMe({ settings: { ...me.settings, voiceSpeed: v } })}
               >
                 {v}×
@@ -960,36 +944,40 @@ export default function SettingsSheet() {
       <div className="sheet-section">
         <span className="eyebrow">Elsewhere</span>
         <button className="list-row" onClick={() => openSheet('folders')}>
-          <IconFolder size={19} />
+          <IconFolder size={20} />
           <span className="grow">
             <span className="list-row-label">Folders</span>
             <span className="list-row-sub">Private to you — nobody learns which drawer they're in</span>
           </span>
-        </button>
+          <IconChevron className="chev" />
+          </button>
         <button className="list-row" onClick={() => openSheet('scheduled')}>
-          <IconSchedule size={19} />
+          <IconSchedule size={20} />
           <span className="grow">
             <span className="list-row-label">Scheduled messages</span>
           </span>
-        </button>
+          <IconChevron className="chev" />
+          </button>
         <button className="list-row" onClick={() => openSheet('reminders')}>
-          <IconBell size={19} />
+          <IconBell size={20} />
           <span className="grow">
             <span className="list-row-label">Reminders</span>
             <span className="list-row-sub">Messages you asked to come back to</span>
           </span>
-        </button>
+          <IconChevron className="chev" />
+          </button>
         <button className="list-row" onClick={() => openSheet('starred')}>
-          <IconStar size={19} />
+          <IconStar size={20} />
           <span className="grow">
             <span className="list-row-label">Starred messages</span>
           </span>
-        </button>
+          <IconChevron className="chev" />
+          </button>
         <button
           className="list-row"
           onClick={() => patchMe({ settings: { ...me.settings, enterToSend: !me.settings.enterToSend } })}
         >
-          <IconSettings size={19} />
+          <IconSettings size={20} />
           <span className="grow">
             <span className="list-row-label">Enter sends the message</span>
             <span className="list-row-sub">Off means Enter makes a new line</span>
@@ -1002,19 +990,21 @@ export default function SettingsSheet() {
 
       <div className="sheet-section">
         <span className="eyebrow">Honest note</span>
-        <p className="tiny faint" style={{ paddingLeft: 4, lineHeight: 1.65 }}>
+        <p className="tiny faint">
           Nook has no feeds, no ads and no tracking, and your messages are encrypted in transit. They are
           <strong> not</strong> end-to-end encrypted — the server can read them. If that matters for what you
           talk about, use something with E2E encryption.
         </p>
       </div>
 
-      <button className="list-row" style={{ color: 'var(--rust)' }} onClick={() => logout()}>
-        <IconLogOut size={19} />
-        <span className="grow">
-          <span className="list-row-label">Sign out</span>
-        </span>
-      </button>
+      <div className="sheet-group">
+        <button className="list-row danger" onClick={() => logout()}>
+          <IconLogOut size={20} />
+          <span className="grow">
+            <span className="list-row-label">Sign out</span>
+          </span>
+        </button>
+      </div>
 
       <input
         ref={fileInput}

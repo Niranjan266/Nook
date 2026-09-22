@@ -4,127 +4,156 @@
    Imported by the components that use it (as tour.css is), so it travels in
    the same chunk as them.
 
-   Everything inside a card is drawn in currentColor mixes rather than named
-   tokens, so one set of rules reads on a clay bubble, on your own accent
-   bubble, and in both themes without an override per case.
+   A card sits on either bubble, so its colours come through a few local
+   variables set once per side: on their bubble the results use the primary
+   colour, on yours (volt) they use your bubble's own ink.
+
+   Design switch (Midnight Pebble default):
+     --poll-row-r   corner of an option row / list row
    ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --poll-row-r: 16px;
+}
 
 /* Non-text payloads need a shelf for the timestamp, as snaps and calls do. */
 .bubble:has(.poll-card, .list-card) {
-  padding-bottom: 24px;
+  padding: var(--s-3) var(--s-3) 28px;
 }
 
 .poll-card,
 .list-card {
+  --poll-accent: var(--primary-ink);
+  --poll-fill: var(--primary-soft);
+  --poll-fill-picked: color-mix(in srgb, var(--primary) 30%, var(--primary-soft));
+  --poll-row: color-mix(in srgb, currentColor 6%, transparent);
+  --poll-mark-ink: var(--on-primary);
+  --poll-mark-fill: var(--primary);
+  --poll-outline: color-mix(in srgb, var(--bubble-theirs-ink) 38%, transparent);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-2);
   /* A bubble shrinks to its content, so a percentage has nothing to be a
      percentage of. Tied to the viewport instead: full width on a desktop,
      and still clear of the avatar gutter on a 360px phone. */
-  width: min(300px, calc(78vw - 64px));
-  padding-top: 2px;
+  width: min(304px, calc(78vw - 64px));
+}
+.msg.mine .poll-card,
+.msg.mine .list-card {
+  --poll-accent: var(--bubble-mine-ink);
+  --poll-fill: color-mix(in srgb, var(--bubble-mine-ink) 12%, transparent);
+  --poll-fill-picked: color-mix(in srgb, var(--bubble-mine-ink) 20%, transparent);
+  --poll-row: color-mix(in srgb, var(--bubble-mine-ink) 7%, transparent);
+  --poll-mark-ink: var(--bubble-mine);
+  --poll-mark-fill: var(--bubble-mine-ink);
+  --poll-outline: color-mix(in srgb, var(--bubble-mine-ink) 45%, transparent);
 }
 
 .poll-kind {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-1);
+  padding: 0 var(--s-1);
   font-size: var(--t-xs);
-  letter-spacing: 0.04em;
-  opacity: 0.75;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--poll-accent);
 }
 
 .poll-question {
-  margin: 0;
+  margin: 0 0 var(--s-1);
+  padding: 0 var(--s-1);
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--t-md);
-  line-height: 1.3;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 22px;
 }
 
 .poll-options {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-1);
 }
 
 .poll-option {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--s-2);
   width: 100%;
   min-height: 40px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--poll-row-r);
   overflow: hidden;
   isolation: isolate;
   text-align: left;
   color: inherit;
-  background: color-mix(in srgb, currentColor 7%, transparent);
-  transition: background var(--dur-fast) var(--ease-out);
+  background: var(--poll-row);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
 }
 .poll-option:hover:not([aria-disabled='true']) {
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.poll-option:active:not([aria-disabled='true']) {
+  transform: scale(0.98);
 }
 .poll-option:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--iris);
   outline-offset: 2px;
 }
 .poll-option[aria-disabled='true'] {
   cursor: default;
 }
 
-/* The result itself: a bar sliding in behind the text. */
+/* The result itself: a fill scaled out from the left behind the text. The
+   row's rounded clip shapes its ends. */
 .poll-bar {
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 0;
   z-index: -1;
-  border-radius: inherit;
-  background: color-mix(in srgb, currentColor 16%, transparent);
+  background: var(--poll-fill);
+  transform: scaleX(0);
 }
 .poll-option.picked .poll-bar {
-  background: color-mix(in srgb, currentColor 26%, transparent);
+  background: var(--poll-fill-picked);
 }
 .poll-option.top {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* A round mark for pick-one, a square for pick-any — the cue a paper form
    gives, so nobody has to read the small print to know which this is. */
 .poll-mark {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex: none;
   display: grid;
   place-items: center;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  opacity: 0.7;
+  box-shadow: inset 0 0 0 2px var(--poll-outline);
+  border-radius: var(--r-pill);
+  color: var(--poll-mark-ink);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 .poll-mark.square {
-  border-radius: 5px;
+  border-radius: calc(var(--r-sm) / 2);
 }
 .poll-option.picked .poll-mark,
 .list-item.checked .poll-mark {
-  opacity: 1;
-  background: currentColor;
-}
-.poll-option.picked .poll-mark svg,
-.list-item.checked .poll-mark svg {
-  color: var(--clay-raised);
-}
-.msg.mine .poll-option.picked .poll-mark svg,
-.msg.mine .list-item.checked .poll-mark svg {
-  color: var(--accent);
+  background: var(--poll-mark-fill);
+  box-shadow: none;
 }
 
 .poll-text {
   flex: 1;
   min-width: 0;
   font-size: var(--t-sm);
-  line-height: 1.35;
+  line-height: 18px;
 }
 
 .poll-voters {
@@ -133,11 +162,11 @@
 }
 .poll-voter {
   display: inline-grid;
-  border-radius: 50%;
-  box-shadow: 0 0 0 1.5px var(--clay-raised);
+  border-radius: var(--r-pill);
+  box-shadow: 0 0 0 2px var(--bubble-theirs);
 }
 .msg.mine .poll-voter {
-  box-shadow: 0 0 0 1.5px var(--accent);
+  box-shadow: 0 0 0 2px var(--bubble-mine);
 }
 .poll-voter + .poll-voter {
   margin-left: -6px;
@@ -145,48 +174,52 @@
 
 .poll-count {
   flex: none;
-  min-width: 34px;
+  min-width: 36px;
   text-align: right;
-  font-family: var(--font-mono);
   font-size: var(--t-xs);
-  opacity: 0.85;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--poll-accent);
 }
 
 .poll-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
+  min-height: 32px;
+  padding: 0 var(--s-1);
   font-size: var(--t-xs);
   opacity: 0.85;
 }
 
-/* A small slab: closing is deliberate and cannot be undone, so it gets the
-   material of things you press — at a size that stays out of the way. */
+/* Closing is deliberate and cannot be undone, so it is a real button — at a
+   size that stays out of the way. */
 .poll-close {
-  padding: 4px 10px;
-  border: 2px solid currentColor;
-  border-radius: var(--r-slab);
-  box-shadow: 2px 2px 0 currentColor;
+  height: 32px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, currentColor 10%, transparent);
   color: inherit;
-  font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 700;
   font-size: var(--t-xs);
   transition:
-    transform var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
+    transform var(--dur-press) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+.poll-close:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 16%, transparent);
 }
 .poll-close:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: 0 0 0 currentColor;
+  transform: scale(var(--press-scale));
 }
 .poll-close:disabled {
   opacity: 0.5;
 }
 
 .poll-card.closed .poll-option {
-  background: color-mix(in srgb, currentColor 5%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent);
 }
 
 /* ── list ───────────────────────────────────────────────────────────────── */
@@ -202,7 +235,7 @@
 .list-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-1);
   overflow: hidden;
 }
 .list-tick {
@@ -210,18 +243,19 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 36px;
-  padding: 6px;
-  border-radius: 9px;
+  gap: var(--s-3);
+  min-height: 40px;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--poll-row-r);
   text-align: left;
   color: inherit;
+  transition: background var(--dur-fast) var(--ease-out);
 }
 .list-tick:hover:not(:disabled) {
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  background: var(--poll-row);
 }
 .list-tick:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--iris);
   outline-offset: 1px;
 }
 .list-text {
@@ -231,7 +265,8 @@
 }
 .list-label {
   font-size: var(--t-sm);
-  line-height: 1.35;
+  line-height: 18px;
+  transition: opacity var(--dur-base) var(--ease-out);
 }
 .list-item.checked .list-label {
   text-decoration: line-through;
@@ -240,36 +275,39 @@
 }
 .list-by {
   font-size: 11px;
+  line-height: 14px;
   opacity: 0.7;
 }
 .list-remove {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--r-pill);
   color: inherit;
   opacity: 0.55;
 }
 .list-remove:hover,
 .list-remove:focus-visible {
   opacity: 1;
-  background: color-mix(in srgb, currentColor 10%, transparent);
+  background: var(--poll-row);
 }
 
 .list-add {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 3px 3px 12px;
-  border-radius: 10px;
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  gap: var(--s-2);
+  min-height: 40px;
+  margin-top: var(--s-1);
+  padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3);
+  border-radius: var(--poll-row-r);
+  background: var(--poll-row);
 }
 .list-add input {
   flex: 1;
   min-width: 0;
-  padding: 6px 0;
+  padding: 0;
   border: 0;
   background: none;
   color: inherit;
@@ -284,20 +322,24 @@
   outline: none;
 }
 .list-add:focus-within {
-  box-shadow: 0 0 0 2px currentColor;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--poll-accent) 60%, transparent);
 }
 .list-add-btn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  color: inherit;
-  background: color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: var(--r-pill);
+  color: var(--poll-mark-ink);
+  background: var(--poll-mark-fill);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.list-add-btn:active:not(:disabled) {
+  transform: scale(var(--press-scale));
 }
 .list-add-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 /* ── the builder sheet ──────────────────────────────────────────────────── */
@@ -308,76 +350,93 @@
 .builder-lines {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .builder-line {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
 }
 .builder-line .groove {
-  padding: 11px 14px;
+  min-height: 44px;
 }
 .builder-remove {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  color: var(--ink-soft);
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
 }
 .builder-remove:hover,
 .builder-remove:focus-visible {
-  color: var(--rust);
-  background: var(--clay-sunk);
+  color: var(--danger-ink);
+  background: var(--surface-2);
 }
 .builder-add {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 8px 12px;
-  border-radius: var(--r-clay-sm);
-  color: var(--accent-deep);
-  font-weight: 600;
+  gap: var(--s-2);
+  min-height: 40px;
+  margin-top: var(--s-2);
+  padding: 0 var(--s-3);
+  border-radius: var(--r-pill);
+  color: var(--primary-ink);
+  font-weight: 700;
   font-size: var(--t-sm);
 }
 .builder-add:hover {
-  background: var(--clay-sunk);
+  background: var(--primary-soft);
 }
 .builder-settings {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .builder-close {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 11px 14px;
-  border-radius: var(--r-clay-sm);
-  background: var(--clay-surface);
-  box-shadow: var(--clay-1);
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  box-shadow: var(--edge), var(--shadow-1);
 }
 .builder-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--s-2);
 }
 .builder-chip {
-  padding: 6px 11px;
+  min-height: 36px;
+  padding: 0 var(--s-3);
   border-radius: var(--r-pill);
-  background: var(--clay-sunk);
-  box-shadow: var(--clay-in);
-  color: var(--ink-soft);
-  font-size: var(--t-xs);
-  font-weight: 500;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+.builder-chip:active {
+  transform: scale(var(--press-scale));
 }
 .builder-chip.on {
-  background: var(--accent);
-  color: var(--on-accent);
-  box-shadow: none;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* base.css lifts every phone button to 44px; inside a card these stay at
+   their 32px so the rows keep one rhythm. */
+@media (max-width: 640px) {
+  .poll-close,
+  .list-remove,
+  .list-add-btn {
+    min-height: 0;
+  }
 }
 
 /* The bars and list rows already skip their animation in JS; this covers the
@@ -385,7 +444,18 @@
 @media (prefers-reduced-motion: reduce) {
   .poll-option,
   .poll-close,
-  .list-tick {
+  .poll-mark,
+  .list-tick,
+  .list-label,
+  .builder-chip {
     transition: none;
   }
+}
+
+/* Squarer option rows where the design's other corners are squarer too. */
+:root[data-design='calm'] {
+  --poll-row-r: 10px;
+}
+:root[data-design='midnight'] {
+  --poll-row-r: 8px;
 }

@@ -1,73 +1,203 @@
 /* ── /nookcontrol ──────────────────────────────────────────────────────────
    Same materials as the app, different density. A chat wants air; a table of
-   accounts wants rows you can scan. So: tighter spacing, mono for anything
-   you might compare or copy, and no decoration that does not carry meaning.
+   accounts wants rows you can scan. So: a sidebar of sections, cards for the
+   numbers, one clean table, and no decoration that does not carry meaning.
+
+   Semantic tokens only — the design set can be swapped on <html> and this
+   panel follows. The one exception is the email preview, which mirrors
+   mail.js: an email cannot read tokens, so neither can its likeness.
    ────────────────────────────────────────────────────────────────────────── */
 
 .admin {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100dvh;
-  padding: var(--s-5) var(--s-5) var(--s-7);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ── the sidebar ─────────────────────────────────────────────────────────── */
+
+.admin-side {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-7);
+  padding: var(--s-6) var(--s-4);
+  background: var(--surface);
+  box-shadow: inset -1px 0 0 var(--line);
+  min-width: 0;
+}
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-2);
+}
+.admin-brand svg {
+  flex: none;
+}
+.admin-brand-words {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.admin-brand-words b {
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+}
+.admin-brand-words span {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.admin-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.admin-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--tap);
+  padding: 0 var(--s-4);
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  font-weight: 700;
+  font-size: var(--t-base);
+  text-align: left;
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.admin-tab svg {
+  flex: none;
+}
+.admin-tab:hover:not(.on) {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.admin-tab:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
+}
+.admin-tab.on {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+.admin-tab:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 2px;
+}
+
+.admin-side-foot {
+  margin-top: auto;
+  display: grid;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.admin-actor {
+  padding: 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-signout {
+  width: 100%;
+}
+
+/* ── the page ────────────────────────────────────────────────────────────── */
+
+.admin-main {
+  width: 100%;
   max-width: 1180px;
-  margin: 0 auto;
+  min-width: 0;
+  padding: var(--s-7) var(--s-7) var(--s-9);
 }
 
 .admin-head {
   display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  margin-bottom: var(--s-5);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin-bottom: var(--s-6);
 }
 .admin-head h1 {
+  font-family: var(--font-display);
   font-size: var(--t-2xl);
-  letter-spacing: -0.02em;
-}
-.admin-actor {
-  font-family: var(--font-mono);
-  max-width: 34ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
 }
 
 /* ── the numbers ─────────────────────────────────────────────────────────── */
 
 .admin-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: var(--s-3);
-  margin-bottom: var(--s-5);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--s-4);
+  margin-bottom: var(--s-7);
 }
 .admin-card {
-  padding: var(--s-4);
   display: grid;
-  gap: 2px;
+  gap: var(--s-1);
+  padding: var(--s-5);
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--edge), var(--shadow-1);
+}
+.admin-card-label {
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: var(--ink-2);
 }
 .admin-card strong {
   font-family: var(--font-display);
   font-size: var(--t-2xl);
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.admin-card-sub {
+  font-size: var(--t-xs);
+  color: var(--ink-2);
 }
 
-/* ── search and sort ─────────────────────────────────────────────────────── */
+/* ── search and filters ──────────────────────────────────────────────────── */
 
 .admin-toolbar {
   display: flex;
   gap: var(--s-3);
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: var(--s-3);
+  margin-bottom: var(--s-4);
 }
 .admin-search {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  flex: 1 1 260px;
-  padding: 10px 14px;
-  background: var(--clay-sunk);
-  border-radius: var(--r-clay-sm);
-  box-shadow: var(--clay-in);
+  flex: 1 1 280px;
+  min-height: var(--tap);
+  padding: 0 var(--s-4);
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  box-shadow: var(--edge), var(--shadow-1);
+  color: var(--ink-3);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+.admin-search:focus-within {
+  box-shadow: 0 0 0 2px var(--iris), var(--ring);
 }
 .admin-search input {
   flex: 1;
@@ -78,80 +208,120 @@
   font: inherit;
   outline: none;
 }
+.admin-search input::placeholder {
+  color: var(--ink-2);
+}
 .admin-search svg {
-  opacity: 0.55;
   flex: none;
 }
 
+/* Pill filters: a track holding the choices, the chosen one in primary. */
 .admin-sorts {
   display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
-  background: var(--clay-sunk);
-  box-shadow: var(--clay-in);
   flex-wrap: wrap;
+  align-self: flex-start;
+  gap: var(--s-1);
+  padding: var(--s-1);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
 }
 .admin-sort {
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-faint);
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--s-4);
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
   font-size: var(--t-sm);
-  cursor: pointer;
+  font-weight: 700;
   white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.admin-sort:hover:not(.on):not(:disabled) {
+  color: var(--ink);
+}
+.admin-sort:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
 }
 .admin-sort.on {
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.admin-sort:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .admin-count {
-  margin-bottom: var(--s-2);
+  margin: 0 0 var(--s-2);
+  padding-left: var(--s-2);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  color: var(--ink-2);
 }
 
 /* ── the table ───────────────────────────────────────────────────────────── */
 
 .admin-table-wrap {
-  background: var(--clay-surface);
-  border-radius: var(--r-clay);
-  box-shadow: var(--clay-1);
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--edge), var(--shadow-1);
   overflow-x: auto; /* rather than squashing columns on a narrow screen */
 }
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 820px;
+  min-width: 860px;
 }
 .admin-table th {
   text-align: left;
   font-size: var(--t-xs);
-  letter-spacing: 0.12em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-faint);
-  font-weight: 500;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--clay-edge, rgba(30, 26, 23, 0.1));
+  color: var(--ink-2);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
+.admin-table th:first-child,
+.admin-table td:first-child {
+  padding-left: var(--s-5);
+}
+.admin-table th:last-child,
+.admin-table td:last-child {
+  padding-right: var(--s-5);
+}
 .admin-table td {
-  padding: 11px 14px;
-  border-bottom: 1px solid rgba(30, 26, 23, 0.06);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
   vertical-align: middle;
+  font-size: var(--t-sm);
 }
 .admin-table tbody tr:last-child td {
   border-bottom: 0;
 }
-.admin-table tbody tr:hover {
-  background: rgba(30, 26, 23, 0.03);
+.admin-table tbody tr {
+  transition: background var(--dur-fast) var(--ease-out);
 }
-.admin-table .num {
-  text-align: right;
+.admin-table tbody tr:hover {
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
 }
 .admin-table .mono {
   font-family: var(--font-mono);
+  font-size: var(--t-xs);
+}
+/* Counts line up by tabular figures, not by a monospace face. */
+.admin-table .num {
+  text-align: right;
+  font-family: var(--font-body);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .admin-table tr.is-suspended td {
   opacity: 0.55;
@@ -160,20 +330,28 @@
 .admin-person {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-3);
   min-width: 0;
 }
+.admin-person-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.admin-person-words .tiny {
+  color: var(--ink-2);
+}
 .admin-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
   flex: none;
   display: grid;
   place-items: center;
-  background: var(--accent);
+  background: var(--primary-soft);
   background-size: cover;
   background-position: center;
-  color: var(--on-accent);
+  color: var(--primary-ink);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--t-sm);
@@ -181,34 +359,37 @@
 .admin-name {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-weight: 600;
+  gap: var(--s-2);
+  font-weight: 700;
+  font-size: var(--t-base);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .admin-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--moss);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--success);
   flex: none;
 }
 
 .admin-chip-bad {
-  background: var(--rust);
-  color: #fdf6f3;
+  background: var(--danger);
+  color: var(--bg);
 }
 .admin-chip-quiet {
-  opacity: 0.6;
+  background: var(--surface-2);
+  color: var(--ink-2);
 }
 
 .admin-empty {
   display: grid;
   justify-items: center;
   gap: var(--s-2);
-  padding: var(--s-7);
-  color: var(--ink-faint);
+  padding: var(--s-8);
+  margin: 0;
+  color: var(--ink-2);
   font-size: var(--t-sm);
 }
 
@@ -218,57 +399,85 @@
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: var(--s-5);
+  padding: var(--s-5) var(--s-4);
+  background: var(--bg);
+  color: var(--ink);
 }
 .admin-gate-card {
   width: 100%;
-  max-width: 380px;
-  padding: var(--s-6);
+  max-width: 400px;
+  padding: var(--s-7) var(--s-6) var(--s-6);
   display: grid;
-  gap: var(--s-3);
+  gap: var(--s-4);
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--lift);
+}
+.admin-gate-mark {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--s-2);
+}
+.admin-gate-card .eyebrow {
+  margin-bottom: calc(var(--s-4) * -1);
+  text-align: center;
+  font-weight: 700;
 }
 .admin-gate-card h1 {
+  font-family: var(--font-display);
   font-size: var(--t-2xl);
-  letter-spacing: -0.02em;
-  margin-top: -4px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+.admin-gate-sub {
+  margin: calc(var(--s-3) * -1) 0 var(--s-2);
+  text-align: center;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.admin-gate-card .groove {
+  min-height: 52px;
+  padding: 0 var(--s-5);
+}
+.admin-gate-card .slab {
+  min-height: 52px;
+}
+.admin-google {
+  gap: var(--s-3);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  font-weight: 700;
+}
+.admin-google:hover:not(:disabled) {
+  filter: none;
+  background: var(--surface-2);
 }
 
 .admin-error,
 .admin-note {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
+  gap: var(--s-2);
+  margin: 0;
   font-size: var(--t-sm);
   line-height: 1.5;
-  color: var(--rust);
+}
+.admin-error {
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger-ink);
+  font-weight: 700;
 }
 .admin-note {
-  color: var(--ink-faint);
+  color: var(--ink-2);
 }
 .admin-error svg,
 .admin-note svg {
   flex: none;
   margin-top: 2px;
-}
-
-/* ── phones ──────────────────────────────────────────────────────────────── */
-
-@media (max-width: 640px) {
-  .admin {
-    padding: var(--s-4) var(--s-3) var(--s-6);
-  }
-  .admin-head h1 {
-    font-size: var(--t-xl);
-  }
-  .admin-actor {
-    display: none; /* the sign-out button matters more than who you are */
-  }
-  .admin-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .admin-card strong {
-    font-size: var(--t-xl);
-  }
 }
 
 /* ── one account ─────────────────────────────────────────────────────────── */
@@ -277,7 +486,7 @@
   cursor: pointer;
 }
 .admin-row:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--iris);
   outline-offset: -2px;
 }
 
@@ -285,21 +494,22 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(30, 26, 23, 0.4);
+  background: var(--scrim);
 }
 .admin-drawer {
   position: fixed;
   top: 0;
   right: 0;
   z-index: 41;
-  width: min(430px, 100vw);
+  width: min(440px, 100vw);
   height: 100dvh;
   overflow-y: auto;
-  padding: var(--s-5);
-  background: var(--clay-bg);
-  box-shadow: -18px 0 46px rgba(30, 26, 23, 0.18);
+  padding: var(--s-6);
+  background: var(--bg);
+  border-radius: var(--r-sheet) 0 0 var(--r-sheet);
+  box-shadow: var(--lift);
   display: grid;
-  gap: var(--s-4);
+  gap: var(--s-5);
   align-content: start;
 }
 .admin-drawer-head {
@@ -309,48 +519,76 @@
 }
 .admin-drawer-person {
   display: flex;
-  gap: var(--s-3);
+  gap: var(--s-4);
   align-items: center;
 }
 .admin-drawer-person h2 {
+  font-family: var(--font-display);
   font-size: var(--t-xl);
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.admin-drawer-person .tiny {
+  color: var(--ink-2);
 }
 .admin-avatar-lg {
-  width: 58px;
-  height: 58px;
+  width: 60px;
+  height: 60px;
   font-size: var(--t-lg);
 }
+.admin-drawer .eyebrow {
+  display: block;
+  margin-bottom: var(--s-2);
+  font-weight: 700;
+}
 
+.admin-banner-ok,
 .admin-banner-bad {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--r-clay-sm);
-  background: var(--rust);
-  color: #fdf6f3;
+  gap: var(--s-2);
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-card);
   font-size: var(--t-sm);
+  font-weight: 700;
+  line-height: 1.5;
+}
+.admin-banner-ok {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success-ink);
+}
+.admin-banner-bad {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger-ink);
+}
+.admin-banner-ok svg,
+.admin-banner-bad svg {
+  flex: none;
 }
 
 .admin-facts {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--s-3) var(--s-4);
-  padding: var(--s-4);
-  background: var(--clay-surface);
-  border-radius: var(--r-clay);
-  box-shadow: var(--clay-1);
+  gap: var(--s-4);
+  margin: 0;
+  padding: var(--s-5);
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--edge), var(--shadow-1);
 }
 .admin-facts dt {
   font-size: var(--t-xs);
-  letter-spacing: 0.12em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-2);
 }
 .admin-facts dd {
+  margin: 0;
   font-size: var(--t-sm);
-  font-weight: 600;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* A bar per day. Fourteen bars is enough to see a rhythm and small enough to
@@ -359,34 +597,41 @@
 .admin-spark {
   display: flex;
   align-items: flex-end;
-  gap: 3px;
-  height: 54px;
+  gap: var(--s-1);
+  height: 64px;
   padding: var(--s-3);
-  background: var(--clay-sunk);
-  border-radius: var(--r-clay-sm);
-  box-shadow: var(--clay-in);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
 }
 .admin-spark span {
   flex: 1;
   min-width: 4px;
-  border-radius: 3px 3px 0 0;
-  background: var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--primary);
 }
 
 .admin-rooms {
   list-style: none;
   display: grid;
-  gap: 2px;
-  margin-top: 4px;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
 }
 .admin-rooms li {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding: 8px 10px;
-  border-radius: var(--r-clay-sm);
-  background: var(--clay-surface);
+  min-height: var(--tap);
+  padding: 0 var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: var(--edge);
   font-size: var(--t-sm);
+  font-weight: 600;
+}
+.admin-rooms li .tiny {
+  color: var(--ink-2);
+  font-weight: 400;
 }
 
 .admin-actions {
@@ -398,121 +643,131 @@
   width: 100%;
   justify-content: center;
 }
+.admin-actions .tiny {
+  color: var(--ink-2);
+}
 
 .admin-danger {
   display: grid;
   gap: var(--s-2);
-  padding: var(--s-3);
-  border: 2px solid var(--rust);
-  border-radius: var(--r-clay-sm);
+  padding: var(--s-4);
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--danger);
 }
-
-@media (max-width: 640px) {
-  .admin-drawer {
-    width: 100vw;
-    padding: var(--s-4) var(--s-3);
-  }
-  .admin-facts {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--s-2) var(--s-3);
-  }
+.admin-danger .tiny {
+  margin: 0;
 }
 
 /* ── writing to people ───────────────────────────────────────────────────── */
 
-.admin-tabs {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
-  background: var(--clay-sunk);
-  box-shadow: var(--clay-in);
-  margin-bottom: var(--s-4);
-}
-.admin-tab {
-  padding: 8px 16px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-faint);
-  font-size: var(--t-sm);
-  cursor: pointer;
-}
-.admin-tab.on {
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-}
-
 .admin-compose {
   display: grid;
-  gap: var(--s-3);
-  max-width: 620px;
+  gap: var(--s-4);
+  max-width: 680px;
+  padding: var(--s-6);
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--edge), var(--shadow-1);
+}
+.admin-compose .field > span:first-child {
+  display: block;
+  margin-bottom: var(--s-2);
+  padding-left: var(--s-4);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.admin-compose .tiny.faint {
+  color: var(--ink-2);
+  padding: 0 var(--s-4);
 }
 .admin-textarea {
   resize: vertical;
   min-height: 140px;
+  padding: var(--s-4) var(--s-5);
   font: inherit;
   line-height: 1.6;
 }
 select.groove {
   appearance: none;
   cursor: pointer;
+  padding-right: var(--s-8);
+  /* A chevron drawn from the text colour, so it follows every theme. */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-2) 50%),
+    linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) 50%,
+    calc(100% - 17px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
 }
 
-/* A rough sketch of the email, not a rendering of it — enough to catch a
-   wrong heading or a wall of unbroken text before it reaches anyone. */
+.admin-preview {
+  display: grid;
+  gap: var(--s-2);
+}
+.admin-preview .eyebrow {
+  padding-left: var(--s-4);
+  font-weight: 700;
+}
+
+/*
+ * The email, sketched. Not a rendering — enough to catch a wrong heading or
+ * a wall of unbroken text before it reaches anyone. Its colours are mail.js's
+ * (an email is light and fixed-brand whatever the app is wearing), declared
+ * once here so there is a single place to keep them in step.
+ */
+.admin-preview-card,
+.admin-mail {
+  --mail-bg: #f4f2fb;
+  --mail-card: #ffffff;
+  --mail-line: #e4e0f3;
+  --mail-ink: #1f1b2e;
+  --mail-muted: #5e5875;
+  --mail-primary: #5443d6;
+}
 .admin-preview-card {
-  background: #f4eee6;
-  border-radius: 20px;
   padding: var(--s-5);
-  margin-top: 6px;
-  color: #1e1a17;
+  background: var(--mail-bg);
+  border-radius: var(--r-card);
+  box-shadow: inset 0 0 0 1px var(--mail-line);
+  color: var(--mail-ink);
+}
+/* In Compose the sketch is the card itself, so it wears the card's white. */
+.admin-preview > .admin-preview-card {
+  background: var(--mail-card);
 }
 .admin-preview-brand {
-  font-size: 11px;
-  letter-spacing: 0.2em;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #5c5349;
+  color: var(--mail-muted);
 }
 .admin-preview-card h3 {
   font-family: var(--font-display);
-  font-size: 22px;
-  letter-spacing: -0.02em;
-  margin: 10px 0 12px;
+  font-size: var(--t-xl);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: var(--s-3) 0;
 }
 .admin-preview-card p {
-  font-size: 14px;
+  font-size: var(--t-sm);
   line-height: 1.6;
-  color: #5c5349;
-  margin: 0 0 12px;
+  color: var(--mail-muted);
+  margin: 0 0 var(--s-3);
   white-space: pre-wrap;
 }
 .admin-preview-btn {
   display: inline-block;
-  padding: 10px 20px;
-  background: #c0603c;
-  color: #fff6ef;
-  border: 2px solid #1e1a17;
-  border-radius: 8px;
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.admin-banner-ok {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--r-clay-sm);
-  background: var(--moss);
-  color: #f5f7f2;
+  padding: var(--s-3) var(--s-6);
+  background: var(--mail-primary);
+  color: #fff;
+  border-radius: var(--r-pill);
+  font-weight: 800;
   font-size: var(--t-sm);
-  line-height: 1.5;
-}
-.admin-banner-ok svg,
-.admin-banner-bad svg {
-  flex: none;
 }
 
 /**
@@ -535,12 +790,20 @@ select.groove {
   }
 }
 .rise-in {
-  animation: nook-rise 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: nook-rise var(--dur-slow) var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .rise-in {
-    animation-duration: 1ms;
+    animation-name: nook-fade;
+  }
+}
+@keyframes nook-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -551,24 +814,27 @@ select.groove {
    which is where most announcements actually go wrong.
    ────────────────────────────────────────────────────────────────────────── */
 .admin-notif {
+  /* A lock screen's colours, not ours: dark, because a lock screen is, and
+     judging contrast against a light panel tells you about the panel, not
+     about the phone. */
+  --lock-bg: #23212b;
+  --lock-ink: #f4f2fa;
+  --lock-muted: #b9b4c8;
   display: flex;
-  gap: 12px;
+  gap: var(--s-3);
   align-items: flex-start;
-  margin-top: 10px;
-  padding: 13px 14px;
-  /* Dark, because a lock screen is. Judging contrast against a light panel
-     tells you about the panel, not about the phone. */
-  background: #2a2622;
-  border-radius: 18px;
+  margin-top: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: var(--lock-bg);
+  border-radius: var(--r-card);
 }
 .admin-notif-icon {
   flex: none;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  background: #f4eee6;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
 }
 .admin-notif-text {
   min-width: 0;
@@ -577,18 +843,18 @@ select.groove {
   gap: 2px;
 }
 .admin-notif-text b {
-  font-size: 14px;
-  color: #f6f1e9;
-  font-weight: 650;
+  font-size: var(--t-sm);
+  color: var(--lock-ink);
+  font-weight: 700;
   /* One line, ellipsised — exactly what Android does to a long title. */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .admin-notif-text span {
-  font-size: 13px;
+  font-size: var(--t-sm);
   line-height: 1.45;
-  color: #bdb4a8;
+  color: var(--lock-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -596,30 +862,243 @@ select.groove {
 }
 
 .admin-mail {
-  margin-top: 10px;
-  padding: 16px;
-  background: #fbf7f1;
-  border-radius: 16px;
+  margin-top: var(--s-3);
+  padding: var(--s-5);
+  background: var(--mail-card);
+  border-radius: var(--r-card);
+  box-shadow: inset 0 0 0 1px var(--mail-line);
 }
 .admin-mail-subject {
-  font-size: 12px;
-  color: #5c5349;
-  padding-bottom: 10px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #ded5c8;
+  font-size: var(--t-xs);
+  color: var(--mail-muted);
+  padding-bottom: var(--s-3);
+  margin-bottom: var(--s-3);
+  border-bottom: 1px solid var(--mail-line);
 }
 .admin-mail-heading {
   font-family: var(--font-display);
-  font-size: 20px;
-  letter-spacing: -0.02em;
-  color: #1e1a17;
-  margin-bottom: 10px;
+  font-size: var(--t-lg);
+  font-weight: 600;
+  color: var(--mail-ink);
+  margin-bottom: var(--s-3);
 }
 .admin-mail-body {
-  font-size: 14px;
+  font-size: var(--t-sm);
   line-height: 1.65;
-  color: #5c5349;
+  color: var(--mail-muted);
   /* The body carries deliberate blank lines; collapsing them would hide the
      one formatting decision the writer actually made. */
   white-space: pre-wrap;
+}
+
+/* ── narrower screens: the sidebar becomes a top bar ─────────────────────── */
+
+@media (max-width: 900px) {
+  .admin {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-side {
+    z-index: 30;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    box-shadow: inset 0 -1px 0 var(--line);
+  }
+  .admin-tabs {
+    order: 3;
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .admin-tab {
+    flex: none;
+    min-height: 40px;
+    font-size: var(--t-sm);
+  }
+  .admin-side-foot {
+    margin: 0 0 0 auto;
+    display: flex;
+    align-items: center;
+  }
+  .admin-actor {
+    display: none; /* the sign-out button matters more than who you are */
+  }
+  .admin-signout {
+    width: auto;
+  }
+  .admin-main {
+    padding: var(--s-6) var(--s-4) var(--s-8);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-head h1 {
+    font-size: var(--t-xl);
+  }
+  .admin-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-3);
+  }
+  .admin-card {
+    padding: var(--s-4);
+  }
+  .admin-card strong {
+    font-size: var(--t-xl);
+  }
+  .admin-compose {
+    padding: var(--s-5) var(--s-4);
+  }
+  /* one scrolling row of filters rather than a ragged second line */
+  .admin-sorts {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .admin-sort {
+    flex: none;
+  }
+  .admin-drawer {
+    width: 100vw;
+    padding: var(--s-5) var(--s-4);
+    border-radius: 0;
+  }
+  .admin-facts {
+    gap: var(--s-3);
+  }
+}
+
+/* ── Design: which look everyone gets ────────────────────────────────────── */
+
+.design-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+.design-intro {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.design-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--s-4);
+}
+.design-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  box-shadow: var(--edge), var(--shadow-1);
+  text-align: left;
+  color: var(--ink);
+}
+.design-card:focus-visible {
+  outline: none;
+  box-shadow: var(--edge), var(--shadow-1), var(--ring);
+}
+/* The selection ring glides between cards rather than jumping. */
+.design-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: calc(var(--r-card) + 3px);
+  border: 2px solid var(--primary);
+  pointer-events: none;
+}
+.design-thumbs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-2);
+}
+.design-thumb {
+  position: relative;
+  height: 96px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.18);
+}
+.design-thumb-bubble {
+  position: absolute;
+  left: 10px;
+  top: 12px;
+  width: 58%;
+  height: 18px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.design-thumb-bubble.mine {
+  left: auto;
+  right: 10px;
+  top: 38px;
+  width: 50%;
+}
+.design-thumb-button {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  height: 16px;
+  border-radius: var(--r-pill);
+}
+.design-card-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--tap);
+}
+.design-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.design-card-text strong {
+  font-size: var(--t-lg);
+  font-weight: 600;
+  line-height: 1.1;
+}
+.design-card-text span {
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.design-live {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-size: var(--t-xs);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.design-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
+.design-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--success-ink);
+  font-weight: 600;
+}
+.design-note.error {
+  color: var(--danger-ink);
+}
+.design-preview-note {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
 }

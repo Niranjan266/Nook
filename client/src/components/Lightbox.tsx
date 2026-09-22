@@ -86,10 +86,8 @@ export default function Lightbox() {
 
           <header className="lightbox-head">
             <span className="grow stack" style={{ gap: 0 }}>
-              <span style={{ fontWeight: 600 }}>{message.sender.displayName || 'Someone'}</span>
-              <span className="tiny" style={{ opacity: 0.7 }}>
-                {clock(message.createdAt)}
-              </span>
+              <span style={{ fontWeight: 700 }}>{message.sender.displayName || 'Someone'}</span>
+              <span className="lightbox-sub">{clock(message.createdAt)}</span>
             </span>
             {!isSnap && (
               <a
@@ -131,7 +129,7 @@ export default function Lightbox() {
             </p>
           ) : (
             message.body && (
-              <p className="hint" style={{ padding: 'var(--s-4)', textAlign: 'center', color: '#F7F2EA' }}>
+              <p className="lightbox-caption">
                 {message.body}
               </p>
             )

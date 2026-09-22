@@ -19,10 +19,13 @@ import {
 } from '@/lib/adminApi';
 import { startGoogleSignIn } from '@/lib/native';
 import { API_BASE } from '@/lib/config';
-import { IconSearch, IconWarning, IconLogOut, IconCheck, IconUsers } from '@/components/Icon';
+import { IconSearch, IconWarning, IconLogOut, IconCheck, IconUsers, IconBell, IconSend, IconWallpaper } from '@/components/Icon';
+import Logo from '@/components/Logo';
+import { GoogleMark } from '@/features/auth/FrontDoor';
 import { UserPanelHost } from './UserPanel';
 import Compose from './Compose';
 import Templates from './Templates';
+import Designs from './Designs';
 
 const SORTS = [
   { id: 'recent', label: 'Last seen' },
@@ -30,6 +33,18 @@ const SORTS = [
   { id: 'messages', label: 'Most messages' },
   { id: 'name', label: 'Name' },
 ] as const;
+
+/**
+ * The panel's sections, in sidebar order. A list rather than three hand-written
+ * buttons so a new section is one line here and one branch in the body.
+ */
+const TABS = [
+  { id: 'people', label: 'People', icon: IconUsers },
+  { id: 'templates', label: 'Announce', icon: IconBell },
+  { id: 'write', label: 'Write to people', icon: IconSend },
+  { id: 'design', label: 'Design', icon: IconWallpaper },
+] as const;
+type Tab = (typeof TABS)[number]['id'];
 
 const ago = (ms: number) => {
   if (!ms) return 'never';
@@ -120,10 +135,13 @@ function SignIn({ onIn }: { onIn: () => void }) {
       {/* CSS entrance, not motion: a backgrounded tab throttles rAF and
           freezes a JS animation mid-flight, which left this card stuck at
           half opacity looking broken. */}
-      <form className="clay clay-3 admin-gate-card rise-in" onSubmit={submit}>
+      <form className="admin-gate-card rise-in" onSubmit={submit}>
+        <div className="admin-gate-mark">
+          <Logo size={72} tile={false} animate />
+        </div>
         <span className="eyebrow">Nook</span>
         <h1>Control</h1>
-        <p className="small muted">This page is not linked from anywhere. Only you should be here.</p>
+        <p className="admin-gate-sub">This page is not linked from anywhere. Only you should be here.</p>
 
         {config && !config.passwordSignIn && (
           <p className="admin-note">
@@ -179,7 +197,7 @@ function SignIn({ onIn }: { onIn: () => void }) {
             </div>
             <button
               type="button"
-              className="slab slab-quiet slab-block"
+              className="slab slab-block admin-google"
               onClick={() => {
                 // Reuse the app's Google flow, then trade the resulting
                 // session for an admin token — see AdminApp's handoff effect.
@@ -192,6 +210,7 @@ function SignIn({ onIn }: { onIn: () => void }) {
                 });
               }}
             >
+              <GoogleMark />
               Continue with Google
             </button>
           </>
@@ -214,7 +233,7 @@ export default function AdminApp() {
   const [error, setError] = useState('');
   const [actor, setActor] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'people' | 'write' | 'templates'>('people');
+  const [tab, setTab] = useState<Tab>('people');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -263,53 +282,66 @@ export default function AdminApp() {
 
   return (
     <div className="admin">
+      {/* A sidebar on a desk, a top bar on a phone — the same element, so the
+          sections are one list whichever way it is laid out. */}
+      <aside className="admin-side">
+        <div className="admin-brand">
+          <Logo size={36} tile={false} />
+          <span className="admin-brand-words">
+            <b>Nook</b>
+            <span>Control</span>
+          </span>
+        </div>
+
+        <nav className="admin-tabs" role="group" aria-label="Section">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              className={`admin-tab${tab === t.id ? ' on' : ''}`}
+              onClick={() => setTab(t.id)}
+              aria-pressed={tab === t.id}
+            >
+              <t.icon size={18} />
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="admin-side-foot">
+          <span className="admin-actor" title={actor}>
+            {actor}
+          </span>
+          <button
+            className="clay-btn admin-signout"
+            onClick={() => {
+              setAdminToken(null);
+              setSignedIn(false);
+            }}
+          >
+            <IconLogOut size={16} /> Sign out
+          </button>
+        </div>
+      </aside>
+
+      <main className="admin-main">
       <header className="admin-head">
-        <span className="stack" style={{ gap: 0, minWidth: 0 }}>
-          <span className="eyebrow">Nook</span>
-          <h1>Control</h1>
-        </span>
-        <span className="grow" />
-        <span className="tiny muted admin-actor" title={actor}>
-          {actor}
-        </span>
-        <button
-          className="clay-btn"
-          onClick={() => {
-            setAdminToken(null);
-            setSignedIn(false);
-          }}
-        >
-          <IconLogOut size={16} /> Sign out
-        </button>
+        <span className="eyebrow">Control</span>
+        <h1>{TABS.find((t) => t.id === tab)?.label}</h1>
       </header>
 
       <div className="admin-cards">
         {cards.map((c) => (
-          <div className="clay clay-2 admin-card" key={c.label}>
-            <span className="eyebrow">{c.label}</span>
+          <div className="admin-card" key={c.label}>
+            <span className="admin-card-label">{c.label}</span>
             <strong>{c.value.toLocaleString()}</strong>
-            <span className="tiny faint">{c.sub}</span>
+            <span className="admin-card-sub">{c.sub}</span>
           </div>
         ))}
       </div>
 
-      <div className="admin-tabs" role="group" aria-label="Section">
-        <button className={`admin-tab${tab === 'people' ? ' on' : ''}`} onClick={() => setTab('people')}>
-          People
-        </button>
-        <button
-          className={`admin-tab${tab === 'templates' ? ' on' : ''}`}
-          onClick={() => setTab('templates')}
-        >
-          Announce
-        </button>
-        <button className={`admin-tab${tab === 'write' ? ' on' : ''}`} onClick={() => setTab('write')}>
-          Write to people
-        </button>
-      </div>
-
       {tab === 'write' && <Compose people={users} />}
       {tab === 'templates' && <Templates people={users} />}
+      {tab === 'design' && <Designs />}
 
       {tab === 'people' && (
       <>
@@ -345,7 +377,7 @@ export default function AdminApp() {
         </p>
       )}
 
-      <p className="tiny faint admin-count">
+      <p className="admin-count">
         {loading ? 'Loading…' : `${users.length} of ${total} ${total === 1 ? 'person' : 'people'}`}
       </p>
 
@@ -386,7 +418,7 @@ export default function AdminApp() {
                     >
                       {!u.avatarUrl && u.displayName.slice(0, 1).toUpperCase()}
                     </span>
-                    <span className="stack" style={{ gap: 0, minWidth: 0 }}>
+                    <span className="admin-person-words">
                       <span className="admin-name">
                         {u.displayName}
                         {u.online && <span className="admin-dot" title="Online now" />}
@@ -430,6 +462,7 @@ export default function AdminApp() {
       </div>
       </>
       )}
+      </main>
 
       <UserPanelHost userId={openId} onClose={() => setOpenId(null)} onChanged={load} />
     </div>

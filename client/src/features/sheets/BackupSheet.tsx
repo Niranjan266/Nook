@@ -46,7 +46,7 @@ function Strength({ password }: { password: string }) {
           <i key={i} className={score >= i ? (score <= 1 ? 'warn' : 'on') : ''} />
         ))}
       </div>
-      <p className="tiny faint" style={{ margin: '4px 0 0' }} aria-live="polite">
+      <p className="tiny faint" aria-live="polite">
         {hint}
       </p>
     </>
@@ -280,7 +280,7 @@ export default function BackupSheet() {
         </button>
       )
     ) : (
-      <p className="tiny faint" style={{ margin: 0 }}>
+      <p className="tiny faint">
         Google Drive is not set up on this server{purpose === 'backup' ? ' — save to a file instead.' : '.'}
       </p>
     );
@@ -292,11 +292,11 @@ export default function BackupSheet() {
       {step === 'working' && (
         <div className="sheet-section" aria-live="polite">
           <span className="eyebrow">{mode === 'restore' ? 'Restoring' : 'Backing up'}</span>
-          <p className="small" style={{ margin: 0 }}>
+          <p className="small">
             {progress.label || 'Starting…'}
           </p>
           <Bar fraction={progress.fraction} />
-          <p className="tiny faint" style={{ margin: 0 }}>
+          <p className="tiny faint">
             Keep Nook open until this finishes.
           </p>
           <button className="clay-btn" onClick={cancel}>
@@ -307,15 +307,15 @@ export default function BackupSheet() {
 
       {step === 'done' && result && (
         <div className="sheet-section">
-          <span className="eyebrow row" style={{ gap: 6, color: 'var(--moss)' }}>
+          <span className="eyebrow note-ok">
             <IconCheck size={15} /> {result.title}
           </span>
           {result.lines.map((line, i) => (
-            <p key={i} className="small" style={{ margin: 0, lineHeight: 1.55 }}>
+            <p key={i} className="small">
               {line}
             </p>
           ))}
-          <div className="row" style={{ gap: 6, marginTop: 6 }}>
+          <div className="row" style={{ gap: 'var(--s-2)', marginTop: 'var(--s-1)' }}>
             {result.archive && (
               <button className="slab grow" onClick={() => openSheet('archive')}>
                 <IconArchive size={16} /> Open the archive
@@ -331,7 +331,7 @@ export default function BackupSheet() {
       {step === 'form' && mode === 'backup' && (
         <>
           <div className="sheet-section">
-            <p className="tiny faint" style={{ margin: 0, lineHeight: 1.65, paddingLeft: 4 }}>
+            <p className="tiny faint">
               Your normal chats already live on your account and follow you to a new phone. A backup keeps what
               doesn't: <strong>secret chats</strong>, whose keys and messages exist only on this device, and a{' '}
               <strong>personal archive</strong> of your chats you can read offline — even after messages disappear or
@@ -341,7 +341,7 @@ export default function BackupSheet() {
 
           <div className="sheet-section">
             <span className="eyebrow">Which chats</span>
-            <div className="row" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <button className={`clay-btn grow${scope === 'all' ? ' on' : ''}`} onClick={() => setScope('all')}>
                 All chats
               </button>
@@ -350,7 +350,7 @@ export default function BackupSheet() {
               </button>
             </div>
             {scope === 'choose' && (
-              <div className="stack backup-picklist" style={{ gap: 6 }}>
+              <div className="sheet-group backup-picklist">
                 {chats.map((c) => {
                   const on = picked.has(c.id);
                   return (
@@ -379,7 +379,7 @@ export default function BackupSheet() {
                 })}
               </div>
             )}
-            <p className="tiny faint" style={{ margin: 0, paddingLeft: 4 }}>
+            <p className="tiny faint">
               Secret chats are always included. Photos and files are kept as links, so they open while the server still
               has them.
             </p>
@@ -387,7 +387,7 @@ export default function BackupSheet() {
 
           <div className="sheet-section">
             <span className="eyebrow">Where</span>
-            <div className="row" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <button className={`clay-btn grow${dest === 'file' ? ' on' : ''}`} onClick={() => setDest('file')}>
                 <IconFile size={16} /> A file
               </button>
@@ -398,7 +398,7 @@ export default function BackupSheet() {
               )}
             </div>
             {dest === 'drive' && drive?.connected && (
-              <p className="tiny faint" style={{ margin: 0, paddingLeft: 4 }}>
+              <p className="tiny faint">
                 Into a hidden Nook folder in your Drive. Nook can't see any of your other files, and Google only ever
                 holds the sealed file — never your password.
               </p>
@@ -407,7 +407,7 @@ export default function BackupSheet() {
           </div>
 
           <div className="sheet-section">
-            <span className="eyebrow row" style={{ gap: 6 }}>
+            <span className="eyebrow">
               <IconLock size={14} /> Backup password
             </span>
             <input
@@ -430,12 +430,12 @@ export default function BackupSheet() {
               placeholder="Once more"
             />
             {confirm && confirm !== password && (
-              <p className="tiny" style={{ margin: 0, color: 'var(--rust)' }}>
+              <p className="tiny bad">
                 The two passwords don't match.
               </p>
             )}
             <button className="list-row backup-warning" onClick={() => setUnderstood((v) => !v)} aria-pressed={understood}>
-              <IconWarning size={19} />
+              <IconWarning size={20} />
               <span className="grow">
                 <span className="list-row-label">If I lose this password, the backup is gone</span>
                 <span className="list-row-sub">
@@ -447,7 +447,7 @@ export default function BackupSheet() {
           </div>
 
           {error && (
-            <p className="small" role="alert" style={{ margin: 0, color: 'var(--rust)' }}>
+            <p className="sheet-note bad" role="alert">
               {error}
             </p>
           )}
@@ -461,7 +461,7 @@ export default function BackupSheet() {
       {step === 'form' && mode === 'restore' && (
         <>
           <div className="sheet-section">
-            <p className="tiny faint" style={{ margin: 0, lineHeight: 1.65, paddingLeft: 4 }}>
+            <p className="tiny faint">
               Restoring puts your secret-chat keys and messages back on this device, and opens your normal chats as a{' '}
               <strong>read-only archive</strong>. Nothing is re-sent, and nothing in your live chats changes. A backup
               only restores into the account that made it.
@@ -470,7 +470,7 @@ export default function BackupSheet() {
 
           <div className="sheet-section">
             <span className="eyebrow">From</span>
-            <div className="row" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <button className={`clay-btn grow${source === 'file' ? ' on' : ''}`} onClick={() => setSource('file')}>
                 <IconFile size={16} /> A file
               </button>
@@ -483,7 +483,7 @@ export default function BackupSheet() {
 
             {source === 'file' ? (
               <button className="list-row" onClick={() => fileInput.current?.click()}>
-                <IconFile size={19} />
+                <IconFile size={20} />
                 <span className="grow">
                   <span className="list-row-label">{file ? file.name : 'Choose a .nookbak file'}</span>
                   <span className="list-row-sub">{file ? formatBytes(file.bytes.length) : 'From this device'}</span>
@@ -491,11 +491,11 @@ export default function BackupSheet() {
               </button>
             ) : drive?.connected ? (
               driveFiles == null ? (
-                <p className="tiny faint" style={{ margin: 0 }}>
+                <p className="tiny faint">
                   Looking in your Drive…
                 </p>
               ) : driveFiles.length === 0 ? (
-                <p className="tiny faint" style={{ margin: 0 }}>
+                <p className="tiny faint">
                   No backups in your Drive yet.
                 </p>
               ) : (
@@ -506,7 +506,7 @@ export default function BackupSheet() {
                     aria-pressed={driveChoice === f.id}
                     onClick={() => setDriveChoice(f.id)}
                   >
-                    <IconArchive size={19} />
+                    <IconArchive size={20} />
                     <span className="grow">
                       <span className="list-row-label">
                         {longDate(f.createdTime)} · {clock(f.createdTime)}
@@ -523,7 +523,7 @@ export default function BackupSheet() {
           </div>
 
           <div className="sheet-section">
-            <span className="eyebrow row" style={{ gap: 6 }}>
+            <span className="eyebrow">
               <IconLock size={14} /> Backup password
             </span>
             <input
@@ -542,7 +542,7 @@ export default function BackupSheet() {
           </div>
 
           {error && (
-            <p className="small" role="alert" style={{ margin: 0, color: 'var(--rust)' }}>
+            <p className="sheet-note bad" role="alert">
               {error}
             </p>
           )}
@@ -626,10 +626,10 @@ export function ArchiveSheet() {
 
       {archive === null && (
         <div className="sheet-section">
-          <p className="small" style={{ margin: 0 }}>
+          <p className="small">
             No archive on this device.
           </p>
-          <p className="tiny faint" style={{ margin: 0 }}>
+          <p className="tiny faint">
             Restore a backup from Settings → Backup &amp; restore, and its chats appear here to read offline.
           </p>
         </div>
@@ -655,13 +655,15 @@ export function ArchiveSheet() {
               );
             })}
           </div>
-          <button className="list-row" style={{ color: 'var(--rust)' }} onClick={remove}>
-            <IconTrash size={19} />
+          <div className="sheet-group">
+          <button className="list-row danger" onClick={remove}>
+            <IconTrash size={20} />
             <span className="grow">
               <span className="list-row-label">Remove the archive from this device</span>
               <span className="list-row-sub">Signing out removes it too. The backup file brings it back.</span>
             </span>
           </button>
+          </div>
         </>
       )}
 

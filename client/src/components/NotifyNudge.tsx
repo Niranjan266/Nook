@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { enablePush, neverAsked } from '@/lib/push';
 import { useUi } from '@/stores/ui';
-import { spring } from '@/lib/motion';
+import { toastIn } from '@/lib/motion';
 import { IconBell, IconClose } from '@/components/Icon';
 
 /**
@@ -71,15 +71,15 @@ export default function NotifyNudge({ show }: { show: boolean }) {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="notify-nudge clay"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 24 }}
-          transition={spring}
+          className="notify-nudge"
+          variants={toastIn}
+          initial="hidden"
+          animate="show"
+          exit="exit"
           role="dialog"
           aria-label="Turn on notifications"
         >
-          <span className="clay-round" style={{ width: 40, height: 40, flex: 'none' }}>
+          <span className="notify-nudge-icon">
             <IconBell size={18} />
           </span>
 
@@ -100,7 +100,7 @@ export default function NotifyNudge({ show }: { show: boolean }) {
           </span>
 
           <button className="notify-nudge-x" onClick={snooze} aria-label="Dismiss">
-            <IconClose size={15} />
+            <IconClose size={16} />
           </button>
         </motion.div>
       )}

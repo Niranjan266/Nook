@@ -19,13 +19,15 @@
  * loads for every new person, on the connection they happened to sign up on.
  * Three.js is ~600KB and a Lottie player ~60KB before any animation file, all
  * to decorate a moment the app already owns the tools for: Framer Motion is
- * in the bundle powering everything else, and the confetti is two dozen clay
+ * in the bundle powering everything else, and the confetti is two dozen coloured
  * shards it animates for free. The first thing a new account sees should not
  * be a loading spinner for its own welcome.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import Logo from '@/components/Logo';
+import { springs, dur } from '@/lib/motion';
 
 const FLAG = (id: string) => `nook.welcomed.${id}`;
 
@@ -41,8 +43,8 @@ const QUOTES = [
   'Every good story starts in a nook.',
 ];
 
-/** The clay palette, for the confetti. */
-const SHARD_COLOURS = ['#C0603C', '#57694A', '#D9A441', '#8B9DA9', '#A9502F', '#EDE3D6'];
+/** The Midnight Pebble palette, for the confetti. */
+const SHARD_COLOURS = ['#C8F545', '#8B7CFF', '#FFB36B', '#3DD6A8', '#6AA8FF', '#FF8FA3'];
 
 export function shouldWelcome(me: { id: string; createdAt?: string | null } | null): boolean {
   if (!me?.createdAt) return false;
@@ -115,14 +117,16 @@ export default function Welcome({ open, name, userId, onClose }: Props) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+          transition={{ duration: dur.base }}
         >
           <motion.div
-            className="welcome-card clay"
-            initial={{ scale: 0.6, y: 60, rotate: reduced ? 0 : -4, opacity: 0 }}
-            animate={{ scale: 1, y: 0, rotate: 0, opacity: 1 }}
-            exit={{ scale: 0.85, y: 30, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 210, damping: 20, mass: 0.9 }}
+            className="welcome-card"
+            // A large thing arriving: it settles on the sheet spring rather
+            // than bouncing; the small things inside it get the bounce.
+            initial={{ scale: 0.92, y: 32, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.96, y: 16, opacity: 0, transition: { duration: dur.fast } }}
+            transition={springs.sheet}
           >
             {/* Confetti, from behind the mark. Skipped entirely for people who
                 asked their OS for less motion — for them this is a calm card,
@@ -150,38 +154,16 @@ export default function Welcome({ open, name, userId, onClose }: Props) {
                 />
               ))}
 
-            {/* The mark. The alcove draws itself in — the room appears, then
-                the nook is carved out of it, which is the logo's own story. */}
-            <motion.svg
-              viewBox="0 0 96 96"
-              width="76"
-              height="76"
-              aria-hidden="true"
-              initial={{ scale: 0, rotate: reduced ? 0 : -12 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.15 }}
+            {/* The mark. The tile lands, then the pebbles arrive one after the
+                other — two people finding the same corner, the logo's own story. */}
+            <motion.div
+              style={{ lineHeight: 0 }}
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ ...springs.pop, delay: 0.15 }}
             >
-              <defs>
-                <linearGradient id="wl-face" x1="0" y1="0" x2="0.4" y2="1">
-                  <stop offset="0" stopColor="#F6F1E9" />
-                  <stop offset="0.55" stopColor="#EDE3D6" />
-                  <stop offset="1" stopColor="#DCCDB9" />
-                </linearGradient>
-                <linearGradient id="wl-alcove" x1="0" y1="0" x2="0.2" y2="1">
-                  <stop offset="0" stopColor="#A9502F" />
-                  <stop offset="1" stopColor="#C0603C" />
-                </linearGradient>
-              </defs>
-              <rect x="6" y="6" width="84" height="84" rx="26" fill="url(#wl-face)" />
-              <motion.path
-                d="M32 74 V46 a16 16 0 0 1 32 0 V74 Z"
-                fill="url(#wl-alcove)"
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                style={{ transformOrigin: '48px 74px' }}
-                transition={{ type: 'spring', stiffness: 220, damping: 15, delay: 0.4 }}
-              />
-            </motion.svg>
+              <Logo size={76} animate={!reduced} />
+            </motion.div>
 
             {/* The greeting, a word at a time — arriving, not just appearing. */}
             <h2 className="welcome-title" aria-label={words.join(' ')}>
@@ -190,7 +172,7 @@ export default function Welcome({ open, name, userId, onClose }: Props) {
                   key={i}
                   initial={{ opacity: 0, y: reduced ? 0 : 18 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 + i * 0.07, type: 'spring', stiffness: 300, damping: 24 }}
+                  transition={{ ...springs.gentle, delay: 0.5 + i * 0.07 }}
                 >
                   {word}
                   {i < words.length - 1 ? ' ' : ''}
@@ -212,8 +194,8 @@ export default function Welcome({ open, name, userId, onClose }: Props) {
               onClick={dismiss}
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2, type: 'spring', stiffness: 260, damping: 22 }}
-              whileTap={{ scale: 0.97 }}
+              transition={{ ...springs.pop, delay: 1.2 }}
+              whileTap={{ scale: 0.96 }}
             >
               Step inside
             </motion.button>

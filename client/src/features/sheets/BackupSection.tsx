@@ -63,13 +63,13 @@ export default function BackupSection({ userId }: { userId: string }) {
   return (
     <div className="sheet-section">
       <span className="eyebrow">Backup &amp; restore</span>
-      <p className="tiny faint" style={{ margin: 0, paddingLeft: 4, lineHeight: 1.6 }}>
+      <p className="tiny faint">
         Your chats already follow your account to a new phone. A backup keeps what doesn't — secret chats, whose keys
         live only on this device — plus a personal archive you can read offline. Sealed with a password only you know.
       </p>
 
       <button className="list-row" onClick={() => openSheet('backup', { mode: 'backup' })}>
-        <IconDownload size={19} />
+        <IconDownload size={20} />
         <span className="grow">
           <span className="list-row-label">Back up now</span>
           <span className="list-row-sub">{last}</span>
@@ -77,7 +77,7 @@ export default function BackupSection({ userId }: { userId: string }) {
       </button>
 
       <button className="list-row" onClick={() => openSheet('backup', { mode: 'restore' })}>
-        <IconRefresh size={19} />
+        <IconRefresh size={20} />
         <span className="grow">
           <span className="list-row-label">Restore from a backup</span>
           <span className="list-row-sub">A .nookbak file{drive?.available ? ' or Google Drive' : ''}</span>
@@ -86,7 +86,7 @@ export default function BackupSection({ userId }: { userId: string }) {
 
       {archiveAt && (
         <button className="list-row" onClick={() => openSheet('archive')}>
-          <IconArchive size={19} />
+          <IconArchive size={20} />
           <span className="grow">
             <span className="list-row-label">Open the archive</span>
             <span className="list-row-sub">Read-only snapshot from {longDate(archiveAt)}</span>
@@ -96,7 +96,7 @@ export default function BackupSection({ userId }: { userId: string }) {
 
       {drive?.available && (
         <div className="list-row">
-          <IconHistory size={19} />
+          <IconHistory size={20} />
           <span className="grow">
             <span className="list-row-label">Google Drive</span>
             <span className="list-row-sub">
@@ -106,11 +106,11 @@ export default function BackupSection({ userId }: { userId: string }) {
             </span>
           </span>
           {drive.connected ? (
-            <button className="clay-btn" onClick={disconnect} disabled={busy}>
+            <button className="clay-btn slab-sm" onClick={disconnect} disabled={busy}>
               Disconnect
             </button>
           ) : (
-            <button className="clay-btn" onClick={connect} disabled={busy}>
+            <button className="clay-btn slab-sm" onClick={connect} disabled={busy}>
               {busy ? 'Opening…' : 'Connect'}
             </button>
           )}
@@ -118,7 +118,7 @@ export default function BackupSection({ userId }: { userId: string }) {
       )}
 
       <button className="list-row" onClick={toggleRemind}>
-        <IconBell size={19} />
+        <IconBell size={20} />
         <span className="grow">
           <span className="list-row-label">Weekly reminder</span>
           <span className="list-row-sub">

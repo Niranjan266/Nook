@@ -86,13 +86,13 @@ export default function FoldersSheet() {
           <div className="sheet-section">
             <span className="eyebrow">Your folders</span>
             {folders.length === 0 && (
-              <p className="small muted">
+              <p className="sheet-note">
                 None yet. A folder is just a filter over your conversations — nobody else can see it.
               </p>
             )}
             {folders.map((f) => (
               <div key={f.id} className="list-row">
-                <span style={{ fontSize: 19 }}>{f.emoji || '📁'}</span>
+                <span className="row-icon" style={{ fontSize: 20 }}>{f.emoji || '📁'}</span>
                 <button className="grow" style={{ textAlign: 'left' }} onClick={() => setEditing(f.id)}>
                   <span className="list-row-label">{f.name}</span>
                   <span className="list-row-sub">
@@ -100,12 +100,11 @@ export default function FoldersSheet() {
                   </span>
                 </button>
                 <button
-                  className="clay-round"
-                  style={{ width: 32, height: 32, color: 'var(--rust)' }}
+                  className="row-action danger"
                   onClick={() => save(folders.filter((x) => x.id !== f.id))}
                   aria-label={`Delete ${f.name}`}
                 >
-                  <IconTrash size={15} />
+                  <IconTrash size={18} />
                 </button>
               </div>
             ))}
@@ -113,26 +112,14 @@ export default function FoldersSheet() {
 
           <div className="sheet-section">
             <span className="eyebrow">New folder</span>
-            <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <div className="emoji-picks">
               {EMOJI.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => setEmoji(e)}
-                  aria-pressed={emoji === e}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    fontSize: 18,
-                    borderRadius: 11,
-                    boxShadow: emoji === e ? '0 0 0 2.5px var(--ink)' : 'var(--clay-1)',
-                    background: 'var(--clay-surface)',
-                  }}
-                >
+                <button key={e} className="emoji-pick" onClick={() => setEmoji(e)} aria-pressed={emoji === e}>
                   {e}
                 </button>
               ))}
             </div>
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <input
                 className="groove grow"
                 placeholder="Work, Family, Loud ones…"
@@ -149,15 +136,15 @@ export default function FoldersSheet() {
         </>
       ) : (
         <>
-          <button className="clay-btn" style={{ alignSelf: 'flex-start' }} onClick={() => setEditing(null)}>
+          <button className="clay-btn slab-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setEditing(null)}>
             ← All folders
           </button>
 
           <div className="sheet-section">
-            <span className="eyebrow row" style={{ gap: 8 }}>
-              <IconFolder size={15} /> {current.emoji} {current.name}
+            <span className="eyebrow">
+              <IconFolder size={14} /> {current.emoji} {current.name}
             </span>
-            <p className="tiny faint" style={{ paddingLeft: 4 }}>
+            <p className="tiny faint">
               Tick the conversations that belong here.
             </p>
 

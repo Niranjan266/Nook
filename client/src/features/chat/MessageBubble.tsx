@@ -10,7 +10,7 @@ import Blur from '@/components/Blur';
 import VoiceNote from './VoiceNote';
 import ReactionBar from './ReactionBar';
 import { clock, bytes, linkify, duration, accentFor } from '@/lib/format';
-import { bubbleIn, spring, popIn } from '@/lib/motion';
+import { bubbleSend, bubbleReceive, popIn, popFrom, reactionPop, press } from '@/lib/motion';
 import {
   IconTick,
   IconTickDouble,
@@ -107,6 +107,8 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
   const enter = animateIn ? 'hidden' : false;
   const swipeEnabled = useAuth((s) => s.me?.settings.swipeToReply ?? true);
   const [picker, setPicker] = useState(false);
+  /** Whether the popup carries the actions card, or only the reactions. */
+  const [withMenu, setWithMenu] = useState(false);
   /**
    * The message's box on screen, captured at the moment the picker opens.
    * Measured rather than guessed: the old picker used a fixed percentage of
@@ -116,20 +118,36 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
-  const openPicker = () => {
+  /** The menu's second page. Reset on every open so it always opens at the top. */
+  const [reminding, setReminding] = useState(false);
+  const openPicker = (menu = false) => {
     setAnchorRect(bubbleRef.current?.getBoundingClientRect() || null);
+    setWithMenu(menu);
+    setReminding(false);
     setPicker(true);
   };
-  const [menu, setMenuOpen] = useState(false);
-  /** The menu's second page. Reset on every close so it always opens at the top. */
-  const [reminding, setReminding] = useState(false);
-  const setMenu = (v: boolean | ((prev: boolean) => boolean)) => {
-    setMenuOpen(v);
-    setReminding(false);
-  };
+  const closeMenu = () => setPicker(false);
   // A primitive from the selector, so only the bubble whose bell changed re-renders.
   const reminded = useChat((s) => Boolean(s.remindedIds[m.id]));
   const [history, setHistory] = useState<{ body: string; at: string; current?: boolean }[] | null>(null);
+
+  /**
+   * Which reactions were already here, so only one that lands while you watch
+   * pops in (with its sparks). Null until the first render has been seen:
+   * everything present when the chat opens simply appears.
+   */
+  const knownReactions = useRef<Set<string> | null>(null);
+  const [burst, setBurst] = useState<string | null>(null);
+  useEffect(() => {
+    const now = new Set(m.reactions.map((r) => r.emoji));
+    const before = knownReactions.current;
+    knownReactions.current = now;
+    const added = before ? [...now].find((e) => !before.has(e)) : undefined;
+    if (!added) return;
+    setBurst(added);
+    const t = window.setTimeout(() => setBurst(null), 700);
+    return () => window.clearTimeout(t);
+  }, [m.reactions]);
 
   const mine = m.sender.id === meId;
   const isPinned = conversation.pins?.some((p) => p.messageId === m.id);
@@ -208,15 +226,23 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
 
   if (m.type === 'system') {
     return (
-      <motion.div className="system-note" variants={bubbleIn} initial={enter} animate="show">
+      <motion.div className="system-note" variants={popIn} initial={enter} animate="show">
         {m.body}
       </motion.div>
     );
   }
 
+  // Yours rises out of the composer; theirs slides in from their side.
+  const arrive = mine ? bubbleSend : bubbleReceive;
+
   if (m.deletedForAll) {
     return (
-      <motion.div className={`msg${mine ? ' mine' : ''}`} variants={bubbleIn} initial={enter} animate="show">
+      <motion.div
+        className={`msg${mine ? ' mine' : ''}${runStart ? ' run-start' : ''}`}
+        variants={arrive}
+        initial={enter}
+        animate="show"
+      >
         <div className="bubble" style={{ opacity: 0.7, fontStyle: 'italic' }}>
           <span className="msg-text small">This message was unsent</span>
         </div>
@@ -229,9 +255,10 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
     return acc;
   }, {});
 
+  // Long-press on touch, right-click with a mouse: the whole popup.
   const openRadial = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
-    openPicker();
+    openPicker(true);
   };
 
   /* Reserve the right shape before the file arrives, so nothing jumps. */
@@ -294,7 +321,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
               <video src={safeUrl(m.media?.url)} preload="metadata" />
             )}
             <span className="play">
-              <span className="clay-round" style={{ width: 52, height: 52 }}>
+              <span className="clay-round">
                 <IconPlay size={22} />
               </span>
             </span>
@@ -323,16 +350,15 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
             download={m.media?.name}
             target="_blank"
             rel="noreferrer"
-            style={{ color: 'inherit', textDecoration: 'none' }}
           >
             <span className="file-icon">
               <IconFile size={20} />
             </span>
-            <span className="grow stack">
+            <span className="grow stack" style={{ minWidth: 0 }}>
               <span className="file-name truncate">{m.media?.name}</span>
               <span className="file-size">{bytes(m.media?.size)}</span>
             </span>
-            <IconDownload size={18} style={{ opacity: 0.7 }} />
+            <IconDownload size={18} className="file-go" />
           </a>
         );
 
@@ -460,10 +486,10 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           <span className={`call-log${missed ? ' missed' : ''}`}>
             <span className="call-log-icon">{mine ? <IconCallOut size={18} /> : <IconCallIn size={18} />}</span>
             <span className="stack">
-              <span style={{ fontWeight: 500, fontSize: 'var(--t-sm)' }}>
+              <span className="call-log-title">
                 {m.call?.kind === 'video' ? 'Video call' : 'Voice call'}
               </span>
-              <span className="tiny" style={{ opacity: 0.75 }}>
+              <span className="snap-sub">
                 {missed
                   ? m.call?.status === 'declined'
                     ? 'Declined'
@@ -495,6 +521,190 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
   })();
 
   const isMediaBubble = ['image', 'video'].includes(m.type);
+  const inGroup = conversation.type === 'group';
+
+  /**
+   * The actions card of the message popup. Reply and thread lead, because on
+   * a phone there is no hover toolbar to offer them; delete sits last, apart.
+   */
+  const menuContent = reminding ? (
+    <RemindPicker messageId={m.id} onBack={() => setReminding(false)} onDone={closeMenu} />
+  ) : (
+    <>
+      <button
+        className="list-row"
+        role="menuitem"
+        onClick={() => {
+          setReplyTo(m);
+          closeMenu();
+        }}
+      >
+        <IconReply size={18} />
+        <span className="grow">
+          <span className="list-row-label">Reply</span>
+        </span>
+      </button>
+      {!secretChat && (
+        <button
+          className="list-row"
+          role="menuitem"
+          onClick={() => {
+            openThread(m.id);
+            closeMenu();
+          }}
+        >
+          <IconThread size={18} />
+          <span className="grow">
+            <span className="list-row-label">Reply in a thread</span>
+          </span>
+        </button>
+      )}
+      {/* Not on a message still sending: it has no id the server knows yet. */}
+      {!m.status && (
+        <button className="list-row" role="menuitem" onClick={() => setReminding(true)}>
+          <IconBell size={18} />
+          <span className="grow">
+            <span className="list-row-label">{reminded ? 'Reminder set' : 'Remind me'}</span>
+            <span className="list-row-sub">{reminded ? 'Change or cancel it' : 'Bring this back later'}</span>
+          </span>
+        </button>
+      )}
+      <button
+        className="list-row"
+        role="menuitem"
+        onClick={() => {
+          star(m);
+          closeMenu();
+        }}
+      >
+        {m.starred ? <IconStarFill size={18} /> : <IconStar size={18} />}
+        <span className="grow">
+          <span className="list-row-label">{m.starred ? 'Unstar' : 'Star'}</span>
+        </span>
+      </button>
+      {/*
+        Keep, offered only where it changes something: on a chat with
+        a disappearing timer running. Everywhere else the message was
+        never going anywhere, and a button promising to save it would
+        be answering a question nobody asked.
+
+        Distinct from Star, which is a bookmark — somewhere to find it
+        again. This is about whether it still exists to be found.
+      */}
+      {conversation.disappearAfter > 0 && m.type !== 'snap' && (
+        <button
+          className="list-row"
+          role="menuitem"
+          onClick={() => {
+            saveMessage(m.id, !m.saved).catch((e) => toast(e?.message || 'Could not keep that.', true));
+            closeMenu();
+          }}
+        >
+          <IconClock size={18} />
+          <span className="grow">
+            <span className="list-row-label">{m.saved ? 'Let it disappear' : 'Keep this'}</span>
+            <span className="list-row-sub">
+              {m.saved ? 'It is being kept past the timer' : 'Stops the timer deleting it'}
+            </span>
+          </span>
+        </button>
+      )}
+      {!secretChat && (
+        <button
+          className="list-row"
+          role="menuitem"
+          onClick={() => {
+            (isPinned ? unpin(conversation.id, m.id) : pin(conversation.id, m.id)).catch((e) =>
+              toast(e?.message || 'Could not pin that.', true)
+            );
+            closeMenu();
+          }}
+        >
+          <IconPin size={18} />
+          <span className="grow">
+            <span className="list-row-label">{isPinned ? 'Unpin' : 'Pin to the top'}</span>
+          </span>
+        </button>
+      )}
+      {/* Votes and ticks belong to this chat, and a secret message can only
+          be read here; the server refuses a forward of either too. */}
+      {!secretChat && m.type !== 'poll' && m.type !== 'list' && (
+        <button
+          className="list-row"
+          role="menuitem"
+          onClick={() => {
+            openSheet('forward', { messageId: m.id });
+            closeMenu();
+          }}
+        >
+          <IconForward size={18} />
+          <span className="grow">
+            <span className="list-row-label">Forward</span>
+          </span>
+        </button>
+      )}
+      {m.type === 'text' && m.body && (
+        <button
+          className="list-row"
+          role="menuitem"
+          onClick={() => {
+            navigator.clipboard?.writeText(m.body);
+            toast('Copied');
+            closeMenu();
+          }}
+        >
+          <IconFile size={18} />
+          <span className="grow">
+            <span className="list-row-label">Copy text</span>
+          </span>
+        </button>
+      )}
+      {mine && !secretChat && editable(m) && Date.now() - new Date(m.createdAt).getTime() < 15 * 60 * 1000 && (
+        <button
+          className="list-row"
+          role="menuitem"
+          onClick={() => {
+            setEditing(m);
+            closeMenu();
+          }}
+        >
+          <IconEdit size={18} />
+          <span className="grow">
+            <span className="list-row-label">Edit</span>
+          </span>
+        </button>
+      )}
+      <span className="menu-rule" aria-hidden="true" />
+      <button
+        className="list-row danger"
+        role="menuitem"
+        onClick={() => {
+          remove(m, 'me');
+          closeMenu();
+        }}
+      >
+        <IconTrash size={18} />
+        <span className="grow">
+          <span className="list-row-label">Delete for me</span>
+        </span>
+      </button>
+      {mine && (
+        <button
+          className="list-row danger"
+          role="menuitem"
+          onClick={() => {
+            remove(m, 'everyone');
+            closeMenu();
+          }}
+        >
+          <IconTrash size={18} />
+          <span className="grow">
+            <span className="list-row-label">Unsend for everyone</span>
+          </span>
+        </button>
+      )}
+    </>
+  );
 
   return (
     <>
@@ -502,7 +712,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         className={`msg${mine ? ' mine' : ''}${runStart ? ' run-start' : ''}${
           m.status === 'pending' ? ' pending' : ''
         }${m.status === 'failed' ? ' failed' : ''}`}
-        variants={bubbleIn}
+        variants={arrive}
         initial={enter}
         animate="show"
         exit="exit"
@@ -517,21 +727,21 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
       >
         {/* The reply arrow revealed by a swipe, behind the bubble. */}
         <span className={`swipe-hint${armed ? ' armed' : ''}`} aria-hidden="true">
-          <IconReply size={17} />
+          <IconReply size={18} />
         </span>
 
-        {showAvatar && !mine && conversation.type === 'group' ? (
+        {showAvatar && !mine && inGroup ? (
           <span className="msg-avatar">
             <Avatar
               name={m.sender.displayName || '?'}
               src={m.sender.avatarUrl}
               id={m.sender.id}
               accent={m.sender.accent}
-              size={30}
+              size={32}
             />
           </span>
-        ) : conversation.type === 'group' && !mine ? (
-          <span style={{ width: 30, flex: 'none' }} />
+        ) : inGroup && !mine ? (
+          <span className="msg-avatar-gap" />
         ) : null}
 
         <div
@@ -539,11 +749,8 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           className={`bubble${isMediaBubble ? ' media' : ''}${m.type === 'sticker' ? ' sticker' : ''}`}
         >
           {/* Each person keeps their own colour, so a busy group stays readable. */}
-          {runStart && !mine && conversation.type === 'group' && (
-            <span
-              className="msg-sender"
-              style={{ color: `var(--${m.sender.accent || accentFor(m.sender.id)}-deep)` }}
-            >
+          {runStart && !mine && inGroup && (
+            <span className="msg-sender" data-accent={m.sender.accent || accentFor(m.sender.id)}>
               {m.sender.displayName}
             </span>
           )}
@@ -614,7 +821,7 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           </span>
 
           {/* hover tools */}
-          <div className="msg-tools" style={{ opacity: menu ? 1 : undefined }}>
+          <div className="msg-tools" style={{ opacity: picker ? 1 : undefined }}>
             <button onClick={() => setReplyTo(m)} aria-label="Reply" title="Reply">
               <IconReply size={16} />
             </button>
@@ -627,182 +834,54 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
                 <IconThread size={16} />
               </button>
             )}
-            <button onClick={openPicker} aria-label="React" title="React">
+            <button onClick={() => openPicker(false)} aria-label="React" title="React">
               <IconEmoji size={16} />
             </button>
-            <button onClick={() => setMenu((v) => !v)} aria-label="More" title="More">
+            <button onClick={() => openPicker(true)} aria-label="More" title="More">
               <IconMore size={16} />
             </button>
           </div>
-
-          <AnimatePresence>
-            {menu && (
-              <motion.div
-                className="attach-menu"
-                style={{ bottom: 'auto', top: 'calc(100% + 6px)', right: mine ? 0 : 'auto', left: mine ? 'auto' : 0 }}
-                variants={popIn}
-                initial="hidden"
-                animate="show"
-                exit="exit"
-                // Not on the reminder page: a native date picker pulls the
-                // pointer out of the menu, and closing then loses the choice.
-                onMouseLeave={() => !reminding && setMenu(false)}
-              >
-                {reminding ? (
-                  <RemindPicker messageId={m.id} onBack={() => setReminding(false)} onDone={() => setMenu(false)} />
-                ) : (
-                <>
-                {/* Not on a message still sending: it has no id the server knows yet. */}
-                {!m.status && (
-                  <button className="list-row" onClick={() => setReminding(true)}>
-                    <IconBell size={17} />
-                    <span className="grow">
-                      <span className="list-row-label">{reminded ? 'Reminder set' : 'Remind me'}</span>
-                      <span className="list-row-sub">{reminded ? 'Change or cancel it' : 'Bring this back later'}</span>
-                    </span>
-                  </button>
-                )}
-                <button
-                  className="list-row"
-                  onClick={() => {
-                    star(m);
-                    setMenu(false);
-                  }}
-                >
-                  {m.starred ? <IconStarFill size={17} /> : <IconStar size={17} />}
-                  <span className="grow">
-                    <span className="list-row-label">{m.starred ? 'Unstar' : 'Star'}</span>
-                  </span>
-                </button>
-                {/*
-                  Keep, offered only where it changes something: on a chat with
-                  a disappearing timer running. Everywhere else the message was
-                  never going anywhere, and a button promising to save it would
-                  be answering a question nobody asked.
-
-                  Distinct from Star, which is a bookmark — somewhere to find it
-                  again. This is about whether it still exists to be found.
-                */}
-                {conversation.disappearAfter > 0 && m.type !== 'snap' && (
-                  <button
-                    className="list-row"
-                    onClick={() => {
-                      saveMessage(m.id, !m.saved).catch((e) =>
-                        toast(e?.message || 'Could not keep that.', true)
-                      );
-                      setMenu(false);
-                    }}
-                  >
-                    <IconClock size={17} />
-                    <span className="grow">
-                      <span className="list-row-label">{m.saved ? 'Let it disappear' : 'Keep this'}</span>
-                      <span className="list-row-sub">
-                        {m.saved ? 'It is being kept past the timer' : 'Stops the timer deleting it'}
-                      </span>
-                    </span>
-                  </button>
-                )}
-
-                {!secretChat && (
-                <button
-                  className="list-row"
-                  onClick={() => {
-                    (isPinned ? unpin(conversation.id, m.id) : pin(conversation.id, m.id)).catch((e) =>
-                      toast(e?.message || 'Could not pin that.', true)
-                    );
-                    setMenu(false);
-                  }}
-                >
-                  <IconPin size={17} />
-                  <span className="grow">
-                    <span className="list-row-label">{isPinned ? 'Unpin' : 'Pin to the top'}</span>
-                  </span>
-                </button>
-                )}
-                {/* Votes and ticks belong to this chat, and a secret message can only
-                    be read here; the server refuses a forward of either too. */}
-                {!secretChat && m.type !== 'poll' && m.type !== 'list' && (
-                <button
-                  className="list-row"
-                  onClick={() => {
-                    openSheet('forward', { messageId: m.id });
-                    setMenu(false);
-                  }}
-                >
-                  <IconForward size={17} />
-                  <span className="grow">
-                    <span className="list-row-label">Forward</span>
-                  </span>
-                </button>
-                )}
-                {m.type === 'text' && m.body && (
-                  <button
-                    className="list-row"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(m.body);
-                      toast('Copied');
-                      setMenu(false);
-                    }}
-                  >
-                    <IconFile size={17} />
-                    <span className="grow">
-                      <span className="list-row-label">Copy text</span>
-                    </span>
-                  </button>
-                )}
-                {mine && !secretChat && editable(m) && Date.now() - new Date(m.createdAt).getTime() < 15 * 60 * 1000 && (
-                  <button
-                    className="list-row"
-                    onClick={() => {
-                      setEditing(m);
-                      setMenu(false);
-                    }}
-                  >
-                    <IconEdit size={17} />
-                    <span className="grow">
-                      <span className="list-row-label">Edit</span>
-                    </span>
-                  </button>
-                )}
-                <button
-                  className="list-row"
-                  onClick={() => {
-                    remove(m, 'me');
-                    setMenu(false);
-                  }}
-                >
-                  <IconTrash size={17} />
-                  <span className="grow">
-                    <span className="list-row-label">Delete for me</span>
-                  </span>
-                </button>
-                {mine && (
-                  <button
-                    className="list-row"
-                    style={{ color: 'var(--rust)' }}
-                    onClick={() => {
-                      remove(m, 'everyone');
-                      setMenu(false);
-                    }}
-                  >
-                    <IconTrash size={17} />
-                    <span className="grow">
-                      <span className="list-row-label">Unsend for everyone</span>
-                    </span>
-                  </button>
-                )}
-                </>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </motion.div>
+
+      {/* Reactions dock under the bubble; a new one pops in with a burst. */}
+      {Object.keys(grouped).length > 0 && (
+        <div
+          className={`reactions${mine ? ' mine' : ''}${inGroup ? ' in-group' : ''}`}
+          style={{ alignSelf: mine ? 'flex-end' : 'flex-start' }}
+        >
+          {Object.entries(grouped).map(([emoji, users]) => (
+            <motion.button
+              key={emoji}
+              className={`reaction${users.includes(meId) ? ' by-me' : ''}`}
+              onClick={() => react(m, emoji)}
+              variants={reactionPop}
+              initial={knownReactions.current && !knownReactions.current.has(emoji) ? 'hidden' : false}
+              animate="show"
+              whileTap={press}
+              layout
+            >
+              <span>{emoji}</span>
+              {users.length > 1 && <span className="count">{users.length}</span>}
+              {burst === emoji && (
+                <span className="spark-burst" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              )}
+            </motion.button>
+          ))}
+        </div>
+      )}
 
       {/* A tangent lives here instead of burying the main conversation. */}
       {m.replyCount > 0 && (
         <button
-          className={`thread-tag${mine ? ' mine' : ''}`}
+          className={`thread-tag${mine ? ' mine' : ''}${inGroup ? ' in-group' : ''}`}
           onClick={() => openThread(m.id)}
           style={{ alignSelf: mine ? 'flex-end' : 'flex-start' }}
         >
@@ -818,9 +897,9 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           <>
             <div style={{ position: 'fixed', inset: 0, zIndex: 79 }} onClick={() => setHistory(null)} />
             <motion.div
-              className="clay clay-3 edit-history"
+              className="edit-history"
               style={{ alignSelf: mine ? 'flex-end' : 'flex-start' }}
-              variants={popIn}
+              variants={popFrom(mine ? 'top right' : 'top left')}
               initial="hidden"
               animate="show"
               exit="exit"
@@ -845,38 +924,20 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         </button>
       )}
 
-      {Object.keys(grouped).length > 0 && (
-        <div className={`reactions${mine ? ' mine' : ''}`} style={{ alignSelf: mine ? 'flex-end' : 'flex-start' }}>
-          {Object.entries(grouped).map(([emoji, users]) => (
-            <motion.button
-              key={emoji}
-              className={`reaction${users.includes(meId) ? ' by-me' : ''}`}
-              onClick={() => react(m, emoji)}
-              variants={popIn}
-              initial="hidden"
-              animate="show"
-              layout
-            >
-              <span>{emoji}</span>
-              {users.length > 1 && <span className="count">{users.length}</span>}
-            </motion.button>
-          ))}
-        </div>
-      )}
-
       {/*
-        The reaction picker. Anchored to this message and rendered into
-        <body> — see ReactionBar for why both matter.
+        The popup — reactions, and the actions card. Anchored to this message
+        and rendered into <body>; see ReactionBar for why both matter.
+        Mounted from the first open on (so it can still animate out), not
+        once per bubble up front — sixty idle pickers is sixty storage reads.
       */}
-      {/* Mounted from the first open on (so it can still animate out), not
-          once per bubble up front — sixty idle pickers is sixty storage reads. */}
       {anchorRect && (
         <ReactionBar
           open={picker}
           anchor={anchorRect}
           mine={mine}
           onPick={(emoji) => react(m, emoji)}
-          onClose={() => setPicker(false)}
+          onClose={closeMenu}
+          menu={withMenu ? menuContent : undefined}
         />
       )}
     </>

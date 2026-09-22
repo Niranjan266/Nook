@@ -126,6 +126,7 @@ export function NewChatSheet() {
 
   return (
     <Sheet open={open} onClose={closeSheet} title={secretMode ? 'New secret chat' : 'New conversation'}>
+      <div className="sheet-section">
       <label className="field">
         <span className="sr-only">Find someone by username or Nook ID</span>
         <input
@@ -137,16 +138,18 @@ export function NewChatSheet() {
           spellCheck={false}
         />
       </label>
-      <p className="tiny faint" style={{ padding: '4px 4px 0' }}>
+      <p className="tiny faint">
         A Nook ID looks like <code>nook-7f3k2q</code>. Yours is in Settings.
       </p>
+      </div>
 
+      <div className="sheet-group">
       <button
         className={`list-row secret-row${secretMode ? ' on' : ''}`}
         onClick={() => setSecretMode((v) => !v)}
         aria-pressed={secretMode}
       >
-        <span className="clay-round secret-seal" style={{ width: 40, height: 40, boxShadow: 'none' }}>
+        <span className="row-icon secret-seal">
           <IconLock size={18} />
         </span>
         <span className="grow">
@@ -158,14 +161,15 @@ export function NewChatSheet() {
       </button>
 
       <button className="list-row" onClick={() => openSheet('new-group')}>
-        <span className="clay-round" style={{ width: 40, height: 40, boxShadow: 'none', background: 'var(--clay-sunk)' }}>
-          <IconUsers size={19} />
+        <span className="row-icon">
+          <IconUsers size={20} />
         </span>
         <span className="grow">
           <span className="list-row-label">New group</span>
           <span className="list-row-sub">Pick a few people</span>
         </span>
       </button>
+      </div>
 
       <div className="sheet-section">
         <span className="eyebrow">{q.trim().length >= 2 ? 'Search results' : 'Your contacts'}</span>
@@ -194,7 +198,7 @@ export function NewChatSheet() {
           </button>
         ))}
         {shown.length === 0 && (
-          <p className="small muted" style={{ padding: '10px 4px' }}>
+          <p className="sheet-note">
             {q.trim().length < 2
               ? 'No contacts yet. Search for a username or Nook ID to start.'
               : wasNookId
@@ -284,9 +288,9 @@ export function NewGroupSheet() {
       </label>
 
       {picked.length > 0 && (
-        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <div className="row" style={{ gap: 'var(--s-2)', flexWrap: 'wrap' }}>
           {picked.map((p) => (
-            <button key={p.id} className="chip chip-quiet" style={{ height: 30, paddingRight: 6 }} onClick={() => toggle(p)}>
+            <button key={p.id} className="chip chip-quiet" style={{ height: 32, padding: '0 var(--s-3)', fontSize: 'var(--t-sm)' }} onClick={() => toggle(p)}>
               {p.displayName.split(' ')[0]} ✕
             </button>
           ))}
@@ -300,7 +304,7 @@ export function NewGroupSheet() {
 
       <div className="sheet-section">
         {people.length === 0 && (
-          <p className="small muted" style={{ padding: '10px 4px' }}>
+          <p className="sheet-note">
             {q.trim().length >= 2
               ? 'Nobody by that name among your friends. You can only add people who have accepted you.'
               : 'No friends yet. Add someone from New conversation first.'}
@@ -418,8 +422,10 @@ export function SearchSheet() {
 
   return (
     <Sheet open={open} onClose={closeSheet} title="Search messages">
-      <SearchBox value={q} onChange={setQ} placeholder="What are you looking for?" />
-      <SearchChips kind={kind} onChange={setKind} />
+      <div className="search-head">
+        <SearchBox value={q} onChange={setQ} placeholder="What are you looking for?" />
+        <SearchChips kind={kind} onChange={setKind} />
+      </div>
       <SearchResults
         state={state}
         query={q}
@@ -461,8 +467,8 @@ export function StarredSheet() {
                 closeSheet();
               }}
             >
-              <span className="clay-round" style={{ width: 38, height: 38, color: 'var(--ochre-deep)' }}>
-                <IconStarFill size={17} />
+              <span className="row-icon" style={{ color: 'var(--peach-ink)' }}>
+                <IconStarFill size={18} />
               </span>
               <span className="grow">
                 <span className="list-row-label truncate">{c?.name || 'Conversation'}</span>
@@ -472,7 +478,7 @@ export function StarredSheet() {
             </button>
           );
         })}
-        {!items.length && <p className="small muted">Nothing starred yet. Star a message to keep it here.</p>}
+        {!items.length && <p className="sheet-note">Nothing starred yet. Star a message to keep it here.</p>}
       </div>
     </Sheet>
   );
@@ -508,21 +514,21 @@ export function CallsSheet() {
             >
               <Avatar name={c.with.displayName} src={c.with.avatarUrl} id={c.with.id} accent={c.with.accent} size={40} />
               <span className="grow">
-                <span className="list-row-label" style={missed ? { color: 'var(--rust)' } : undefined}>
+                <span className={`list-row-label${missed ? ' bad' : ''}`}>
                   {c.with.displayName}
                 </span>
-                <span className="list-row-sub row" style={{ gap: 5 }}>
+                <span className="list-row-sub row" style={{ gap: 'var(--s-1)' }}>
                   {c.direction === 'outgoing' ? <IconCallOut size={13} /> : <IconCallIn size={13} />}
                   {missed ? (c.status === 'declined' ? 'Declined' : 'Missed') : duration(c.duration)}
                   <span aria-hidden="true">·</span>
                   {stamp(c.at)}
                 </span>
               </span>
-              {c.kind === 'video' ? <IconVideo size={17} style={{ opacity: 0.6 }} /> : <IconPhone size={17} style={{ opacity: 0.6 }} />}
+              {c.kind === 'video' ? <IconVideo size={18} className="chev" /> : <IconPhone size={18} className="chev" />}
             </button>
           );
         })}
-        {!calls.length && <p className="small muted">No calls yet.</p>}
+        {!calls.length && <p className="sheet-note">No calls yet.</p>}
       </div>
     </Sheet>
   );
@@ -584,16 +590,16 @@ export function RequestsSheet() {
               <span className="list-row-label">{r.user.displayName}</span>
               <span className="list-row-sub">{r.note || `@${r.user.username}`}</span>
             </span>
-            <span className="row" style={{ gap: 6, flex: 'none' }}>
+            <span className="row" style={{ gap: 'var(--s-2)', flex: 'none' }}>
               <button
-                className="clay-btn"
+                className="clay-btn slab-sm"
                 disabled={busy === r.user.id}
                 onClick={() => run(r.user.id, () => decline(r.user.id), 'Declined')}
               >
                 Decline
               </button>
               <button
-                className="slab"
+                className="slab slab-sm"
                 disabled={busy === r.user.id}
                 onClick={() =>
                   run(r.user.id, async () => {
@@ -608,7 +614,7 @@ export function RequestsSheet() {
           </div>
         ))}
         {incoming.length === 0 && (
-          <p className="small muted" style={{ padding: '10px 4px' }}>
+          <p className="sheet-note">
             Nobody is waiting on you.
           </p>
         )}
@@ -625,7 +631,7 @@ export function RequestsSheet() {
                 <span className="list-row-sub">Waiting for them to accept</span>
               </span>
               <button
-                className="clay-btn"
+                className="clay-btn slab-sm"
                 style={{ flex: 'none' }}
                 disabled={busy === r.user.id}
                 onClick={() => run(r.user.id, () => cancel(r.user.id), 'Request taken back')}

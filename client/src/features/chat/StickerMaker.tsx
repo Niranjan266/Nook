@@ -228,7 +228,7 @@ export default function StickerMaker({ open, file, onClose, onSaved }: Props) {
           onPointerDown={(e) => e.target === e.currentTarget && !busy && onClose()}
         >
           <motion.div
-            className="sticker-maker clay"
+            className="sticker-maker"
             role="dialog"
             aria-modal="true"
             aria-label="Make a sticker"
@@ -241,7 +241,7 @@ export default function StickerMaker({ open, file, onClose, onSaved }: Props) {
               <span className="sticker-maker-title">
                 <IconSticker size={17} /> {step === 'crop' ? 'Frame your sticker' : 'Your clay sticker'}
               </span>
-              <button className="clay-round" style={{ width: 36, height: 36 }} onClick={onClose} disabled={!!busy} aria-label="Close">
+              <button className="clay-round" onClick={onClose} disabled={!!busy} aria-label="Close">
                 <IconClose size={17} />
               </button>
             </header>
@@ -346,10 +346,9 @@ export default function StickerMaker({ open, file, onClose, onSaved }: Props) {
                     aria-label="Caption"
                   />
                   {busy === 'saving' && (
-                    <span
-                      className="rule"
-                      style={{ background: `linear-gradient(90deg, var(--moss) ${pct}%, var(--clay-sunk) ${pct}%)` }}
-                    />
+                    <span className="upload-track" aria-hidden="true">
+                      <i style={{ transform: `scaleX(${pct / 100})` }} />
+                    </span>
                   )}
                   <div className="sticker-maker-row">
                     <button className="slab slab-quiet" onClick={() => setStep('crop')} disabled={!!busy}>

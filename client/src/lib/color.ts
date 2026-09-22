@@ -53,14 +53,14 @@ export function dominantColor(src: string): Promise<string> {
   });
 }
 
-export function readableOn(hex: string): '#1E1A17' | '#F7F2EA' {
+export function readableOn(hex: string): '#0E0D14' | '#F4F2FA' {
   const h = hex.replace('#', '');
-  if (h.length < 6) return '#1E1A17';
+  if (h.length < 6) return '#0E0D14';
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);
   const b = parseInt(h.slice(4, 6), 16);
   const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  return lum > 0.55 ? '#1E1A17' : '#F7F2EA';
+  return lum > 0.55 ? '#0E0D14' : '#F4F2FA';
 }
 
 /** Crop + downscale a picked image to a sane wallpaper size before upload. */
@@ -187,12 +187,17 @@ export async function compressImage(file: File, maxEdge = 1920): Promise<File> {
   }
 }
 
+/*
+ * The ids are stored on conversations (and validated by the server), so they
+ * keep their clay-era names; the tints are the fixed Midnight Pebble hues —
+ * the same in both modes, like the avatars.
+ */
 export const WALLPAPER_PRESETS = [
-  { id: 'dusk-clay', label: 'Dusk Clay', tint: '#C0603C' },
-  { id: 'moss-paper', label: 'Moss Paper', tint: '#57694A' },
-  { id: 'ochre-dune', label: 'Ochre Dune', tint: '#CE9535' },
-  { id: 'slate-rain', label: 'Slate Rain', tint: '#47606F' },
-  { id: 'arch', label: 'Arches', tint: '#C0603C' },
+  { id: 'dusk-clay', label: 'Dusk Clay', tint: '#8B7CFF' },
+  { id: 'moss-paper', label: 'Moss Paper', tint: '#3DD6A8' },
+  { id: 'ochre-dune', label: 'Ochre Dune', tint: '#FFB36B' },
+  { id: 'slate-rain', label: 'Slate Rain', tint: '#6AA8FF' },
+  { id: 'arch', label: 'Arches', tint: '#FF8FA3' },
   { id: 'grid', label: 'Graph', tint: '' },
   { id: 'plain', label: 'Plain', tint: '' },
 ] as const;

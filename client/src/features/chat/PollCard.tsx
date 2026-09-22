@@ -5,8 +5,8 @@ import { useChat } from '@/stores/chat';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
 import Avatar from '@/components/Avatar';
-import { IconPoll, IconChecklist, IconCheck, IconClose, IconPlus } from '@/components/Icon';
-import { spring } from '@/lib/motion';
+import { IconPoll, IconChecklist, IconClose, IconPlus } from '@/components/Icon';
+import { spring, springs } from '@/lib/motion';
 import '@/styles/polls.css';
 
 /**
@@ -46,6 +46,37 @@ function closesLabel(iso: string) {
   if (h < 36) return `Closes in ${h} h`;
   return `Closes in ${Math.round(h / 24)} days`;
 }
+
+/**
+ * A tick that draws itself when it appears — but only when it appears
+ * because someone just ticked it. Ticks already there when the card mounts
+ * are simply drawn.
+ */
+function Tick({ calm }: { calm: boolean }) {
+  // Read once, at mount: a re-render must not restart the stroke.
+  const [draw] = useState(() => !calm && mountedCards.current);
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <motion.path
+        d="M5 12.5l4.5 4.5L19 7.5"
+        stroke="currentColor"
+        strokeWidth={3.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={draw ? { pathLength: 0 } : false}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.28, ease: [0.2, 0.9, 0.3, 1] }}
+      />
+    </svg>
+  );
+}
+
+/**
+ * Set a moment after the first cards paint, so ticks that were already there
+ * on load don't all draw at once — only the ones ticked while you watch.
+ */
+const mountedCards = { current: false };
+if (typeof window !== 'undefined') window.setTimeout(() => (mountedCards.current = true), 1500);
 
 /* ── poll ─────────────────────────────────────────────────────────────────── */
 
@@ -121,15 +152,17 @@ export function PollCard({ message: m, conversation, meId }: Props) {
               aria-disabled={locked}
               onClick={() => choose(o.id)}
             >
+              {/* Scaled, not resized: the fill grows on the compositor. */}
               <motion.span
                 className="poll-bar"
                 aria-hidden="true"
+                style={{ originX: 0 }}
                 initial={false}
-                animate={{ width: `${pct}%` }}
-                transition={calm ? { duration: 0 } : spring}
+                animate={{ scaleX: pct / 100 }}
+                transition={calm ? { duration: 0 } : springs.gentle}
               />
               <span className={`poll-mark${poll.multiple ? ' square' : ''}`} aria-hidden="true">
-                {picked && <IconCheck size={12} strokeWidth={3} />}
+                {picked && <Tick calm={calm} />}
               </span>
               <span className="poll-text">{o.text}</span>
               {!poll.anonymous && o.voters.length > 0 && (
@@ -244,7 +277,7 @@ export function ListCard({ message: m, conversation, meId }: Props) {
                   onClick={() => void toggleListItem(m, item.id, !item.checkedBy)}
                 >
                   <span className="poll-mark square" aria-hidden="true">
-                    {item.checkedBy && <IconCheck size={12} strokeWidth={3} />}
+                    {item.checkedBy && <Tick calm={calm} />}
                   </span>
                   <span className="list-text">
                     <span className="list-label">{item.text}</span>

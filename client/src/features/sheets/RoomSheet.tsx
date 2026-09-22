@@ -51,19 +51,19 @@ export default function RoomSheet() {
       {/* ── mood ───────────────────────────────────────────────────────── */}
       <div className="sheet-section">
         <span className="eyebrow">How it is right now</span>
-        <p className="tiny faint" style={{ paddingLeft: 4 }}>
+        <p className="tiny faint">
           Only the people in this room see this. It is not a status broadcast.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--s-2)' }}>
           {MOODS.map((m) => (
             <button
               key={m.id || 'none'}
-              className={`clay-btn${conversation.roomState?.mood === m.id ? ' on' : ''}`}
-              style={{ justifyContent: 'flex-start', fontSize: 'var(--t-sm)' }}
+              className={`clay-btn slab-sm${conversation.roomState?.mood === m.id ? ' on' : ''}`}
+              style={{ justifyContent: 'flex-start' }}
               onClick={() => pickMood(m.id)}
               disabled={busy}
             >
-              <span style={{ fontSize: 15 }}>{m.emoji || '—'}</span>
+              <span style={{ fontSize: 'var(--t-base)' }}>{m.emoji || '—'}</span>
               {m.label}
             </button>
           ))}
@@ -79,10 +79,10 @@ export default function RoomSheet() {
 
       {/* ── the wall ───────────────────────────────────────────────────── */}
       <div className="sheet-section">
-        <span className="eyebrow row" style={{ gap: 8 }}>
-          <IconWall size={15} /> The wall
+        <span className="eyebrow">
+          <IconWall size={14} /> The wall
         </span>
-        <p className="tiny faint" style={{ paddingLeft: 4 }}>
+        <p className="tiny faint">
           Pinned to the room itself, so it never scrolls away.
           {conversation.wallObjects?.length ? ` ${conversation.wallObjects.length} of 12 used.` : ''}
         </p>
@@ -94,7 +94,7 @@ export default function RoomSheet() {
           onChange={(e) => setObjectText(e.target.value)}
           maxLength={200}
         />
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row" style={{ gap: 'var(--s-2)' }}>
           <button
             className="clay-btn grow"
             disabled={!objectText.trim()}
@@ -113,7 +113,7 @@ export default function RoomSheet() {
           </button>
         </div>
 
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row" style={{ gap: 'var(--s-2)' }}>
           <input
             className="groove"
             type="date"
@@ -142,9 +142,9 @@ export default function RoomSheet() {
         </div>
 
         {conversation.wallObjects?.length > 0 && (
-          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          <div className="row" style={{ gap: 'var(--s-2)', flexWrap: 'wrap' }}>
             {conversation.wallObjects.map((o) => (
-              <span key={o.id} className="chip chip-quiet" style={{ height: 26 }}>
+              <span key={o.id} className="chip chip-quiet" style={{ height: 28, padding: '0 var(--s-3)', fontSize: 'var(--t-xs)' }}>
                 {o.type === 'countdown' && o.date ? `${o.text} · ${daysUntil(o.date)}` : o.text}
               </span>
             ))}
@@ -154,8 +154,8 @@ export default function RoomSheet() {
 
       {/* ── time of day ────────────────────────────────────────────────── */}
       <div className="sheet-section">
-        <span className="eyebrow row" style={{ gap: 8 }}>
-          <IconSchedule size={15} /> Time of day
+        <span className="eyebrow">
+          <IconSchedule size={14} /> Time of day
         </span>
         <button
           className="list-row"
@@ -169,7 +169,7 @@ export default function RoomSheet() {
             })
           }
         >
-          <IconSchedule size={18} />
+          <IconSchedule size={20} />
           <span className="grow">
             <span className="list-row-label">The room has an evening</span>
             <span className="list-row-sub">Warm and dark at night, light in the morning</span>
@@ -179,7 +179,7 @@ export default function RoomSheet() {
 
         {schedule.enabled && (
           <>
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row" style={{ gap: 'var(--s-2)' }}>
               <label className="field grow">
                 <span className="field-label">Evening starts</span>
                 <input
@@ -205,20 +205,22 @@ export default function RoomSheet() {
             </div>
 
             {(['day', 'night'] as const).map((slot) => (
-              <div key={slot} className="stack" style={{ gap: 6 }}>
-                <span className="small muted" style={{ textTransform: 'capitalize' }}>
+              <div key={slot} className="stack" style={{ gap: 'var(--s-2)' }}>
+                <span className="small muted" style={{ textTransform: 'capitalize', paddingLeft: 'var(--s-4)' }}>
                   {slot} look
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 'var(--s-1)' }}>
                   {WALLPAPER_PRESETS.map((p) => (
                     <button
                       key={p.id}
                       className={`wp-${p.id}`}
                       style={{
                         aspectRatio: '1',
-                        borderRadius: 9,
+                        borderRadius: 'var(--r-sm)',
                         boxShadow:
-                          schedule[slot]?.preset === p.id ? '0 0 0 2.5px var(--ink)' : 'var(--clay-1)',
+                          schedule[slot]?.preset === p.id
+                            ? '0 0 0 3px var(--surface), 0 0 0 5px var(--ink)'
+                            : 'var(--edge), var(--shadow-1)',
                       }}
                       aria-label={`${slot}: ${p.label}`}
                       onClick={() =>
@@ -238,13 +240,13 @@ export default function RoomSheet() {
 
       {/* ── history ────────────────────────────────────────────────────── */}
       <div className="sheet-section">
-        <span className="eyebrow row" style={{ gap: 8 }}>
-          <IconHistory size={15} /> Every wallpaper this room has worn
+        <span className="eyebrow">
+          <IconHistory size={14} /> Every wallpaper this room has worn
         </span>
         {history.length === 0 ? (
-          <p className="small muted">Nothing yet. Change the wallpaper and this becomes a diary.</p>
+          <p className="sheet-note">Nothing yet. Change the wallpaper and this becomes a diary.</p>
         ) : (
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }}>
+          <div style={{ display: 'flex', gap: 'var(--s-2)', overflowX: 'auto', padding: 'var(--s-1) var(--s-1) var(--s-2)' }}>
             {history
               .map((h, i) => ({ ...h, i }))
               .reverse()
@@ -256,8 +258,8 @@ export default function RoomSheet() {
                     flex: 'none',
                     width: 64,
                     height: 84,
-                    borderRadius: 12,
-                    boxShadow: 'var(--clay-1)',
+                    borderRadius: 'var(--r-sm)',
+                    boxShadow: 'var(--edge), var(--shadow-1)',
                     backgroundImage: h.url ? cssUrl(h.url) : undefined,
                     backgroundSize: 'cover',
                     position: 'relative',
@@ -274,11 +276,11 @@ export default function RoomSheet() {
                   <span
                     className="tiny"
                     style={{
-                      background: 'rgba(30,26,23,.62)',
+                      background: 'rgba(0, 0, 0, 0.55)',
                       color: '#fff',
                       padding: '1px 6px',
-                      borderRadius: 6,
-                      fontSize: 9,
+                      borderRadius: 'var(--r-pill)',
+                      fontSize: 10,
                     }}
                   >
                     {stamp(h.at)}

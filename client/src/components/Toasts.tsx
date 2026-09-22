@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUi } from '@/stores/ui';
-import { toastIn, spring } from '@/lib/motion';
+import { toastDrop, springs } from '@/lib/motion';
 import { IconCheck, IconWarning } from './Icon';
 
 export default function Toasts() {
@@ -8,6 +8,8 @@ export default function Toasts() {
   const dropToast = useUi((s) => s.dropToast);
 
   return (
+    // Dropped in from the top, where the eye already goes for news, and
+    // clear of the composer and the phone's bottom bar.
     <div className="toasts" role="status" aria-live="polite">
       {/* popLayout: a leaving toast stops taking space at once, so the others
           slide into place alongside its exit instead of after it. */}
@@ -16,11 +18,11 @@ export default function Toasts() {
           <motion.button
             key={t.id}
             className={`toast${t.bad ? ' bad' : ''}`}
-            variants={toastIn}
+            variants={toastDrop}
             initial="hidden"
             animate="show"
             exit="exit"
-            transition={{ layout: spring }}
+            transition={{ layout: springs.gentle }}
             onClick={() => dropToast(t.id)}
             layout
           >

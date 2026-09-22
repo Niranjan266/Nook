@@ -32,6 +32,7 @@ import {
   IconCheck,
   IconRefresh,
   IconSearch,
+  IconChevron,
 } from '@/components/Icon';
 
 const TIMERS = [0, 3600, 86400, 604800, 2592000];
@@ -92,7 +93,7 @@ export default function ChatInfoSheet() {
 
   return (
     <Sheet open={open} onClose={closeSheet} title={isGroup ? 'Group' : isSecret ? 'Secret chat' : 'Contact'}>
-      <div className="stack" style={{ alignItems: 'center', gap: 10, padding: '4px 0 8px' }}>
+      <div className="sheet-hero">
         <Avatar
           name={conversation.name}
           src={conversation.avatarUrl}
@@ -101,8 +102,8 @@ export default function ChatInfoSheet() {
           size={96}
           square={isGroup}
         />
-        <h3 style={{ textAlign: 'center' }}>{conversation.name}</h3>
-        <p className="small muted" style={{ textAlign: 'center' }}>
+        <h3>{conversation.name}</h3>
+        <p className="small muted">
           {isGroup
             ? conversation.description || `${conversation.members.length} people`
             : partner
@@ -113,16 +114,16 @@ export default function ChatInfoSheet() {
             actually are. Otherwise a nickname set months ago becomes a small
             mystery, and nothing else in the app would tell you. */}
         {!isGroup && partner?.nickname && (
-          <p className="tiny faint" style={{ textAlign: 'center' }}>
+          <p className="tiny muted">
             You call them {partner.nickname} · they’re {partner.realName}
           </p>
         )}
         {!isGroup && partner && (
-          <p className="tiny faint">
+          <p className="tiny muted">
             {partnerPresence?.online ? 'Online now' : partnerPresence?.lastSeen ? `Last seen ${lastSeenLabel(partnerPresence.lastSeen)}` : ''}
           </p>
         )}
-        {!isGroup && partner?.about && <p className="small" style={{ textAlign: 'center' }}>{partner.about}</p>}
+        {!isGroup && partner?.about && <p className="small">{partner.about}</p>}
       </div>
 
       {!isGroup && partner && (
@@ -143,11 +144,11 @@ export default function ChatInfoSheet() {
                   if (e.key === 'Escape') setRenaming(false);
                 }}
               />
-              <p className="tiny faint" style={{ margin: '4px 0 6px' }}>
+              <p className="tiny faint">
                 Only you see this. {partner.realName || partner.displayName} is never told, and nobody
                 in a shared group sees it either. Leave it empty to go back to their real name.
               </p>
-              <div className="row" style={{ gap: 6 }}>
+              <div className="row" style={{ gap: 'var(--s-2)' }}>
                 <button className="clay-btn grow" onClick={() => setRenaming(false)}>
                   Cancel
                 </button>
@@ -164,7 +165,7 @@ export default function ChatInfoSheet() {
                 setRenaming(true);
               }}
             >
-              <IconTag size={19} />
+              <IconTag size={20} />
               <span className="grow">
                 <span className="list-row-label">
                   {partner.nickname ? `Rename — currently “${partner.nickname}”` : 'Give them a nickname'}
@@ -193,7 +194,7 @@ export default function ChatInfoSheet() {
               }
             }}
           >
-            <span className="clay-round secret-seal" style={{ width: 34, height: 34, boxShadow: 'none' }}>
+            <span className="clay-round secret-seal" style={{ width: 36, height: 36 }}>
               <IconLock size={16} />
             </span>
             <span className="grow">
@@ -210,35 +211,38 @@ export default function ChatInfoSheet() {
         {!isSecret && (
         <>
         <button className="list-row" onClick={() => openSheet('room')}>
-          <IconWall size={19} />
+          <IconWall size={20} />
           <span className="grow">
             <span className="list-row-label">This room</span>
             <span className="list-row-sub">
               Mood, the wall, time of day, and every wallpaper it has worn
             </span>
           </span>
+          <IconChevron className="chev" />
         </button>
 
         <button className="list-row" onClick={() => openSheet('chat-search')}>
-          <IconSearch size={19} />
+          <IconSearch size={20} />
           <span className="grow">
             <span className="list-row-label">Search in this chat</span>
             <span className="list-row-sub">Words, photos, links, voice notes, or one person</span>
           </span>
+          <IconChevron className="chev" />
         </button>
 
         <button className="list-row" onClick={() => openSheet('media')}>
-          <IconImage size={19} />
+          <IconImage size={20} />
           <span className="grow">
             <span className="list-row-label">Shared photos, files and voice</span>
             <span className="list-row-sub">Everything sent here, without scrolling back</span>
           </span>
+          <IconChevron className="chev" />
         </button>
         </>
         )}
 
         <button className="list-row" onClick={() => openSheet('wallpaper')}>
-          <IconWallpaper size={19} />
+          <IconWallpaper size={20} />
           <span className="grow">
             <span className="list-row-label">Wallpaper</span>
             <span className="list-row-sub">
@@ -249,10 +253,11 @@ export default function ChatInfoSheet() {
                 : 'None yet'}
             </span>
           </span>
+          <IconChevron className="chev" />
         </button>
 
         <button className="list-row" onClick={() => toggle('muted')} aria-pressed={conversation.muted}>
-          {conversation.muted ? <IconBellOff size={19} /> : <IconBell size={19} />}
+          {conversation.muted ? <IconBellOff size={20} /> : <IconBell size={20} />}
           <span className="grow">
             <span className="list-row-label">{conversation.muted ? 'Muted' : 'Notifications on'}</span>
           </span>
@@ -260,7 +265,7 @@ export default function ChatInfoSheet() {
         </button>
 
         <button className="list-row" onClick={() => toggle('pinned')} aria-pressed={conversation.pinned}>
-          <IconPin size={19} />
+          <IconPin size={20} />
           <span className="grow">
             <span className="list-row-label">Pin to top</span>
           </span>
@@ -268,7 +273,7 @@ export default function ChatInfoSheet() {
         </button>
 
         <button className="list-row" onClick={() => toggle('archived')}>
-          <IconArchive size={19} />
+          <IconArchive size={20} />
           <span className="grow">
             <span className="list-row-label">{conversation.archived ? 'Unarchive' : 'Archive'}</span>
           </span>
@@ -280,7 +285,7 @@ export default function ChatInfoSheet() {
           off has to ask for the code, or it is not a lock.
         */}
         <button className="list-row" onClick={() => setLockStep(conversation.locked ? 'remove' : 'choose')}>
-          <IconLock size={19} />
+          <IconLock size={20} />
           <span className="grow">
             <span className="list-row-label">{conversation.locked ? 'Chat lock is on' : 'Lock this chat'}</span>
             <span className="list-row-sub">
@@ -294,7 +299,7 @@ export default function ChatInfoSheet() {
 
         {conversation.locked && (
           <button className="list-row" onClick={() => setLockStep('change')}>
-            <IconRefresh size={19} />
+            <IconRefresh size={20} />
             <span className="grow">
               <span className="list-row-label">Change the code</span>
               <span className="list-row-sub">You will need the current one first</span>
@@ -312,7 +317,7 @@ export default function ChatInfoSheet() {
       {/* ── custom notification, for this person only ─────────────────── */}
       <div className="sheet-section">
         <span className="eyebrow">Custom notification</span>
-        <p className="tiny faint" style={{ paddingLeft: 4, marginBottom: 8 }}>
+        <p className="tiny faint">
           Just for {isGroup ? 'this group' : conversation.name.split(' ')[0]}. Anything left on
           “Default” follows your setting in Settings → Notifications, so changing that later still
           reaches this chat.
@@ -340,15 +345,16 @@ export default function ChatInfoSheet() {
 
       <div className="sheet-section">
         <span className="eyebrow">How this person sounds</span>
-        <p className="tiny faint" style={{ paddingLeft: 4 }}>
+        <p className="tiny faint">
           You learn who it is without looking at the screen.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+        <div className="list-row stacked">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--s-2)' }}>
           {SOUNDS.map((s) => (
             <button
               key={s.id}
-              className={`clay-btn${(conversation.sound || 'default') === s.id ? ' on' : ''}`}
-              style={{ justifyContent: 'flex-start', fontSize: 'var(--t-sm)' }}
+              className={`clay-btn slab-sm${(conversation.sound || 'default') === s.id ? ' on' : ''}`}
+              style={{ justifyContent: 'flex-start' }}
               onClick={() => {
                 previewSound(s.id);
                 updatePrefs(conversation.id, { sound: s.id });
@@ -360,53 +366,56 @@ export default function ChatInfoSheet() {
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       {/* ── pace ─────────────────────────────────────────────────────── */}
       <div className="sheet-section">
         <span className="eyebrow">Pace</span>
-        <p className="tiny faint" style={{ paddingLeft: 4 }}>
+        <p className="tiny faint">
           Slow mode limits each person, not the room — one chatty member can't mute everyone else.
         </p>
-        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        <div className="list-row stacked">
+        <div className="row" style={{ gap: 'var(--s-2)', flexWrap: 'wrap' }}>
           {[0, 30, 300, 3600].map((s) => (
             <button
               key={s}
-              className={`clay-btn${conversation.slowMode === s ? ' on' : ''}`}
-              style={{ padding: '7px 13px', fontSize: 'var(--t-sm)' }}
+              className={`clay-btn slab-sm${conversation.slowMode === s ? ' on' : ''}`}
               onClick={() => setPace(conversation.id, { slowMode: s })}
             >
               {s === 0 ? 'Off' : s < 60 ? `${s}s` : s < 3600 ? `${s / 60} min` : '1 hour'}
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       <div className="sheet-section">
         <span className="eyebrow">Disappearing messages</span>
-        <p className="tiny faint" style={{ paddingLeft: 4 }}>
+        <p className="tiny faint">
           New messages delete themselves after this long. Existing ones stay.
         </p>
-        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        <div className="list-row stacked">
+        <div className="row" style={{ gap: 'var(--s-2)', flexWrap: 'wrap' }}>
           {TIMERS.map((t) => (
             <button
               key={t}
-              className={`clay-btn${conversation.disappearAfter === t ? ' on' : ''}`}
-              style={{ padding: '7px 13px', fontSize: 'var(--t-sm)' }}
+              className={`clay-btn slab-sm${conversation.disappearAfter === t ? ' on' : ''}`}
               onClick={() => setDisappearing(conversation.id, t)}
             >
               {t === 0 ? 'Off' : disappearLabel(t)}
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       {isGroup && (
         <div className="sheet-section">
-          <span className="eyebrow row" style={{ justifyContent: 'space-between' }}>
+          <span className="eyebrow" style={{ justifyContent: 'space-between' }}>
             <span>{conversation.members.length} people</span>
             {isAdmin && (
-              <button className="small" style={{ color: 'var(--accent-deep)', fontWeight: 600 }} onClick={() => openSheet('new-group')}>
+              <button className="text-btn" onClick={() => openSheet('new-group')}>
                 <IconPlus size={14} /> Add
               </button>
             )}
@@ -426,7 +435,7 @@ export default function ChatInfoSheet() {
                   <>
                     <button
                       className="clay-round"
-                      style={{ width: 32, height: 32 }}
+                      style={{ width: 36, height: 36 }}
                       onClick={() => setRole(conversation.id, p.id, m.role === 'admin' ? 'member' : 'admin')}
                       aria-label={m.role === 'admin' ? 'Remove admin' : 'Make admin'}
                       title={m.role === 'admin' ? 'Remove admin' : 'Make admin'}
@@ -435,11 +444,11 @@ export default function ChatInfoSheet() {
                     </button>
                     <button
                       className="clay-round"
-                      style={{ width: 32, height: 32, color: 'var(--rust)' }}
+                      style={{ width: 36, height: 36, color: 'var(--danger-ink)' }}
                       onClick={() => removeMember(conversation.id, p.id)}
                       aria-label={`Remove ${p.displayName}`}
                     >
-                      <IconTrash size={15} />
+                      <IconTrash size={18} />
                     </button>
                   </>
                 )}
@@ -454,7 +463,7 @@ export default function ChatInfoSheet() {
                 toast('Invite link copied');
               }}
             >
-              <IconUsers size={19} />
+              <IconUsers size={20} />
               <span className="grow">
                 <span className="list-row-label">Copy invite link</span>
                 <span className="list-row-sub">Anyone with it can join</span>
@@ -483,7 +492,7 @@ export default function ChatInfoSheet() {
             }
           }}
         >
-          <IconDownload size={19} />
+          <IconDownload size={20} />
           <span className="grow">
             <span className="list-row-label">{exporting ? 'Building…' : 'Export this conversation'}</span>
             <span className="list-row-sub">A readable file you keep. Your data genuinely leaves.</span>
@@ -506,7 +515,7 @@ export default function ChatInfoSheet() {
               }
             }}
           >
-            <IconUsers size={19} />
+            <IconUsers size={20} />
             <span className="grow">
               <span className="list-row-label">Invite a guest</span>
               <span className="list-row-sub">One conversation, no account, no install</span>
@@ -519,8 +528,7 @@ export default function ChatInfoSheet() {
       <div className="sheet-section">
         <span className="eyebrow">Careful now</span>
         <button
-          className="list-row"
-          style={{ color: 'var(--rust)' }}
+          className="list-row danger"
           onClick={async () => {
             await del(`/conversations/${conversation.id}/messages`);
             toast('Cleared for you only');
@@ -528,7 +536,7 @@ export default function ChatInfoSheet() {
             location.reload();
           }}
         >
-          <IconTrash size={19} />
+          <IconTrash size={20} />
           <span className="grow">
             <span className="list-row-label">Clear messages</span>
             <span className="list-row-sub">Only on your side</span>
@@ -537,15 +545,14 @@ export default function ChatInfoSheet() {
 
         {isGroup ? (
           <button
-            className="list-row"
-            style={{ color: 'var(--rust)' }}
+            className="list-row danger"
             onClick={() => {
               if (!confirmLeave) return setConfirmLeave(true);
               removeMember(conversation.id, me.id);
               closeSheet();
             }}
           >
-            <IconBlock size={19} />
+            <IconBlock size={20} />
             <span className="grow">
               <span className="list-row-label">{confirmLeave ? 'Tap again to leave' : 'Leave group'}</span>
             </span>
@@ -563,8 +570,7 @@ export default function ChatInfoSheet() {
                 rather than the only exit offered.
               */}
               <button
-                className="list-row"
-                style={{ color: 'var(--rust)' }}
+                className="list-row danger"
                 onClick={async () => {
                   if (!confirmDelete) return setConfirmDelete(true);
                   try {
@@ -580,7 +586,7 @@ export default function ChatInfoSheet() {
                   }
                 }}
               >
-                <IconUser size={19} />
+                <IconUser size={20} />
                 <span className="grow">
                   <span className="list-row-label">
                     {confirmDelete ? 'Tap again to delete' : `Delete ${partner.displayName.split(' ')[0]}`}
@@ -595,15 +601,14 @@ export default function ChatInfoSheet() {
               </button>
 
               <button
-                className="list-row"
-                style={{ color: 'var(--rust)' }}
+                className="list-row danger"
                 onClick={async () => {
                   await post(`/users/${partner.id}/block`);
                   toast(`${partner.displayName} is blocked`);
                   closeSheet();
                 }}
               >
-                <IconBlock size={19} />
+                <IconBlock size={20} />
                 <span className="grow">
                   <span className="list-row-label">Block {partner.displayName.split(' ')[0]}</span>
                   <span className="list-row-sub">They can no longer message you</span>
@@ -681,9 +686,9 @@ function LockFlow({
   };
 
   return (
-    <div className="lock-flow clay">
+    <div className="lock-flow">
       {stage === 'choose' && (
-        <div className="stack" style={{ gap: 12 }}>
+        <div className="stack" style={{ gap: 'var(--s-3)' }}>
           <div className="stack" style={{ gap: 2 }}>
             <h3 style={{ margin: 0 }}>Lock this chat</h3>
             <p className="small muted" style={{ margin: 0 }}>
@@ -742,7 +747,7 @@ function LockFlow({
       )}
 
       {stage === 'change-new' && (
-        <div className="stack" style={{ gap: 12 }}>
+        <div className="stack" style={{ gap: 'var(--s-3)' }}>
           <div className="seg" role="group" aria-label="New lock type">
             <button
               className={`seg-item${existing === 'pin' ? ' on' : ''}`}
@@ -825,10 +830,8 @@ function TriChoice({
   ];
 
   return (
-    <div className="stack" style={{ gap: 6, marginBottom: 12 }}>
-      <span className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
-        <span className="list-row-label">{label}</span>
-      </span>
+    <div className="list-row stacked">
+      <span className="list-row-label">{label}</span>
       <div className="seg" role="group" aria-label={label}>
         {options.map((o) => (
           <button
@@ -841,7 +844,7 @@ function TriChoice({
           </button>
         ))}
       </div>
-      <span className="tiny faint">{hint}</span>
+      <span className="list-row-sub">{hint}</span>
     </div>
   );
 }

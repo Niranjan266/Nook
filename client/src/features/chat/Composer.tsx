@@ -6,7 +6,7 @@ import { useAuth } from '@/stores/auth';
 import { useUi } from '@/stores/ui';
 import { getSocket } from '@/lib/socket';
 import { upload, get } from '@/lib/api';
-import { popIn, spring } from '@/lib/motion';
+import { popFrom, spring, press, dur, ease } from '@/lib/motion';
 import { duration } from '@/lib/format';
 import { compressImage } from '@/lib/color';
 import { transcribe, canTranscribe } from '@/lib/transcribe';
@@ -611,9 +611,9 @@ export default function Composer({ conversationId }: Props) {
   if (isSecret && place.ready && !place.here) {
     return (
       <div className="composer">
-        <div className="locked-composer clay secret-elsewhere">
-          <span className="clay-round" style={{ width: 38, height: 38, flex: 'none', background: 'var(--clay-sunk)', boxShadow: 'none' }}>
-            <IconLock size={17} />
+        <div className="locked-composer secret-elsewhere">
+          <span className="locked-composer-seal">
+            <IconLock size={18} />
           </span>
           <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
             <span className="list-row-label">This secret chat is on another device</span>
@@ -650,8 +650,7 @@ export default function Composer({ conversationId }: Props) {
 
         {conversation?.slowMode > 0 && (
           <motion.div
-            className="quiet-warning"
-            style={{ background: 'color-mix(in srgb, var(--moss) 16%, var(--clay-surface))' }}
+            className="quiet-warning slow"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -677,14 +676,13 @@ export default function Composer({ conversationId }: Props) {
             transition={spring}
           >
             <span className="grow stack" style={{ minWidth: 0 }}>
-              <span className="tiny" style={{ fontWeight: 700, color: 'var(--accent-deep)' }}>
+              <span className="composer-reply-label">
                 {editing ? 'Editing' : `Replying to ${replyTo?.sender?.displayName || 'them'}`}
               </span>
               <span className="small truncate muted">{(editing || replyTo)?.body || (editing || replyTo)?.type}</span>
             </span>
             <button
               className="clay-round"
-              style={{ width: 32, height: 32 }}
               onClick={() => {
                 setReplyTo(null);
                 setEditing(null);
@@ -698,8 +696,7 @@ export default function Composer({ conversationId }: Props) {
 
         {uploading && (
           <motion.div
-            className="composer-reply"
-            style={{ borderLeftColor: 'var(--moss)' }}
+            className="composer-reply uploading"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -708,12 +705,10 @@ export default function Composer({ conversationId }: Props) {
               <span className="tiny" style={{ fontWeight: 700 }}>
                 Uploading {uploading.name}
               </span>
-              <span
-                className="rule"
-                style={{
-                  background: `linear-gradient(90deg, var(--moss) ${uploading.pct}%, var(--clay-sunk) ${uploading.pct}%)`,
-                }}
-              />
+              {/* A scaled fill rather than a repainted gradient. */}
+              <span className="upload-track" aria-hidden="true">
+                <i style={{ transform: `scaleX(${uploading.pct / 100})` }} />
+              </span>
             </span>
             <span className="tabular small">{uploading.pct}%</span>
           </motion.div>
@@ -754,7 +749,7 @@ export default function Composer({ conversationId }: Props) {
 
           <AnimatePresence>
             {attachOpen && (
-              <motion.div className="attach-menu" variants={popIn} initial="hidden" animate="show" exit="exit">
+              <motion.div className="attach-menu" variants={popFrom('bottom left')} initial="hidden" animate="show" exit="exit">
                 <button
                   className="list-row"
                   onClick={() => {
@@ -882,7 +877,6 @@ export default function Composer({ conversationId }: Props) {
             <button
               ref={emojiButton}
               className={`clay-round${emojiOpen ? ' on' : ''}`}
-              style={{ width: 38, height: 38 }}
               onClick={() => {
                 // Measured at open time, not on mount: the composer grows as
                 // the textarea does, so a position captured earlier would put
@@ -910,7 +904,6 @@ export default function Composer({ conversationId }: Props) {
                 ref={stickerButton}
                 data-sticker-toggle
                 className={`clay-round${trayOpen ? ' on' : ''}`}
-                style={{ width: 38, height: 38 }}
                 onClick={openTray}
                 aria-label="Stickers"
                 aria-expanded={trayOpen}
@@ -921,7 +914,7 @@ export default function Composer({ conversationId }: Props) {
           </div>
 
           {text.trim() && !editing && !isSecret && (
-            <div style={{ position: 'relative' }}>
+            <div className="composer-aside">
               <button
                 className={`clay-round${scheduleOpen ? ' on' : ''}`}
                 onClick={() => setScheduleOpen((v) => !v)}
@@ -935,14 +928,12 @@ export default function Composer({ conversationId }: Props) {
                   <motion.div
                     className="attach-menu"
                     style={{ right: 0, left: 'auto' }}
-                    variants={popIn}
+                    variants={popFrom('bottom right')}
                     initial="hidden"
                     animate="show"
                     exit="exit"
                   >
-                    <span className="eyebrow" style={{ padding: '4px 8px' }}>
-                      Send later
-                    </span>
+                    <span className="menu-heading">Send later</span>
                     <button className="list-row" onClick={() => scheduleFor(new Date(Date.now() + 3600_000))}>
                       <IconClock size={17} />
                       <span className="grow">
@@ -970,16 +961,29 @@ export default function Composer({ conversationId }: Props) {
             </div>
           )}
 
+          {/* One slot, two buttons: the mic turns into send as words appear,
+              each spinning out as the other spins in. */}
+          <div className="composer-action">
+          <AnimatePresence initial={false}>
           {text.trim() || editing ? (
-            <button
+            <motion.button
+              key="send"
               className="composer-send"
               onClick={() => submit()}
               aria-label={editing ? 'Save edit' : 'Send'}
+              initial={{ opacity: 0, scale: 0.6, rotate: -90 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0, transition: spring }}
+              exit={{ opacity: 0, scale: 0.6, rotate: 90, transition: { duration: dur.fast, ease: ease.in } }}
+              whileTap={press}
             >
               <IconSend size={21} />
-            </button>
+            </motion.button>
           ) : (
-            <button
+            <motion.button
+              key="mic"
+              initial={{ opacity: 0, scale: 0.6, rotate: 90 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0, transition: spring }}
+              exit={{ opacity: 0, scale: 0.6, rotate: -90, transition: { duration: dur.fast, ease: ease.in } }}
               className="composer-send mic-hold"
               onPointerDown={onMicDown}
               // Keyboard and switch access have no "hold": a click with no
@@ -994,8 +998,10 @@ export default function Composer({ conversationId }: Props) {
               title="Hold to record — slide left to cancel, up to lock"
             >
               <IconMic size={21} />
-            </button>
+            </motion.button>
           )}
+          </AnimatePresence>
+          </div>
         </div>
         </motion.div>
       )}
@@ -1172,9 +1178,9 @@ function LockedComposer({ conversation }: { conversation: Convo }) {
 
   return (
     <div className="composer">
-      <div className="locked-composer clay">
-        <span className="clay-round" style={{ width: 38, height: 38, flex: 'none', background: 'var(--clay-sunk)', boxShadow: 'none' }}>
-          <IconLock size={17} />
+      <div className="locked-composer">
+        <span className="locked-composer-seal">
+          <IconLock size={18} />
         </span>
 
         <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>

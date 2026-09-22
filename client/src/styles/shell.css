@@ -1,38 +1,83 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   App shell — dock rail · shelf drawer · conversation surface · clay sheets
+   App shell — dock rail · shelf · conversation surface · sheets
+
+   Semantic tokens only (tokens.css). The whole app can be switched between
+   designs by swapping token sets on <html data-design>, so nothing here names
+   a hex, a font or a fixed shape. Where a SHAPE differs per design (rounded
+   cards vs flat rows with hairlines), it is one of the knobs below, whose
+   defaults are D · Midnight Pebble. A design overrides them on :root.
    ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* conversation rows in the chat list */
+  --list-row-bg: var(--surface); /* resting fill; flat designs: transparent */
+  --list-row-bg-hover: var(--surface-2);
+  --list-row-bg-active: var(--primary-soft);
+  --list-row-radius: var(--r-card);
+  --list-row-gap: var(--s-2); /* space between rows; flat designs: 0 */
+  --list-row-shadow: var(--edge), var(--shadow-1); /* flat designs: none */
+  --list-row-divider: transparent; /* hairline between rows; flat: var(--line) */
+  --list-row-pad: var(--s-3) var(--s-4);
+  --list-avatar: 50px;
+
+  /* grouped rows inside sheets (Settings and friends) */
+  --group-bg: var(--surface-2);
+  --group-radius: var(--r-card);
+  --group-divider: var(--line);
+  --group-row-min: 52px;
+
+  /* the filter chips above the list */
+  --chip-bg: var(--surface);
+  --chip-shadow: var(--edge), var(--shadow-1);
+  --chip-radius: var(--r-pill);
+
+  /* navigation: bottom bar on phones, rail on desks */
+  --nav-bg: var(--surface);
+  --nav-divider: var(--line);
+  --nav-pill: var(--primary-soft);
+  --nav-pill-ink: var(--primary-ink);
+  --nav-h: 64px;
+
+  /* the pane the conversation sits in */
+  --surface-radius: var(--r-sheet);
+}
+
+/* By day a sheet is white, so its groups step down to the page colour
+   rather than up to lavender, which read as a block of tint. */
+:root[data-theme='light'] {
+  --group-bg: var(--bg);
+  --nav-divider: transparent;
+}
 
 .shell {
   display: grid;
   grid-template-columns: var(--rail-w) auto 1fr;
   height: 100dvh;
   overflow: hidden;
-  background: var(--clay-bg);
+  background: var(--bg);
 }
 
-/* ── dock rail ──────────────────────────────────────────────────────────── */
+/* ── dock rail (desk) ───────────────────────────────────────────────────── */
 
 .rail {
   grid-column: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--s-3);
+  gap: var(--s-2);
   padding: var(--s-4) 0;
-  background: var(--clay-bg);
+  background: var(--bg);
   z-index: 30;
 }
 
 .rail-logo {
-  width: 42px;
-  height: 42px;
+  width: var(--tap);
+  height: var(--tap);
   flex: none;
+  display: grid;
+  place-items: center;
   margin-bottom: var(--s-2);
-}
-.rail-logo img {
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(3px 4px 7px rgba(30, 26, 23, 0.2));
+  border-radius: var(--r-sm);
 }
 
 .rail-scroll {
@@ -53,46 +98,59 @@
 
 .rail-item {
   position: relative;
-  width: 46px;
-  height: 46px;
+  width: var(--tap);
+  height: var(--tap);
   flex: none;
+}
+.rail-item > button {
+  display: block;
+  border-radius: var(--r-pill);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.rail-item > button:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
 }
 .rail-item .chip {
   position: absolute;
-  top: -4px;
-  right: -6px;
+  top: calc(-1 * var(--s-1));
+  right: calc(-1 * var(--s-1));
   z-index: 2;
+  box-shadow: 0 0 0 2px var(--bg);
 }
-/* active marker: a hard slab tick on the rail edge */
-.rail-item.active::before {
-  content: '';
+/* The open conversation: a short pill on the rail's edge, which slides from
+   avatar to avatar (layoutId in DockRail). */
+.rail-mark {
   position: absolute;
-  left: -10px;
+  left: calc(-1 * (var(--rail-w) - var(--tap)) / 2);
   top: 50%;
-  transform: translateY(-50%);
-  width: 5px;
-  height: 26px;
-  border-radius: 3px;
-  background: var(--accent);
-  border: 2px solid var(--ink);
+  width: 4px;
+  height: 24px;
+  margin-top: -12px;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  background: var(--primary);
 }
 
 .rail-tip {
   position: absolute;
-  left: calc(100% + 12px);
+  left: calc(100% + var(--s-3));
   top: 50%;
-  transform: translateY(-50%);
-  padding: 6px 11px;
+  margin-top: -15px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--s-3);
   background: var(--ink);
-  color: var(--ink-invert);
-  border-radius: var(--r-slab);
+  color: var(--bg);
+  border-radius: var(--r-pill);
   font-size: var(--t-sm);
-  font-weight: 500;
+  font-weight: 700;
   white-space: nowrap;
   pointer-events: none;
   z-index: 50;
 }
 
+.rail-top,
 .rail-foot {
   display: flex;
   flex-direction: column;
@@ -100,44 +158,133 @@
   align-items: center;
 }
 
-/* ── shelf drawer ───────────────────────────────────────────────────────── */
+/* A nav button: a round icon, with the active pill sliding in behind it. */
+.nav-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  flex: none;
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.nav-btn:hover {
+  color: var(--ink);
+}
+.nav-btn:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
+}
+.nav-btn.on {
+  color: var(--nav-pill-ink);
+}
+.nav-btn > svg,
+.nav-btn > .avatar,
+.nav-btn .nav-icon {
+  position: relative;
+  z-index: 1;
+}
+.nav-btn .nav-icon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+.nav-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  background: var(--nav-pill);
+}
+.nav-btn .chip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  box-shadow: 0 0 0 2px var(--nav-bg);
+}
+.rail .nav-btn .chip {
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.nav-label {
+  display: none;
+}
+
+/* ── shelf: the conversation list ───────────────────────────────────────── */
 
 .shelf {
   grid-column: 2;
   width: var(--shelf-w);
   display: flex;
   flex-direction: column;
-  padding: var(--s-4) var(--s-3) var(--s-3) 0;
+  padding: var(--s-4) var(--s-4) 0 0;
   overflow: hidden;
+  position: relative;
 }
 
 .shelf-head {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding: 0 var(--s-2) var(--s-3);
+  min-height: var(--tap);
+  padding: 0 var(--s-1) var(--s-4);
+}
+.shelf-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1;
+  min-width: 0;
 }
 .shelf-title {
   font-family: var(--font-display);
-  font-size: var(--t-lg);
+  font-size: var(--t-xl);
   font-weight: 600;
-  letter-spacing: -0.02em;
-  flex: 1;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.shelf-me {
+  border-radius: var(--r-pill);
+  flex: none;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.shelf-me:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
 }
 
 .shelf-search {
-  padding: 0 var(--s-2) var(--s-3);
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0 var(--s-1) var(--s-3);
+}
+.shelf-search-icon {
+  position: absolute;
+  left: var(--s-4);
+  color: var(--ink-3);
+  pointer-events: none;
 }
 .shelf-search .groove {
-  padding: 10px 14px;
-  font-size: var(--t-sm);
-  border-radius: var(--r-pill);
+  height: 46px;
+  padding-left: calc(var(--s-4) + 20px + var(--s-2));
+  background: var(--chip-bg);
+  box-shadow: var(--chip-shadow);
+}
+.shelf-search .groove:focus {
+  box-shadow: var(--chip-shadow), var(--ring);
 }
 
 .shelf-tabs {
   display: flex;
-  gap: 6px;
-  padding: 0 var(--s-2) var(--s-3);
+  gap: var(--s-2);
+  /* the chips' shadows need room, or overflow clips them */
+  padding: var(--s-1) var(--s-1) var(--s-3);
+  margin-top: calc(-1 * var(--s-1));
   /* Folders are user-created, so this row has no fixed length. Scroll it
      rather than letting it wrap and shove the list down the screen. */
   overflow-x: auto;
@@ -148,128 +295,219 @@
   display: none;
 }
 .shelf-tab {
+  position: relative;
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border-radius: var(--r-pill);
+  justify-content: center;
+  gap: var(--s-1);
+  height: 34px;
+  min-height: 34px; /* base.css lifts phone buttons to 44; chips stay chips */
+  min-width: 34px;
+  padding: 0 14px;
+  border-radius: var(--chip-radius);
+  background: var(--chip-bg);
+  box-shadow: var(--chip-shadow);
   font-size: var(--t-sm);
-  font-weight: 500;
-  color: var(--ink-soft);
+  font-weight: 700;
+  color: var(--ink-2);
   white-space: nowrap;
-  /* Named, not `all`: `all` also animated layout properties whenever the
-     tab row reflowed. */
   transition:
-    background var(--dur) var(--ease-out),
-    box-shadow var(--dur) var(--ease-out),
-    color var(--dur) var(--ease-out);
+    color var(--dur-base) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.shelf-tab:hover {
+  color: var(--ink);
+}
+.shelf-tab:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
 }
 .shelf-tab.on {
-  background: var(--clay-sunk);
-  box-shadow: var(--clay-in);
-  color: var(--ink);
+  color: var(--on-primary);
+}
+.shelf-tab > span:not(.shelf-tab-pill) {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.shelf-tab-icon {
+  padding: 0;
+  width: 34px;
+}
+/* The filled pill behind the active chip; it slides between them. */
+.shelf-tab-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--chip-radius);
+  background: var(--primary);
 }
 
 .shelf-list {
   flex: 1;
   overflow-y: auto;
-  padding: 2px var(--s-2) var(--s-5);
+  padding: var(--s-1) var(--s-1) var(--s-6);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--list-row-gap);
 }
 
-/* a conversation tile — clay, gets a wallpaper-tinted left edge */
+/* A conversation row: a card on its own (the list is the page). */
 .tile {
   position: relative;
   display: flex;
   align-items: center;
   gap: var(--s-3);
   width: 100%;
-  padding: 11px 13px;
+  min-height: 74px;
+  padding: var(--list-row-pad);
   text-align: left;
-  background: transparent;
-  border-radius: var(--r-clay);
+  background: var(--list-row-bg);
+  border-radius: var(--list-row-radius);
+  box-shadow: var(--list-row-shadow);
   transition:
-    background var(--dur) var(--ease-out),
-    box-shadow var(--dur) var(--ease-out);
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
-.tile:hover {
-  background: var(--clay-surface);
-  box-shadow: var(--clay-1);
-}
-.tile.active {
-  background: var(--clay-surface);
-  box-shadow: var(--clay-2);
-}
-/* The press scale lives in base.css; this lets it ease instead of snap. */
-@media (hover: none) {
-  .tile {
-    transition:
-      transform 160ms var(--ease-out),
-      background var(--dur) var(--ease-out),
-      box-shadow var(--dur) var(--ease-out);
-  }
-  .tile:active {
-    transition-duration: var(--dur-press), var(--dur), var(--dur);
-  }
-}
-.tile.active::after {
+.shelf-list > li + li .tile::before {
   content: '';
   position: absolute;
-  left: 4px;
-  top: 16px;
-  bottom: 16px;
-  width: 4px;
-  border-radius: 2px;
-  background: var(--tile-tint, var(--accent));
+  top: 0;
+  left: calc(var(--s-4) + var(--list-avatar) + var(--s-3));
+  right: var(--s-4);
+  height: 1px;
+  background: var(--list-row-divider);
+}
+.tile:hover {
+  background: var(--list-row-bg-hover);
+}
+.tile:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
+}
+.tile.active {
+  background: var(--list-row-bg-active);
 }
 .tile-body {
   flex: 1;
   min-width: 0;
-}
-.tile-top {
   display: flex;
-  align-items: baseline;
-  gap: var(--s-2);
+  flex-direction: column;
+  gap: var(--s-1);
 }
-.tile-name {
-  font-weight: 600;
-  font-size: var(--t-base);
-  letter-spacing: -0.01em;
-  flex: 1;
-  min-width: 0;
-}
-.tile-time {
-  font-size: 11px;
-  color: var(--ink-faint);
-  flex: none;
-}
+.tile-top,
 .tile-bottom {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-top: 1px;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.tile-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: var(--t-base);
+  line-height: 1.3;
+}
+.tile-name .secret-lock {
+  flex: none;
+  color: var(--success-ink);
+}
+.tile-time {
+  flex: none;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.tile.unread .tile-time {
+  color: var(--primary-ink);
+  font-weight: 800;
 }
 .tile-preview {
   flex: 1;
   min-width: 0;
   font-size: var(--t-sm);
-  color: var(--ink-soft);
-}
-.tile.unread .tile-name {
-  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink-2);
 }
 .tile.unread .tile-preview {
   color: var(--ink);
-  font-weight: 500;
+  font-weight: 600;
+}
+.tile-typing {
+  color: var(--success-ink);
+  font-weight: 700;
+}
+.tile-ticks {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-3);
+}
+.tile-ticks.read {
+  color: var(--iris);
 }
 .tile-marks {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex: none;
+  color: var(--ink-3);
+}
+.tile-marks .chip {
+  min-width: 22px;
+  height: 22px;
+  font-size: var(--t-xs);
+}
+/* A secret chat: the same row, tinted with success so it reads as sealed. */
+.tile.secret {
+  background: color-mix(in srgb, var(--success) 8%, var(--list-row-bg));
+}
+.tile.secret.active {
+  background: color-mix(in srgb, var(--success) 16%, var(--list-row-bg));
+}
+
+.shelf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-8) var(--s-4);
+  text-align: center;
+}
+.shelf-empty-art {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+.shelf-empty p {
+  max-width: 240px;
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+
+/* The new-chat button floating over the phone list. */
+.fab {
+  position: absolute;
+  right: var(--s-5);
+  bottom: var(--s-5);
+  z-index: 5;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--lift);
 }
 
 /* ── conversation surface ───────────────────────────────────────────────── */
@@ -281,20 +519,19 @@
   flex-direction: column;
   min-width: 0;
   margin: var(--s-4) var(--s-4) var(--s-4) 0;
-  border-radius: var(--r-clay-lg);
-  background: var(--clay-surface);
-  box-shadow: var(--clay-2);
+  border-radius: var(--surface-radius);
+  background: var(--surface);
+  box-shadow: var(--edge), var(--shadow-1);
   overflow: hidden;
 }
 
-/* ── clay sheets: slide over, never a fixed third column ────────────────── */
+/* ── sheets: slide over, never a fixed third column ─────────────────────── */
 
 .sheet-scrim {
   position: fixed;
   inset: 0;
   z-index: var(--z-sheet);
-  background: rgba(30, 26, 23, 0.32);
-  backdrop-filter: blur(2px);
+  background: var(--scrim);
 }
 
 .sheet {
@@ -303,87 +540,186 @@
   top: var(--s-4);
   right: var(--s-4);
   bottom: var(--s-4);
-  width: min(400px, calc(100vw - 32px));
+  width: min(420px, calc(100vw - 2 * var(--s-4)));
   display: flex;
   flex-direction: column;
-  background: var(--clay-surface);
-  border-radius: var(--r-clay-lg);
-  box-shadow: var(--clay-3);
+  background: var(--surface);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--lift);
   overflow: hidden;
 }
 .sheet-head {
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: var(--s-4) var(--s-4) var(--s-3);
+  min-height: calc(var(--tap) + 2 * var(--s-4));
+  padding: var(--s-4) var(--s-4) var(--s-3) var(--s-6);
   flex: none;
 }
 .sheet-title {
   font-family: var(--font-display);
   font-size: var(--t-lg);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  line-height: 1.2;
   flex: 1;
+  min-width: 0;
 }
 .sheet-body {
   flex: 1;
   overflow-y: auto;
-  padding: 0 var(--s-4) var(--s-5);
+  padding: var(--s-1) var(--s-5) var(--s-6);
   display: flex;
   flex-direction: column;
-  gap: var(--s-4);
+  gap: var(--s-6);
 }
 .sheet-foot {
   flex: none;
-  padding: var(--s-3) var(--s-4) var(--s-4);
+  padding: var(--s-3) var(--s-5) var(--s-5);
   display: flex;
   gap: var(--s-2);
+  box-shadow: 0 -1px 0 var(--line);
 }
 
+/* A group: a label, an optional note, and a run of rows that join into one
+   rounded block with hairlines between them. */
 .sheet-section {
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
 }
 .sheet-section > .eyebrow {
-  padding-left: 4px;
-  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-4);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+}
+.sheet-section > p.tiny,
+.sheet-section > p.small {
+  padding: 0 var(--s-4);
+  line-height: 1.55;
+}
+/* Descriptions are sentences, so they read in ink-2 — ink-3 is for icons. */
+.sheet .tiny.faint,
+.sheet .small.faint {
+  color: var(--ink-2);
 }
 
+/* ── list rows ──────────────────────────────────────────────────────────── */
+
+/* Base: a quiet row, used in menus (the composer's attach menu, the bubble
+   menu) as well as sheets. In a sheet it joins a group (below). */
 .list-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--s-3);
   width: 100%;
-  padding: 11px 14px;
+  min-height: var(--tap);
+  padding: 10px var(--s-3);
   text-align: left;
-  background: var(--clay-surface);
-  border-radius: var(--r-clay-sm);
-  box-shadow: var(--clay-1);
+  color: var(--ink);
+  background: transparent;
+  border-radius: var(--r-sm);
+  box-shadow: none;
+  text-decoration: none;
   transition:
-    box-shadow var(--dur) var(--ease-out),
-    transform var(--dur) var(--ease-out);
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
-button.list-row:hover {
-  box-shadow: var(--clay-2);
-  transform: translateY(-1px);
+button.list-row:hover,
+a.list-row:hover {
+  background: var(--surface-2);
 }
-button.list-row:active {
-  box-shadow: var(--clay-in);
-  transform: none;
+button.list-row:active,
+a.list-row:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
+}
+.list-row > svg {
+  flex: none;
+  color: var(--ink-2);
 }
 .list-row .grow {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 .list-row-label {
-  font-weight: 500;
+  font-weight: 700;
   font-size: var(--t-base);
+  line-height: 1.3;
 }
 .list-row-sub {
-  font-size: var(--t-xs);
-  color: var(--ink-soft);
+  font-size: var(--t-sm);
+  line-height: 1.35;
+  color: var(--ink-2);
+}
+.list-row .toggle {
+  margin-left: var(--s-2);
+}
+
+/* In a sheet: rows are 52px, on the group fill. */
+.sheet .list-row {
+  min-height: var(--group-row-min);
+  padding: var(--s-3) var(--s-4);
+  background: var(--group-bg);
+  border-radius: var(--group-radius);
+}
+.sheet button.list-row:hover,
+.sheet a.list-row:hover {
+  background: color-mix(in srgb, var(--group-bg) 94%, var(--ink));
+}
+/* Consecutive rows fuse into one block: the flex gap is cancelled, the
+   touching corners squared, and a hairline drawn from the text edge. */
+.sheet .sheet-section > .list-row + .list-row,
+.sheet .sheet-group > .list-row + .list-row {
+  margin-top: calc(-1 * var(--s-2));
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.sheet .sheet-section > .list-row:has(+ .list-row),
+.sheet .sheet-group > .list-row:has(+ .list-row) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.sheet .sheet-section > .list-row + .list-row::before,
+.sheet .sheet-group > .list-row + .list-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(var(--s-4) + 20px + var(--s-3));
+  right: 0;
+  height: 1px;
+  background: var(--group-divider);
+}
+/* A menu or popover inside a sheet keeps its own quiet rows. */
+.sheet .attach-menu .list-row {
+  min-height: var(--tap);
+  padding: 10px var(--s-3);
+  background: transparent;
+  border-radius: var(--r-sm);
+}
+.sheet .attach-menu .list-row:hover {
+  background: var(--surface-2);
+}
+.sheet .attach-menu .list-row::before {
+  display: none;
+}
+/* The one destructive row, alone at the end. */
+.list-row.danger,
+.list-row.danger > svg {
+  color: var(--danger-ink);
+}
+
+/* A standalone group wrapper, for rows that live outside a section. */
+.sheet-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
 }
 
 /* ── empty state ────────────────────────────────────────────────────────── */
@@ -398,50 +734,73 @@ button.list-row:active {
   text-align: center;
 }
 .empty-art {
-  width: 168px;
-  height: 168px;
-  opacity: 0.95;
+  width: 120px;
+  height: 120px;
+  margin-bottom: var(--s-2);
 }
 .empty h3 {
   font-size: var(--t-lg);
 }
 .empty p {
   max-width: 340px;
-  color: var(--ink-soft);
+  color: var(--ink-2);
   font-size: var(--t-sm);
+  margin-bottom: var(--s-2);
 }
 
-/* ── toasts ─────────────────────────────────────────────────────────────── */
+/* ── toasts: dropped in from the top ────────────────────────────────────── */
 
 .toasts {
   position: fixed;
-  left: 50%;
-  bottom: var(--s-5);
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  top: calc(env(safe-area-inset-top, 0px) + var(--s-4));
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
   align-items: center;
+  padding: 0 var(--s-4);
   pointer-events: none;
 }
 .toast {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding: 10px 16px;
+  min-height: var(--tap);
+  padding: 0 var(--s-5) 0 var(--s-4);
   background: var(--ink);
-  color: var(--ink-invert);
+  color: var(--bg);
   border-radius: var(--r-pill);
   font-size: var(--t-sm);
-  font-weight: 500;
-  box-shadow: 0 10px 26px rgba(30, 26, 23, 0.3);
+  font-weight: 700;
+  text-align: left;
+  box-shadow: var(--lift);
   pointer-events: auto;
-  max-width: min(440px, calc(100vw - 32px));
+  max-width: min(440px, 100%);
+}
+.toast > svg {
+  flex: none;
 }
 .toast.bad {
-  background: var(--rust);
-  color: #fdf6f3;
+  background: var(--danger);
+  color: var(--on-primary);
+}
+:root[data-theme='light'] .toast.bad {
+  background: var(--danger-ink);
+  color: var(--surface);
+}
+/* The offline notice rides the same slot as the toasts, centred by margin
+   so Framer can own its transform. */
+.toast.offline {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + var(--s-4));
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--s-4));
+  z-index: 130;
 }
 
 /* ── responsive ─────────────────────────────────────────────────────────── */
@@ -449,7 +808,7 @@ button.list-row:active {
 /* Tablet: shelf narrows */
 @media (max-width: 1180px) {
   :root {
-    --shelf-w: 268px;
+    --shelf-w: 300px;
   }
 }
 
@@ -464,10 +823,10 @@ button.list-row:active {
     top: 0;
     bottom: 0;
     z-index: 40;
-    width: min(340px, calc(100vw - var(--rail-w) - 12px));
-    background: var(--clay-bg);
-    box-shadow: 18px 0 40px rgba(30, 26, 23, 0.18);
-    padding-right: var(--s-3);
+    width: min(360px, calc(100vw - var(--rail-w) - var(--s-3)));
+    padding-left: var(--s-3);
+    background: var(--bg);
+    box-shadow: var(--lift);
   }
   .surface {
     grid-column: 2;
@@ -475,7 +834,7 @@ button.list-row:active {
   }
 }
 
-/* Phone: rail moves to the bottom, surface goes full-bleed */
+/* Phone: the rail becomes a bottom bar, one pane at a time */
 @media (max-width: 640px) {
   :root {
     --rail-w: 0px;
@@ -484,43 +843,99 @@ button.list-row:active {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
   }
+  /* In a conversation the bar steps aside: the chat has its own back button,
+     and the composer wants the bottom edge. */
+  .shell.in-convo {
+    grid-template-rows: 1fr;
+  }
+  .shell.in-convo .rail {
+    display: none;
+  }
   .rail {
     grid-row: 2;
     grid-column: 1;
     flex-direction: row;
-    justify-content: space-around;
-    align-items: center;
-    height: 66px;
-    padding: 8px var(--s-3) calc(8px + env(safe-area-inset-bottom));
-    background: var(--clay-surface);
-    box-shadow: 0 -6px 20px rgba(30, 26, 23, 0.1);
+    align-items: stretch;
+    gap: 0;
+    padding: var(--s-1) var(--s-2) calc(var(--s-2) + env(safe-area-inset-bottom, 0px));
+    background: var(--nav-bg);
+    box-shadow:
+      0 -1px 0 var(--nav-divider),
+      0 -6px 20px color-mix(in srgb, var(--ink) 5%, transparent);
   }
   .rail-logo,
   .rail-scroll {
     display: none;
   }
+  /* The tabs become the bar's own children, Chats first. */
+  .rail-top,
   .rail-foot {
-    flex-direction: row;
-    gap: var(--s-5);
-    width: 100%;
-    justify-content: space-around;
+    display: contents;
   }
-  .rail-item.active::before {
-    left: 50%;
-    top: -9px;
-    transform: translateX(-50%);
-    width: 22px;
-    height: 5px;
+  /* Tabs: a label under an icon, the pill behind the icon only. */
+  .nav-btn {
+    flex: 1;
+    width: auto;
+    height: auto;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-1);
+    padding: var(--s-1) 0;
+    border-radius: var(--r-sm);
+  }
+  .nav-btn .nav-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 32px;
+  }
+  .nav-btn .nav-icon > svg,
+  .nav-btn .nav-icon > .avatar {
+    position: relative;
+    z-index: 1;
+  }
+  .nav-btn .chip {
+    top: -4px;
+    right: 6px;
+  }
+  .nav-label {
+    display: block;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink-2);
+  }
+  .nav-btn.on .nav-label {
+    color: var(--nav-pill-ink);
+    font-weight: 800;
+  }
+  .rail .rail-new,
+  .rail .theme-toggle {
+    display: none;
   }
   .shelf {
     /* Must be reset — the base rule pins it to column 2, which would otherwise
        make the grid invent a second column on phones. */
     grid-column: 1;
     grid-row: 1;
-    position: static;
+    position: relative;
     width: 100%;
     box-shadow: none;
-    padding: var(--s-4) var(--s-3) 0;
+    background: var(--bg);
+    padding: calc(env(safe-area-inset-top, 0px) + var(--s-5)) var(--s-4) 0;
+  }
+  .shelf-head {
+    padding-bottom: var(--s-4);
+  }
+  .shelf-title {
+    font-size: var(--t-2xl);
+  }
+  .shelf-list {
+    padding-bottom: calc(60px + var(--s-9));
   }
   .surface {
     grid-row: 1;
@@ -529,65 +944,64 @@ button.list-row:active {
     border-radius: 0;
     box-shadow: none;
   }
+  /* A bottom sheet. It sits a little below the screen edge, padded back up,
+     so the sheet spring's one small overshoot never shows a gap. */
   .sheet {
     top: auto;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: calc(-1 * var(--s-6));
     width: 100%;
-    max-height: 88dvh;
-    border-radius: var(--r-clay-xl) var(--r-clay-xl) 0 0;
+    max-height: calc(90dvh + var(--s-6));
+    padding-bottom: calc(var(--s-6) + env(safe-area-inset-bottom, 0px));
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   }
   .sheet-head::before {
     content: '';
     position: absolute;
-    top: 9px;
+    top: var(--s-2);
     left: 50%;
-    transform: translateX(-50%);
-    width: 42px;
+    width: 40px;
     height: 5px;
-    border-radius: 3px;
-    background: var(--clay-sunk);
-    box-shadow: var(--clay-in);
+    margin-left: -20px;
+    border-radius: var(--r-pill);
+    background: var(--line);
   }
   .sheet-head {
     position: relative;
-    padding-top: var(--s-5);
+    padding: var(--s-6) var(--s-4) var(--s-3) var(--s-5);
+    min-height: 0;
     /* The head is the drag handle (Sheet.tsx); the browser must not claim
        the gesture as a scroll first. */
     touch-action: none;
   }
-  /* A backdrop blur re-rasterises everything behind it on every frame of
-     the fade — the single most expensive thing on a mid-range Android GPU.
-     A slightly deeper tint reads the same at phone size. */
-  .sheet-scrim {
-    backdrop-filter: none;
-    background: rgba(30, 26, 23, 0.4);
+  .sheet-body {
+    padding: var(--s-1) var(--s-4) var(--s-6);
+  }
+  .sheet-foot {
+    padding: var(--s-3) var(--s-4) var(--s-4);
   }
 }
 
 /* ── the arrival banner ────────────────────────────────────────────────────
-   Clay, because it is an object that has physically dropped onto the screen —
-   puffy, no border, soft dual shadow. Slab would read as a control you must
-   act on, and this is something you may equally ignore.
-   ────────────────────────────────────────────────────────────────────────── */
+   Something that has dropped onto the screen and may equally be ignored, so
+   a surface, not a control. Centred by margin: Framer owns its transform.  */
 
 .msg-banner {
   position: fixed;
   top: calc(var(--s-3) + env(safe-area-inset-top, 0px));
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   z-index: 90; /* above sheets, below a call overlay */
-  width: min(420px, calc(100vw - 24px));
+  width: min(420px, calc(100vw - 2 * var(--s-3)));
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding: 10px 10px 10px 12px;
-  border-radius: var(--r-clay);
-  background: var(--clay-surface);
-  box-shadow:
-    0 14px 34px rgba(30, 26, 23, 0.22),
-    0 2px 0 rgba(255, 255, 255, 0.5) inset;
+  padding: var(--s-3);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  box-shadow: var(--lift);
   overflow: hidden;
   cursor: grab;
   touch-action: pan-x; /* let the vertical drag through to the gesture */
@@ -610,7 +1024,7 @@ button.list-row:active {
   color: inherit;
 }
 .msg-banner-title {
-  font-weight: 600;
+  font-weight: 700;
   font-size: var(--t-sm);
   white-space: nowrap;
   overflow: hidden;
@@ -618,7 +1032,7 @@ button.list-row:active {
 }
 .msg-banner-body {
   font-size: var(--t-sm);
-  color: var(--ink-faint);
+  color: var(--ink-2);
   /* Two lines maximum: enough to know whether it needs you now. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -628,14 +1042,14 @@ button.list-row:active {
 
 .msg-banner-x {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 50%;
-  background: var(--clay-sunk);
-  color: var(--ink-faint);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
   cursor: pointer;
 }
 
@@ -646,8 +1060,8 @@ button.list-row:active {
   height: 2px;
   width: 100%;
   transform-origin: left;
-  background: var(--accent);
-  opacity: 0.55;
+  background: var(--primary);
+  opacity: 0.6;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -660,30 +1074,53 @@ button.list-row:active {
    cannot be confused for part of the conversation, and never covers it. */
 .notify-nudge {
   position: fixed;
-  z-index: 90;
-  left: 50%;
+  /* Under sheets: an open sheet is what you are doing right now; the nudge
+     can wait until it closes. */
+  z-index: calc(var(--z-sheet) - 1);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
-  transform: translateX(-50%);
-  width: min(560px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - 2 * var(--s-4)));
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: 12px 14px;
-  border-radius: var(--r-clay);
-  background: var(--clay-raised);
-  box-shadow: var(--clay-3);
+  padding: var(--s-3) var(--s-9) var(--s-3) var(--s-3);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  box-shadow: var(--lift);
+}
+.notify-nudge-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--primary-soft);
+  color: var(--primary-ink);
 }
 .notify-nudge-x {
   position: absolute;
-  top: 6px;
-  right: 8px;
-  padding: 4px;
-  color: var(--muted);
-  opacity: 0.7;
+  top: var(--s-1);
+  right: var(--s-1);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+}
+.notify-nudge-x:hover {
+  background: var(--surface-2);
 }
 @media (max-width: 560px) {
   .notify-nudge {
     flex-wrap: wrap;
+    padding-right: var(--s-3);
+  }
+  .notify-nudge .grow {
+    padding-right: var(--s-7);
   }
   .notify-nudge .row {
     width: 100%;
@@ -693,14 +1130,11 @@ button.list-row:active {
   }
 }
 
-/* A scrim for a sheet that is changing how the page looks.
-   The normal one dims to 32% and blurs 2px, which is right for a sheet you
-   read and wrong for the wallpaper picker: it hides the wallpaper. Barely
-   there is enough to say "the sheet has focus" while leaving the chat behind
-   legible, which is the whole point of previewing on it. */
+/* A scrim for a sheet that is changing how the page looks. The normal one
+   dims enough to hide the wallpaper being judged; this is barely there,
+   which still says "the sheet has focus" and leaves the chat legible. */
 .sheet-scrim.see-through {
-  background: rgba(30, 26, 23, 0.08);
-  backdrop-filter: none;
+  background: color-mix(in srgb, var(--scrim) 20%, transparent);
 }
 
 /* ── the welcome, once per new account ─────────────────────────────────────
@@ -712,20 +1146,21 @@ button.list-row:active {
   z-index: 200;
   display: grid;
   place-items: center;
-  padding: 24px;
-  background: rgba(30, 26, 23, 0.45);
-  backdrop-filter: blur(3px);
+  padding: var(--s-6);
+  background: var(--scrim);
 }
 .welcome-card {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: var(--s-4);
   max-width: 380px;
   width: 100%;
-  padding: 36px 28px 28px;
-  border-radius: var(--r-clay-lg, 28px);
+  padding: var(--s-8) var(--s-6) var(--s-6);
+  border-radius: var(--r-sheet);
+  background: var(--surface);
+  box-shadow: var(--lift);
   text-align: center;
   /* Shards fly out from behind the mark and past the card's edge; clipping
      them would turn a burst into a peek. */
@@ -739,21 +1174,26 @@ button.list-row:active {
 }
 .welcome-title {
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: var(--t-xl);
+  font-weight: 600;
   line-height: 1.2;
-  letter-spacing: -0.02em;
   margin: 0;
 }
-.welcome-title span { display: inline-block; white-space: pre; }
+.welcome-title span {
+  display: inline-block;
+  white-space: pre;
+}
 .welcome-quote {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--t-base);
   line-height: 1.55;
-  color: var(--muted);
-  font-style: italic;
+  color: var(--ink-2);
   max-width: 300px;
 }
-.welcome-go { margin-top: 8px; padding: 12px 32px; }
+.welcome-go {
+  margin-top: var(--s-2);
+  min-width: 180px;
+}
 
 /* ── message search: in a chat and across everything ────────────────────── */
 
@@ -762,15 +1202,15 @@ button.list-row:active {
 }
 .search-box-icon {
   position: absolute;
-  left: 14px;
+  left: var(--s-4);
   top: 50%;
-  transform: translateY(-50%);
-  color: var(--ink-faint);
+  margin-top: -9px;
+  color: var(--ink-3);
   pointer-events: none;
 }
 .search-box .groove {
-  padding-left: 40px;
-  padding-right: 42px;
+  padding-left: calc(var(--s-4) + 18px + var(--s-2));
+  padding-right: calc(36px + var(--s-2));
 }
 /* The browser's own clear button, beside ours, would be two ways to do one thing. */
 .search-box .groove::-webkit-search-cancel-button {
@@ -778,32 +1218,41 @@ button.list-row:active {
 }
 .search-box-clear {
   position: absolute;
-  right: 6px;
+  right: var(--s-1);
   top: 50%;
-  transform: translateY(-50%);
+  margin-top: -18px;
   width: 36px;
   height: 36px;
   display: grid;
   place-items: center;
   border-radius: var(--r-pill);
-  color: var(--ink-soft);
+  color: var(--ink-2);
+}
+.search-box-clear:hover {
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--ink));
 }
 
-/* Flush with the sheet's own padding rather than the shelf's. */
+.search-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+/* Room for the chips' shadows without shifting them off the sheet's edge. */
 .search-chips {
-  padding: var(--s-3) 0 var(--s-2);
+  padding: var(--s-1);
+  margin: calc(-1 * var(--s-1));
 }
 
 .search-from {
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  margin-bottom: var(--s-2);
+  padding-left: var(--s-4);
 }
 .search-from .groove {
-  padding: 9px 14px;
+  min-height: 40px;
+  padding: var(--s-2) var(--s-4);
   font-size: var(--t-sm);
-  border-radius: var(--r-pill);
   min-width: 0;
 }
 
@@ -816,29 +1265,30 @@ button.list-row:active {
   overflow-wrap: anywhere;
 }
 .search-mark {
-  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  background: color-mix(in srgb, var(--primary) 30%, transparent);
   color: inherit;
-  font-weight: 600;
-  border-radius: 3px;
-  padding: 0 1px;
-}
-:root[data-theme='dark'] .search-mark {
-  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0 2px;
 }
 
 .search-grid {
   display: grid;
   /* Three across on a 360px phone, more as the sheet widens. */
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 6px;
+  gap: var(--s-2);
 }
 .search-tile {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: var(--r-sm);
   overflow: hidden;
-  background: var(--clay-sunk);
-  box-shadow: var(--clay-1);
+  background: var(--surface-2);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.search-tile:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
 }
 .search-tile img,
 .search-tile video {
@@ -857,57 +1307,65 @@ button.list-row:active {
   display: grid;
   place-items: center;
   border-radius: var(--r-pill);
-  background: rgba(30, 26, 23, 0.55);
-  color: #f7f2ea;
+  background: rgba(0, 0, 0, 0.55); /* over a photo: dark in any theme */
+  color: #fff;
 }
 
 .search-more {
   align-self: center;
-  margin-top: var(--s-2);
 }
 
 /* ── backup & restore ──────────────────────────────────────────────────────
-   A pressed-in groove with the accent rising inside it, like everything else
-   that holds a value in Nook. Indeterminate is a slow slide, not a spinner:
-   sealing and downloading have no honest percentage to show. */
+   A pill track with the primary rising inside it. Indeterminate is a slow
+   slide, not a spinner: sealing and downloading have no honest percentage. */
 .backup-bar {
   position: relative;
-  height: 12px;
-  border-radius: 999px;
-  background: var(--clay-surface);
-  box-shadow: var(--clay-in);
+  height: 10px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
   overflow: hidden;
 }
 .backup-bar > span {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 2px;
-  border-radius: 999px;
-  background: var(--accent);
-  transition: width var(--dur) var(--ease-out);
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  transition: width var(--dur-base) var(--ease-out);
 }
 .backup-bar.indeterminate > span {
   width: 34%;
-  animation: backup-slide 1.4s var(--ease-out) infinite;
+  animation: backup-slide 1.4s var(--ease-in-out) infinite;
 }
 @keyframes backup-slide {
-  from { transform: translateX(-110%); }
-  to { transform: translateX(310%); }
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(310%);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .backup-bar.indeterminate > span { animation: none; width: calc(100% - 4px); opacity: 0.5; }
+  .backup-bar.indeterminate > span {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
 }
 .backup-picklist {
-  max-height: 260px;
+  max-height: 280px;
   overflow-y: auto;
   padding: 2px;
 }
-.backup-warning > svg { color: var(--ochre); flex: none; }
+.backup-warning > svg {
+  color: var(--peach-ink);
+  flex: none;
+}
 
 /* The reminder sits at the top, clear of the notification nudge's spot. */
 .notify-nudge.backup-nudge {
-  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  top: calc(env(safe-area-inset-top, 0px) + var(--s-4));
   bottom: auto;
 }
 
@@ -915,67 +1373,416 @@ button.list-row:active {
 .archive-band {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: var(--r-clay-sm);
-  border: 2px dashed var(--ink-soft);
-  color: var(--ink-soft);
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  color: var(--ink-2);
   font-size: var(--t-sm);
+}
+.archive-band > svg {
+  flex: none;
 }
 .archive-thread {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-bottom: 12px;
+  padding-bottom: var(--s-3);
 }
 .archive-day {
-  margin: 14px auto 6px;
+  margin: var(--s-3) auto var(--s-1);
   width: fit-content;
-  padding: 2px 10px;
-  border: 2px solid var(--ink);
-  border-radius: 6px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: var(--clay-surface);
+  padding: 2px var(--s-3);
+  border-radius: var(--r-pill);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  color: var(--ink-2);
+  background: var(--surface-2);
 }
 .archive-msg {
   max-width: 82%;
   width: fit-content;
-  padding: 8px 13px;
-  border-radius: 18px;
-  background: var(--clay-raised);
-  box-shadow: var(--clay-1);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-bubble);
+  background: var(--bubble-theirs);
+  color: var(--bubble-theirs-ink);
+  box-shadow: var(--edge), var(--bubble-theirs-shadow);
   overflow-wrap: anywhere;
 }
 .archive-msg.mine {
   margin-left: auto;
-  background: var(--accent);
-  color: #fdf8f2;
+  background: var(--bubble-mine);
+  color: var(--bubble-mine-ink);
+  box-shadow: none;
 }
-.archive-msg.mine a { color: inherit; }
-.archive-who { font-size: var(--t-xs); font-weight: 700; opacity: 0.75; }
+.archive-msg.mine a {
+  color: inherit;
+}
+.archive-who {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  opacity: 0.75;
+}
 .archive-quote {
   border-left: 3px solid currentColor;
   opacity: 0.72;
-  padding: 2px 8px;
-  margin: 2px 0 5px;
+  padding: 2px var(--s-2);
+  margin: 2px 0 var(--s-1);
   font-size: var(--t-sm);
 }
-.archive-body { white-space: pre-wrap; }
-.archive-transcript { font-size: var(--t-sm); opacity: 0.8; margin-top: 3px; }
+.archive-body {
+  white-space: pre-wrap;
+}
+.archive-transcript {
+  font-size: var(--t-sm);
+  opacity: 0.8;
+  margin-top: 3px;
+}
 .archive-meta {
-  font-family: var(--font-mono);
   font-size: 10px;
+  font-variant-numeric: tabular-nums;
   opacity: 0.7;
   text-align: right;
   margin-top: 2px;
 }
 
-/* A secret chat's tile: the same tile, edged in moss. */
-.tile.secret {
-  background: color-mix(in srgb, var(--moss) 7%, transparent);
+/* ── sheet bits shared by several sheets ────────────────────────────────── */
+
+/* A sheet's hero: a big avatar, a name, a line under it. */
+.sheet-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding-top: var(--s-2);
+  text-align: center;
 }
-.tile.secret.active::after {
-  background: var(--moss);
+.sheet-hero h3 {
+  margin-top: var(--s-2);
+}
+.sheet-hero-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-card);
+}
+.sheet-hero-edit:hover {
+  background: var(--surface-2);
+}
+.avatar-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: 0 0 0 3px var(--surface);
+}
+.avatar-busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.55); /* over a photo: dark in any theme */
+  color: #fff;
+  font-size: var(--t-xs);
+  font-weight: 700;
+}
+
+/* A row of equal choices (theme, speed, last seen) inside a group row. */
+.list-row.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-3);
+}
+.choice-row {
+  display: flex;
+  gap: var(--s-2);
+}
+.choice-row > * {
+  flex: 1;
+}
+.sheet .list-row .clay-btn,
+.sheet .list-row.stacked .seg {
+  background: var(--surface);
+}
+:root[data-theme='dark'] .sheet .list-row .clay-btn {
+  background: var(--surface);
+}
+.sheet .list-row .clay-btn.on,
+.sheet .list-row .clay-btn[aria-pressed='true'] {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+/* Accent swatches in Settings. */
+.swatches {
+  display: flex;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.swatch {
+  width: var(--tap);
+  height: var(--tap);
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.swatch:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
+}
+/* A gap ring, so the selection reads on the swatch and the sheet alike. */
+.swatch[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 3px var(--group-bg),
+    0 0 0 5px var(--ink);
+}
+
+/* Status chips next to an email: coloured text on the quiet chip. */
+.chip.ok {
+  color: var(--success-ink);
+}
+.chip.warn {
+  color: var(--peach-ink);
+}
+.note-ok {
+  color: var(--success-ink);
+}
+
+/* A sheet's big empty message. */
+.sheet-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-8) var(--s-4);
+  text-align: center;
+  color: var(--ink-2);
+}
+.sheet-empty-art {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+.sheet-empty p {
+  max-width: 280px;
+  font-size: var(--t-sm);
+}
+
+/* ── theme reveal ──────────────────────────────────────────────────────────
+   DockRail runs the switch inside document.startViewTransition and grows a
+   clip-path circle on the new snapshot from the toggle. The default cross-
+   fade is switched off so only the circle moves, and the colour fade
+   (.theme-changing, main.tsx) is suppressed — the circle IS the transition. */
+:root.theme-reveal::view-transition-old(root),
+:root.theme-reveal::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+:root.theme-reveal * {
+  transition: none !important;
+}
+
+/* Pointer devices get the press too (touch has it from base.css). */
+@media (prefers-reduced-motion: reduce) {
+  .tile:active,
+  .list-row:active,
+  .nav-btn:active,
+  .shelf-tab:active,
+  .rail-item > button:active,
+  .shelf-me:active,
+  .swatch:active,
+  .search-tile:active {
+    transform: none;
+  }
+}
+
+/* A row that leads somewhere: the chevron is decoration, so ink-3. */
+.list-row > svg.chev {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+/* Segmented choices inside a grouped row: the track steps back to the sheet
+   colour and the choice fills with primary-soft, so both read on the group. */
+.sheet .list-row.stacked .seg {
+  background: var(--surface);
+}
+.sheet .list-row.stacked .seg-item.on {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  box-shadow: none;
+}
+
+/* A small inline text action beside a section label ("+ Add"). */
+.text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 32px;
+  padding: 0 var(--s-2);
+  margin-right: calc(-1 * var(--s-2));
+  border-radius: var(--r-pill);
+  color: var(--primary-ink);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.text-btn:hover {
+  background: var(--surface-2);
+}
+
+/* People rows: the hairline starts where the name does, past the avatar. */
+.sheet .list-row:has(> .avatar)::before {
+  left: calc(var(--s-4) + 40px + var(--s-3));
+}
+/* An off switch on a group row: the track steps back to the sheet colour,
+   or at night it would vanish into the row. */
+.sheet .list-row .toggle:not([aria-checked='true']) {
+  background: var(--surface);
+}
+
+/* A round icon tile at the start of a row, where a person would have a face. */
+.row-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+.sheet .list-row:has(> .row-icon)::before,
+.sheet .list-row:has(> .clay-round)::before {
+  left: calc(var(--s-4) + 40px + var(--s-3));
+}
+
+/* A quiet line of text where a list would be — empty, or a hint. */
+.sheet-note {
+  padding: var(--s-2) var(--s-4);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+/* A small round action at the end of a row (delete, cancel). */
+.row-action {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.row-action:hover {
+  background: var(--surface);
+}
+.row-action:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
+}
+.row-action.danger {
+  color: var(--danger-ink);
+}
+/* When something will happen (a reminder, a scheduled send). */
+.row-when {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  margin-top: 2px;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.row-when.on {
+  color: var(--primary-ink);
+}
+
+/* Folder emoji picks: small tiles, the chosen one ringed. */
+.emoji-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.emoji-pick {
+  width: var(--tap);
+  height: var(--tap);
+  display: grid;
+  place-items: center;
+  font-size: var(--t-lg);
+  border-radius: var(--r-sm);
+  background: var(--group-bg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.emoji-pick:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
+}
+.emoji-pick[aria-pressed='true'] {
+  background: var(--primary-soft);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+/* ── Per-design layout (the admin's choice, lib/design.ts) ──────────────────
+   Colours, type and radii come from tokens.css; what changes here is the
+   *shape* of the chrome. Calm and Midnight list chats as flat rows split by
+   hairlines, the way their mockups drew them; Pebble keeps rounded cards
+   like Midnight Pebble. At the end of the file, and one attribute heavier
+   than the defaults above, so they win however the cascade is ordered. */
+
+:root[data-design='calm'],
+:root[data-design='midnight'] {
+  --list-row-bg: transparent;
+  --list-row-bg-hover: var(--surface-2);
+  --list-row-gap: 0;
+  --list-row-shadow: none;
+  --list-row-divider: var(--line);
+  --list-row-radius: var(--r-sm);
+  --chip-bg: var(--surface-2);
+  --chip-shadow: none;
+  --nav-divider: var(--line);
+}
+:root[data-design='calm'] {
+  --list-avatar: 48px;
+  --chip-radius: var(--r-sm); /* editorial: squarer chips than the pebble designs */
+  --surface-radius: var(--r-card);
+}
+:root[data-design='midnight'] {
+  --list-avatar: 46px;
+  --chip-radius: 8px;
+  --surface-radius: var(--r-card);
+  --nav-h: 60px;
+}
+:root[data-design='calm'][data-theme='light'],
+:root[data-design='midnight'][data-theme='light'] {
+  --group-bg: var(--surface);
+  --nav-divider: var(--line);
+}
+
+/* Inside a conversation on a phone the bottom is the composer's — reply bars,
+   the recording row — so the permission ask moves under the header instead. */
+.shell.in-convo ~ .notify-nudge {
+  top: calc(env(safe-area-inset-top, 0px) + 76px);
+  bottom: auto;
 }

@@ -48,12 +48,12 @@ export default function SecretSection({ conversation, meId }: { conversation: Co
 
   return (
     <div className="sheet-section secret-section">
-      <span className="eyebrow row" style={{ gap: 6 }}>
+      <span className="eyebrow">
         <IconLock size={13} /> End-to-end encrypted
       </span>
 
       {here === false && (
-        <p className="small muted" style={{ padding: '4px 4px 0' }}>
+        <p className="sheet-note">
           This secret chat lives on another of your devices. Its safety number, and its messages, are
           only there.
         </p>
@@ -61,7 +61,7 @@ export default function SecretSection({ conversation, meId }: { conversation: Co
 
       {here && (
         <>
-          <p className="tiny faint" style={{ padding: '0 4px 6px' }}>
+          <p className="tiny faint">
             Compare these numbers with {first}’s — in person, or over a call you trust. If they match,
             nobody is between you. They are the same on both phones.
           </p>
@@ -92,7 +92,7 @@ export default function SecretSection({ conversation, meId }: { conversation: Co
               }
             }}
           >
-            <IconCheck size={19} />
+            <IconCheck size={20} />
             <span className="grow">
               <span className="list-row-label">{verified ? 'Verified' : 'Mark as verified'}</span>
               <span className="list-row-sub">

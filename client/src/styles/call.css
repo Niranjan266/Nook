@@ -1,6 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Calls — ringing, in-call, minimised pill
+
+   Semantic tokens only. Design switch (Midnight Pebble default):
+     --call-btn        a control button's size (the hang/accept pair is larger)
+     --call-btn-big    hang up and accept
+     --call-avatar     the caller's avatar on a voice call
    ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --call-btn: 60px;
+  --call-btn-big: 72px;
+  --call-avatar: 168px;
+}
 
 .call {
   position: fixed;
@@ -8,21 +19,28 @@
   z-index: var(--z-call);
   display: grid;
   grid-template-rows: auto 1fr auto;
-  background: var(--clay-bg);
+  background: var(--bg);
+  color: var(--ink);
   overflow: hidden;
 }
 
+/* A slow glow behind everything: the room, not a spotlight. */
 .call::before {
   content: '';
   position: absolute;
   inset: -30%;
   background:
-    radial-gradient(50% 50% at 30% 20%, var(--accent) 0%, transparent 60%),
-    radial-gradient(45% 45% at 75% 75%, var(--clay-blue) 0%, transparent 60%);
-  opacity: 0.24;
-  filter: blur(70px);
-  animation: drift 30s var(--ease-out) infinite alternate;
+    radial-gradient(50% 50% at 30% 20%, var(--primary) 0%, transparent 60%),
+    radial-gradient(45% 45% at 75% 75%, var(--iris) 0%, transparent 60%);
+  opacity: 0.2;
+  filter: blur(72px);
+  animation: call-drift 30s var(--ease-in-out) infinite alternate;
   pointer-events: none;
+}
+@keyframes call-drift {
+  to {
+    transform: translate(4%, -3%) scale(1.06);
+  }
 }
 
 .call-head {
@@ -31,17 +49,21 @@
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: var(--s-5) var(--s-5) 0;
+  min-height: 44px;
+  padding: var(--s-4) var(--s-4) 0;
+}
+.call-head .clay-round {
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
 }
 .call-state {
   font-size: var(--t-sm);
-  color: var(--ink-soft);
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--ink-2);
 }
 .call-timer {
-  font-family: var(--font-mono);
   font-size: var(--t-sm);
-  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
 }
 
 .call-stage {
@@ -53,41 +75,68 @@
   min-height: 0;
 }
 
-/* voice call: a big breathing clay disc */
+/* voice call: the caller, large */
 .call-orb {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--s-4);
+  gap: var(--s-2);
 }
+.call-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--s-4);
+}
+/* !important over Avatar's inline size, so the phone size can apply. */
 .call-orb .avatar {
-  width: 168px;
-  height: 168px;
-  font-size: 54px;
-  box-shadow: var(--clay-3);
+  position: relative;
+  z-index: 1;
+  width: var(--call-avatar) !important;
+  height: var(--call-avatar) !important;
+  font-size: calc(var(--call-avatar) / 3) !important;
+  box-shadow: var(--lift);
 }
-.call-orb.ringing .avatar {
-  animation: call-pulse 2.1s var(--ease-out) infinite;
+/* Ringing: three rings breathe out of the avatar, one after another. */
+.call-rings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
-@keyframes call-pulse {
-  0%,
-  100% {
-    box-shadow:
-      var(--clay-3),
-      0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent);
+.call-rings i {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 0 0 2px var(--primary);
+  opacity: 0;
+  animation: call-ring 2.4s var(--ease-out) infinite;
+}
+.call-rings i:nth-child(2) {
+  animation-delay: 0.8s;
+}
+.call-rings i:nth-child(3) {
+  animation-delay: 1.6s;
+}
+@keyframes call-ring {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
   }
-  55% {
-    box-shadow:
-      var(--clay-3),
-      0 0 0 30px transparent;
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
   }
 }
 .call-name {
   font-family: var(--font-display);
   font-size: var(--t-xl);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.02em;
   text-align: center;
+}
+.call-handle {
+  font-size: var(--t-sm);
+  color: var(--ink-2);
 }
 
 /* video call */
@@ -95,16 +144,16 @@
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: var(--r-clay-lg);
+  border-radius: var(--r-sheet);
   overflow: hidden;
-  background: var(--clay-sunk);
-  box-shadow: var(--clay-2);
+  background: var(--surface-2);
+  box-shadow: var(--edge), var(--shadow-2);
 }
 .call-video > video {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background: #14110f;
+  background: var(--surface-2);
 }
 .call-self {
   position: absolute;
@@ -112,10 +161,10 @@
   bottom: var(--s-4);
   width: 148px;
   aspect-ratio: 3 / 4;
-  border-radius: var(--r-clay);
+  border-radius: var(--r-card);
   overflow: hidden;
-  box-shadow: var(--clay-2);
-  background: #14110f;
+  box-shadow: var(--lift);
+  background: var(--surface);
   z-index: 3;
 }
 .call-self video {
@@ -129,7 +178,7 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: var(--clay-sunk);
+  background: var(--surface-2);
 }
 
 .call-controls {
@@ -138,57 +187,79 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-5) var(--s-5) calc(var(--s-6) + env(safe-area-inset-bottom));
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-5) calc(var(--s-7) + env(safe-area-inset-bottom));
 }
 .call-btn {
-  width: 60px;
-  height: 60px;
+  width: var(--call-btn);
+  height: var(--call-btn);
   border-radius: var(--r-pill);
   display: grid;
   place-items: center;
-  background: var(--clay-surface);
-  box-shadow: var(--clay-2);
+  background: var(--surface);
+  box-shadow: var(--edge), var(--shadow-1);
   color: var(--ink);
   transition:
-    transform var(--dur) var(--ease-clay),
-    box-shadow var(--dur) var(--ease-out);
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 .call-btn:hover {
-  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--surface) 88%, var(--ink));
 }
 .call-btn:active {
-  transform: scale(0.94);
-  box-shadow: var(--clay-in);
+  transform: scale(var(--press-scale));
+  transition-duration: var(--dur-press);
 }
-.call-btn.off {
-  background: var(--clay-sunk);
-  box-shadow: var(--clay-in);
-  color: var(--ink-faint);
+/* Pressed toggles — muted, camera off, speaker on — fill in, so the state
+   reads at a glance and not only by its icon. */
+.call-btn[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: none;
+}
+/* Hang up and accept carry the page colour as their ink: dark on the bright
+   fills at night, near-white on the deeper fills by day. */
+.call-btn.hang,
+.call-btn.accept {
+  width: var(--call-btn-big);
+  height: var(--call-btn-big);
+  color: var(--bg);
+  box-shadow: var(--shadow-2);
 }
 .call-btn.hang {
-  width: 72px;
-  height: 72px;
-  background: var(--rust);
-  color: #fdf6f3;
-  border: var(--slab-border);
-  box-shadow: var(--slab-shadow-lg);
+  background: var(--danger);
 }
-.call-btn.hang:active {
-  transform: translate(6px, 6px);
-  box-shadow: 0 0 0 var(--ink);
+.call-btn.hang:hover {
+  background: color-mix(in srgb, var(--danger) 88%, var(--ink));
 }
 .call-btn.accept {
-  width: 72px;
-  height: 72px;
-  background: var(--moss);
-  color: #f4f7f0;
-  border: var(--slab-border);
-  box-shadow: var(--slab-shadow-lg);
+  background: var(--success);
+  animation: call-accept 1.8s var(--ease-in-out) infinite;
+}
+.call-btn.accept:hover {
+  background: color-mix(in srgb, var(--success) 88%, var(--ink));
+}
+/* A gentle hop every so often, so the way to answer is the thing that moves. */
+@keyframes call-accept {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  72% {
+    transform: translateY(-6px);
+  }
+  84% {
+    transform: translateY(0);
+  }
+  92% {
+    transform: translateY(-2px);
+  }
 }
 .call-btn.accept:active {
-  transform: translate(6px, 6px);
-  box-shadow: 0 0 0 var(--ink);
+  animation: none;
+  transform: scale(var(--press-scale));
 }
 
 /* minimised pill */
@@ -197,29 +268,40 @@
   z-index: var(--z-call);
   left: 50%;
   top: var(--s-4);
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: 8px 8px 8px 16px;
+  min-height: 48px;
+  padding: var(--s-1) var(--s-1) var(--s-1) var(--s-2);
   background: var(--ink);
-  color: var(--ink-invert);
+  color: var(--bg);
   border-radius: var(--r-pill);
-  box-shadow: 0 12px 30px rgba(30, 26, 23, 0.34);
+  box-shadow: var(--lift);
   cursor: pointer;
 }
+.call-pill-name {
+  font-size: var(--t-sm);
+  font-weight: 700;
+  line-height: 18px;
+}
 .call-pill .call-timer {
-  color: var(--ink-invert);
-  opacity: 0.85;
+  color: var(--bg);
+  opacity: 0.8;
+  font-size: var(--t-xs);
+  line-height: 16px;
 }
 .call-pill .hang-sm {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--r-pill);
   display: grid;
   place-items: center;
-  background: var(--rust);
-  color: #fff;
+  background: var(--danger);
+  color: var(--bg);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.call-pill .hang-sm:active {
+  transform: scale(var(--press-scale));
 }
 
 .call-warning {
@@ -229,28 +311,35 @@
   max-width: 420px;
   text-align: center;
   font-size: var(--t-xs);
-  color: var(--ink-faint);
+  line-height: 16px;
+  color: var(--ink-2);
   padding: 0 var(--s-5) var(--s-3);
 }
 
 @media (max-width: 640px) {
-  .call-orb .avatar {
-    width: 128px;
-    height: 128px;
-    font-size: 42px;
+  :root {
+    --call-btn: 56px;
+    --call-btn-big: 64px;
+    --call-avatar: 128px;
   }
   .call-self {
     width: 104px;
     right: var(--s-3);
     bottom: var(--s-3);
   }
-  .call-btn {
-    width: 54px;
-    height: 54px;
+  .call-controls {
+    gap: var(--s-3);
   }
-  .call-btn.hang,
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call::before,
+  .call-rings i,
   .call-btn.accept {
-    width: 64px;
-    height: 64px;
+    animation: none;
+  }
+  .call-rings i:first-child {
+    opacity: 0.5;
+    transform: scale(1.12);
   }
 }
