@@ -31,8 +31,21 @@ export function db() {
     client = createClient({ url: `file:${path.join(dir, 'nook.db')}` });
   }
 
+  /**
+   * A local SQLite file is locked for the instant of each write, and a second
+   * writer — the send-later tick racing a request, or a test touching the
+   * file beside the server — fails outright with SQLITE_BUSY. Five seconds of
+   * waiting turns that into a pause. Turso is a server and handles its own.
+   */
+  if (String(client.url || env.turso.url || 'file:').startsWith('file:')) {
+    ready = client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
+  }
+
   return client;
 }
+
+/** Settles once per-connection setup has run; queries wait for it. */
+let ready = Promise.resolve();
 
 export const usingTurso = () => Boolean(env.turso.url);
 
@@ -41,7 +54,9 @@ export const usingTurso = () => Boolean(env.turso.url);
    interpolated. No string-built SQL anywhere in the codebase.             */
 
 export async function all(sql, args = []) {
-  const result = await db().execute({ sql, args });
+  const c = db();
+  await ready;
+  const result = await c.execute({ sql, args });
   return result.rows.map(normalise);
 }
 
@@ -51,12 +66,16 @@ export async function one(sql, args = []) {
 }
 
 export async function run(sql, args = []) {
-  return db().execute({ sql, args });
+  const c = db();
+  await ready;
+  return c.execute({ sql, args });
 }
 
 /** Several statements, all-or-nothing. */
 export async function tx(statements) {
-  return db().batch(statements, 'write');
+  const c = db();
+  await ready;
+  return c.batch(statements, 'write');
 }
 
 /**
