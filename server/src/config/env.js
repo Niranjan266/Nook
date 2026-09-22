@@ -67,10 +67,9 @@ export const env = {
   },
 
   /**
-   * Resend — the mail provider from here on. With the key set it wins over
-   * Gmail and Brevo in `auto`. RESEND_FROM must be on a domain verified in
-   * Resend; the default onboarding@resend.dev only delivers to the Resend
-   * account's own address, so it is for trying things out, not for users.
+   * Resend — a fallback for when Gmail is not configured. RESEND_FROM must
+   * be on a domain verified in Resend; the default onboarding@resend.dev
+   * only delivers to the Resend account's own address.
    */
   resend: {
     enabled: bool(process.env.RESEND_API_KEY),
@@ -130,7 +129,7 @@ export const env = {
   },
 
   /**
-   * `auto` picks Resend if it is configured, then Gmail, then Brevo, then the console.
+   * `auto` picks Gmail if it is configured, then Resend, then Brevo, then the console.
    * Set it explicitly to pin one — useful when both are configured and you
    * want to be certain which is in play.
    */

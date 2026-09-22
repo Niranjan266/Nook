@@ -1,5 +1,5 @@
 /**
- * Transactional email — Resend first, with Gmail and Brevo kept as fallbacks.
+ * Transactional email — Gmail first, with Resend and Brevo kept as fallbacks.
  * Nook works entirely without an email address.
  *
  * No API key? Codes are printed to the server console so dev still works.
@@ -26,9 +26,11 @@ export function resolveProvider() {
   if (pinned === 'brevo') return env.brevo.enabled ? 'brevo' : 'console';
   if (pinned === 'console') return 'console';
 
-  // Resend is the provider now; the others only answer when it is not set.
-  if (env.resend.enabled) return 'resend';
+  // Gmail first: mail goes out from the Gmail inbox itself, so that address
+  // is what people see and where their replies land. Resend only answers
+  // when Gmail is not configured.
   if (gmailReady()) return 'gmail';
+  if (env.resend.enabled) return 'resend';
   if (env.brevo.enabled) return 'brevo';
   return 'console';
 }
