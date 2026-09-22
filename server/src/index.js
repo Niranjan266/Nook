@@ -35,6 +35,7 @@ import stickerRoutes from './routes/stickers.js';
 import backupRoutes from './routes/backup.js';
 import e2eeRoutes from './routes/e2ee.js';
 import { startKeepAwake } from './services/keepAwake.js';
+import { currentDesign } from './services/design.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -123,6 +124,15 @@ app.get('/api/health', (req, res) => {
 // Mounted before /api/auth so its own paths win; the auth router has no
 // conflicting routes, but the ordering makes that guarantee explicit.
 app.use('/api/admin', adminRoutes);
+// Which design to draw. Public: the sign-in screen needs it before anyone is.
+app.get('/api/design', async (_req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json({ design: await currentDesign() });
+  } catch (err) {
+    next(err);
+  }
+});
 app.use('/api/auth/google', googleRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

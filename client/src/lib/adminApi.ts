@@ -91,6 +91,7 @@ export const adminGet = <T,>(path: string) => call<T>(path);
 export const adminWake = () => call<{ passwordSignIn: boolean; googleSignIn: boolean }>('/config', { retries: 20 });
 export const adminPost = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'POST', body });
 export const adminPatch = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'PATCH', body });
+export const adminPut = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'PUT', body });
 export const adminDelete = <T,>(path: string, body?: unknown) => call<T>(path, { method: 'DELETE', body });
 
 /* ── shapes ───────────────────────────────────────────────────────────────── */

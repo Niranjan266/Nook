@@ -1,6 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
 import { getToken, refreshSession } from './api';
 import { API_BASE } from './config';
+import { applyDesign } from './design';
 
 let socket: Socket | null = null;
 
@@ -40,6 +41,8 @@ export function connectSocket(): Socket {
   s.on('connect', () => {
     authRetried = false;
   });
+  // The admin switched Nook's design: every open app follows at once.
+  s.on('app:design', (p: { design?: string }) => applyDesign(p?.design));
   s.on('connect_error', async (err) => {
     if (s.active || authRetried || !/token/i.test(err?.message || '')) return;
     authRetried = true;

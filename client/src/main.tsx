@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'framer-motion';
 import App from './App';
+import { initDesign } from './lib/design';
 
 import './styles/tokens.css';
 import './styles/base.css';
@@ -32,6 +33,9 @@ new MutationObserver((records) => {
   window.clearTimeout(themeTimer);
   themeTimer = window.setTimeout(() => root.classList.remove('theme-changing'), 320);
 }).observe(document.documentElement, { attributes: true, attributeOldValue: true, attributeFilter: ['data-theme'] });
+
+// The admin's chosen design: remembered one first, then the server's.
+initDesign();
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

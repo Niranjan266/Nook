@@ -33,6 +33,7 @@ import { createMessage } from '../services/messages.js';
 import * as C from '../db/conversations.js';
 import { claimHandoff } from './google.js';
 import { disconnectUser } from '../sockets/hub.js';
+import { DESIGNS, currentDesign, setDesign } from '../services/design.js';
 
 const router = Router();
 
@@ -506,6 +507,24 @@ router.post(
 /* ── whoami, so the panel can show who it thinks you are ──────────────────── */
 
 router.get('/me', (req, res) => res.json({ actor: req.admin.actor }));
+
+/* ── design ───────────────────────────────────────────────────────────────
+   The look everyone gets. Changing it here reaches every open app at once. */
+
+router.get(
+  '/design',
+  asyncRoute(async (_req, res) => res.json({ design: await currentDesign(), designs: DESIGNS }))
+);
+
+router.put(
+  '/design',
+  asyncRoute(async (req, res) => {
+    const { design } = z.object({ design: z.enum(DESIGNS) }).parse(req.body);
+    await setDesign(design);
+    console.log(`  admin     ${req.admin.actor} switched the design to ${design}`);
+    res.json({ design });
+  })
+);
 
 
 /**
