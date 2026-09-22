@@ -15,6 +15,10 @@ cd "$(dirname "$0")/.." || exit 1
 
 DB="/tmp/nook-test-$$.db"
 PORT="${NOOK_TEST_PORT:-4111}"
+# The suites read NOOK_TEST_BASE, not the port. Without this a run on another
+# port quietly tested whatever server happened to be on 4111.
+export NOOK_TEST_BASE="${NOOK_TEST_BASE:-http://127.0.0.1:$PORT/api}"
+LOG="/tmp/nook-test-server-$PORT.log"
 
 export PORT
 export TURSO_DATABASE_URL="file:$DB"
@@ -45,7 +49,7 @@ export TURN_URL=
 export REMINDER_TICK_MS=1000
 
 rm -f "$DB"*
-node src/index.js > /tmp/nook-test-server.log 2>&1 &
+node src/index.js > $LOG 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null; rm -f "$DB"*' EXIT
 
@@ -55,8 +59,8 @@ for _ in $(seq 1 45); do
 done
 
 if ! (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then
-  echo "server never came up — see /tmp/nook-test-server.log"
-  tail -20 /tmp/nook-test-server.log
+  echo "server never came up — see $LOG"
+  tail -20 $LOG
   exit 1
 fi
 
