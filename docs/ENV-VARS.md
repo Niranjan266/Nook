@@ -206,6 +206,7 @@ safer default.
 | `TURSO_AUTH_TOKEN` | *(your **rotated** token)* | Secret. Full read/write on the database. |
 | `JWT_ACCESS_SECRET` | *(from `Make-Keys.bat`)* | Secret. Anyone holding it can mint a login for any account. |
 | `JWT_REFRESH_SECRET` | *(from `Make-Keys.bat`)* | Secret. Must be a **different** random value from the access secret. |
+| `BACKUP_TOKEN_KEY` | *(a long random string)* | Secret. Seals Google Drive refresh tokens for chat backups. Optional — derived from `JWT_REFRESH_SECRET` when empty. Changing it disconnects every Drive link. See [BACKUP-SETUP.md](BACKUP-SETUP.md). |
 
 #### Why `COOKIE_DOMAIN` matters more than it looks
 

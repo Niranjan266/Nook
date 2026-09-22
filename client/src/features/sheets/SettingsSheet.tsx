@@ -40,6 +40,7 @@ import {
   IconPlay,
 } from '@/components/Icon';
 import { startTour } from '@/components/Tour';
+import BackupSection from './BackupSection';
 
 const ACCENTS = [
   { id: 'terracotta', label: 'Terracotta', hex: '#C0603C' },
@@ -996,6 +997,8 @@ export default function SettingsSheet() {
           <span className="toggle" role="switch" aria-checked={me.settings.enterToSend} />
         </button>
       </div>
+
+      <BackupSection userId={me.id} />
 
       <div className="sheet-section">
         <span className="eyebrow">Honest note</span>

@@ -23,7 +23,9 @@ export type SheetKind =
   | 'scheduled'
   | 'reminders'
   | 'media'
-  | 'chat-search';
+  | 'chat-search'
+  | 'backup'
+  | 'archive';
 
 interface Toast {
   id: number;

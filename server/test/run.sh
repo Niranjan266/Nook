@@ -49,6 +49,10 @@ export TURN_URL=
 export REMINDER_TICK_MS=1000
 # All suites sign up from 127.0.0.1; together they exceed the real limit.
 export AUTH_RATE_LIMIT_MAX=1000
+# The backup suite plays Google itself on NOOK_GOOGLE_BASE (ignored in
+# production), and must derive its token key the default way.
+export NOOK_GOOGLE_BASE="http://127.0.0.1:${NOOK_TEST_MOCK_PORT:-4112}"
+unset BACKUP_TOKEN_KEY
 
 rm -f "$DB"*
 node src/index.js > $LOG 2>&1 &
@@ -70,7 +74,7 @@ if [ $# -gt 0 ]; then
   SUITES=()
   for name in "$@"; do SUITES+=("test/$name.mjs"); done
 else
-  SUITES=(test/features.mjs test/security.mjs test/snap.mjs test/notify.mjs test/push.mjs test/google-native.mjs test/notifyprefs.mjs test/templates.mjs test/account.mjs test/snapkeep.mjs test/turn.mjs test/search.mjs test/reminders.mjs test/stickers.mjs test/polls.mjs)
+  SUITES=(test/features.mjs test/security.mjs test/snap.mjs test/notify.mjs test/push.mjs test/google-native.mjs test/notifyprefs.mjs test/templates.mjs test/account.mjs test/snapkeep.mjs test/turn.mjs test/search.mjs test/reminders.mjs test/stickers.mjs test/polls.mjs test/backup.mjs)
 fi
 
 FAILED=0

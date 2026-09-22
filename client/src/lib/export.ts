@@ -17,18 +17,27 @@ const escape = (s = '') =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
   );
 
-async function fetchAll(conversationId: string): Promise<Message[]> {
+/**
+ * Every message in a conversation, oldest first. Shared with backups, which
+ * need to stop between pages when cancelled and to say how far they have got.
+ */
+export async function fetchAll(
+  conversationId: string,
+  { signal, onPage }: { signal?: AbortSignal; onPage?: (fetched: number) => void } = {}
+): Promise<Message[]> {
   const all: Message[] = [];
   let before: string | undefined;
 
   // Page backwards until the server says there's nothing older.
   for (let page = 0; page < 200; page++) {
+    if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
     const query = new URLSearchParams({ limit: '100' });
     if (before) query.set('before', before);
     const data = await get<{ messages: Message[]; hasMore: boolean }>(
       `/messages/${conversationId}?${query}`
     );
     all.unshift(...data.messages);
+    onPage?.(all.length);
     if (!data.hasMore || !data.messages.length) break;
     before = data.messages[0].createdAt;
   }

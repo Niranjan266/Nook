@@ -135,6 +135,14 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
 
+      # Chat backups to Google Drive reuse the client above. Seals each
+      # person's Drive refresh token at rest; empty falls back to a key derived
+      # from JWT_REFRESH_SECRET. Register the redirect URI
+      #   https://nook-api.niranjand.in/api/backup/drive/callback
+      # on the same OAuth client — see docs/BACKUP-SETUP.md.
+      - key: BACKUP_TOKEN_KEY
+        sync: false
+
       # auto prefers Gmail when configured, then Brevo, then logs to console.
       - key: MAIL_PROVIDER
         value: auto

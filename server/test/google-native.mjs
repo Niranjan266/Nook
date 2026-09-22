@@ -15,6 +15,9 @@ const ORIGIN = BASE.replace(/\/api$/, '');
 /** Follow one hop only — the redirect target is the thing under test. */
 const hop = async (path) => {
   const r = await fetch(ORIGIN + path, { redirect: 'manual' });
+  // Drain the unread redirect body. Left dangling, its socket is still closing
+  // when the suite exits, and Node on Windows can abort on that (libuv assert).
+  await r.body?.cancel();
   return { status: r.status, location: r.headers.get('location') || '' };
 };
 
@@ -60,4 +63,6 @@ r = await hop(`/api/auth/google/callback?error=access_denied&state=${encodeURICo
 t.ok('cancelling returns to the app', r.location.startsWith('nook://auth?'), r.location.slice(0, 60));
 t.ok('carrying the reason', r.location.includes('access_denied'), r.location);
 
-process.exit(t.done() ? 1 : 0);
+// exitCode, not exit(): exiting mid-teardown of fetch's sockets trips a libuv
+// assertion on Windows now and then, which reads as a failed suite.
+process.exitCode = t.done() ? 1 : 0;

@@ -18,6 +18,7 @@ import Toasts from '@/components/Toasts';
 import Welcome, { shouldWelcome } from '@/components/Welcome';
 import Tour, { startTourOnce } from '@/components/Tour';
 import NotifyNudge from '@/components/NotifyNudge';
+import BackupNudge from '@/components/BackupNudge';
 import Lightbox from '@/components/Lightbox';
 import { lazyChunk, prefetch, whenIdle } from '@/lib/idle';
 
@@ -152,6 +153,7 @@ const loadScheduled = () => import('@/features/sheets/ScheduledSheet');
 const loadReminders = () => import('@/features/sheets/RemindersSheet');
 const loadMedia = () => import('@/features/sheets/MediaSheet');
 const loadSearch = () => import('@/features/sheets/MessageSearch');
+const loadBackup = () => import('@/features/sheets/BackupSheet');
 const loadThread = () => import('@/features/chat/ThreadPanel');
 
 const NewChatSheet = lazyChunk(() => loadPeople().then((m) => ({ default: m.NewChatSheet })));
@@ -170,6 +172,8 @@ const ScheduledSheet = lazyChunk(loadScheduled);
 const RemindersSheet = lazyChunk(loadReminders);
 const MediaSheet = lazyChunk(loadMedia);
 const ChatSearchSheet = lazyChunk(loadSearch);
+const BackupSheet = lazyChunk(loadBackup);
+const ArchiveSheet = lazyChunk(() => loadBackup().then((m) => ({ default: m.ArchiveSheet })));
 const ThreadPanel = lazyChunk(loadThread);
 const FrontDoor = lazyChunk(() => import('@/features/auth/FrontDoor'));
 const GuestDoor = lazyChunk(() => import('@/features/auth/GuestDoor'));
@@ -186,6 +190,7 @@ const warmSheets = () =>
     loadReminders,
     loadMedia,
     loadSearch,
+    loadBackup,
     loadThread
   );
 
@@ -420,6 +425,7 @@ function Nook() {
           Android's own dialog, so the web nudge would be a second ask for
           something already granted. */}
       <NotifyNudge show={Boolean(conversation) && !isNativeApp()} />
+      <BackupNudge userId={me.id} />
 
       {/* Fallback is nothing: each sheet brings its own entrance. */}
       {(warm || sheet) && (
@@ -440,6 +446,8 @@ function Nook() {
           <RemindersSheet />
           <MediaSheet />
           <ChatSearchSheet />
+          <BackupSheet />
+          <ArchiveSheet />
         </Suspense>
       )}
 

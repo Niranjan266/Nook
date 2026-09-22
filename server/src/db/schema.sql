@@ -656,3 +656,16 @@ CREATE TABLE IF NOT EXISTS list_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_list_items_message ON list_items (message_id, position);
+
+-- ─── Google Drive, for chat backups ─────────────────────────────────────────
+--
+-- One row per account that has connected Drive. The refresh token is sealed
+-- with AES-GCM before it reaches this table (services/driveTokens.js), so a
+-- copy of the database on its own opens nobody's Drive. No row means not
+-- connected — including after Google reports the grant revoked, which is when
+-- the row is deleted. The backups themselves never touch this server's disk.
+CREATE TABLE IF NOT EXISTS drive_links (
+  user_id           TEXT PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+  refresh_token_enc TEXT NOT NULL,
+  connected_at      INTEGER NOT NULL
+);

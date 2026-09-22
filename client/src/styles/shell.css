@@ -865,3 +865,109 @@ button.list-row:active {
   align-self: center;
   margin-top: var(--s-2);
 }
+
+/* ── backup & restore ──────────────────────────────────────────────────────
+   A pressed-in groove with the accent rising inside it, like everything else
+   that holds a value in Nook. Indeterminate is a slow slide, not a spinner:
+   sealing and downloading have no honest percentage to show. */
+.backup-bar {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--clay-surface);
+  box-shadow: var(--clay-in);
+  overflow: hidden;
+}
+.backup-bar > span {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width var(--dur) var(--ease-out);
+}
+.backup-bar.indeterminate > span {
+  width: 34%;
+  animation: backup-slide 1.4s var(--ease-out) infinite;
+}
+@keyframes backup-slide {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(310%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .backup-bar.indeterminate > span { animation: none; width: calc(100% - 4px); opacity: 0.5; }
+}
+.backup-picklist {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.backup-warning > svg { color: var(--ochre); flex: none; }
+
+/* The reminder sits at the top, clear of the notification nudge's spot. */
+.notify-nudge.backup-nudge {
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  bottom: auto;
+}
+
+/* ── the archive: a snapshot, and visibly one ──────────────────────────── */
+.archive-band {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--r-clay-sm);
+  border: 2px dashed var(--ink-soft);
+  color: var(--ink-soft);
+  font-size: var(--t-sm);
+}
+.archive-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+}
+.archive-day {
+  margin: 14px auto 6px;
+  width: fit-content;
+  padding: 2px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--clay-surface);
+}
+.archive-msg {
+  max-width: 82%;
+  width: fit-content;
+  padding: 8px 13px;
+  border-radius: 18px;
+  background: var(--clay-raised);
+  box-shadow: var(--clay-1);
+  overflow-wrap: anywhere;
+}
+.archive-msg.mine {
+  margin-left: auto;
+  background: var(--accent);
+  color: #fdf8f2;
+}
+.archive-msg.mine a { color: inherit; }
+.archive-who { font-size: var(--t-xs); font-weight: 700; opacity: 0.75; }
+.archive-quote {
+  border-left: 3px solid currentColor;
+  opacity: 0.72;
+  padding: 2px 8px;
+  margin: 2px 0 5px;
+  font-size: var(--t-sm);
+}
+.archive-body { white-space: pre-wrap; }
+.archive-transcript { font-size: var(--t-sm); opacity: 0.8; margin-top: 3px; }
+.archive-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.7;
+  text-align: right;
+  margin-top: 2px;
+}
