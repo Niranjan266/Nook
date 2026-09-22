@@ -29,6 +29,7 @@ import callRoutes from './routes/calls.js';
 import roomRoutes from './routes/rooms.js';
 import spaceRoutes from './routes/spaces.js';
 import linkRoutes from './routes/links.js';
+import { startKeepAwake } from './services/keepAwake.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -224,6 +225,7 @@ server.listen(env.port, '0.0.0.0', () => {
   console.log(`  media     ${mediaProvider()}`);
   console.log(`  email     ${mailProvider()}`);
   console.log(`  client    ${env.clientOrigin.join(', ')}`);
+  startKeepAwake();
   console.log('');
 });
 

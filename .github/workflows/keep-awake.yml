@@ -1,0 +1,26 @@
+# Wake the API if it ever falls asleep.
+#
+# The server pings itself every ten minutes (server/src/services/keepAwake.js),
+# which keeps a free Render instance up once it is running. This is the other
+# half: if it does sleep anyway — a restart, a missed ping — something outside
+# has to knock, or the next person to open the app waits a minute and a half
+# for a cold boot.
+#
+# GitHub runs schedules late when it is busy, so this is a backstop, not the
+# main mechanism. The repository is public, so the minutes are free.
+name: Keep API awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Ping the health check
+        # A cold boot can take well over a minute; wait for it rather than
+        # reporting a failure for something that is simply starting.
+        run: curl -fsS --max-time 180 --retry 2 --retry-delay 10 https://nook-api.niranjand.in/api/health
