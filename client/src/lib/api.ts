@@ -169,7 +169,7 @@ export const del = <T = any,>(p: string, body?: unknown) =>
 /** Upload with progress — XHR, because fetch still has no upload progress. */
 export function upload(
   file: File | Blob,
-  kind: 'message' | 'avatar' | 'wallpaper' | 'voice' = 'message',
+  kind: 'message' | 'avatar' | 'wallpaper' | 'voice' | 'sticker' = 'message',
   onProgress?: (pct: number) => void,
   filename?: string,
   retry = true

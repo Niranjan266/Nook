@@ -11,7 +11,8 @@ import { duration } from '@/lib/format';
 import { compressImage } from '@/lib/color';
 import { transcribe, canTranscribe } from '@/lib/transcribe';
 import { lazyChunk, prefetch, whenIdle } from '@/lib/idle';
-import type { PublicQuietHours, Conversation as Convo } from '@/lib/types';
+import { useStickers } from '@/stores/stickers';
+import type { PublicQuietHours, Conversation as Convo, Sticker } from '@/lib/types';
 import {
   IconSend,
   IconPlus,
@@ -28,6 +29,7 @@ import {
   IconMoon2,
   IconSun,
   IconLock,
+  IconSticker,
 } from '@/components/Icon';
 
 interface Props {
@@ -44,8 +46,13 @@ const VOICE_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=m
  */
 const loadEmoji = () => import('./EmojiPicker');
 const loadCamera = () => import('./SnapCamera');
+const loadTray = () => import('./StickerTray');
+const loadMaker = () => import('./StickerMaker');
 const EmojiPicker = lazyChunk(loadEmoji);
 const SnapCamera = lazyChunk(loadCamera);
+const StickerTray = lazyChunk(loadTray);
+// The maker is only warmed when the tray opens: most sessions never make one.
+const StickerMaker = lazyChunk(loadMaker);
 
 export default function Composer({ conversationId }: Props) {
   // Picked field by field. Destructuring the whole store re-rendered this —
@@ -78,7 +85,18 @@ export default function Composer({ conversationId }: Props) {
   const [camUsed, setCamUsed] = useState(false);
   if (emojiOpen && !emojiUsed) setEmojiUsed(true);
   if (camOpen && !camUsed) setCamUsed(true);
-  useEffect(() => whenIdle(() => prefetch(loadEmoji, loadCamera), 4000), []);
+  useEffect(() => whenIdle(() => prefetch(loadEmoji, loadCamera, loadTray), 4000), []);
+
+  const [trayOpen, setTrayOpen] = useState(false);
+  const [trayUsed, setTrayUsed] = useState(false);
+  const [trayAnchor, setTrayAnchor] = useState<{ left: number; bottom: number } | null>(null);
+  const [makerFile, setMakerFile] = useState<File | null>(null);
+  const [makerUsed, setMakerUsed] = useState(false);
+  if (trayOpen && !trayUsed) setTrayUsed(true);
+  if (makerFile && !makerUsed) setMakerUsed(true);
+  useEffect(() => {
+    if (trayOpen) prefetch(loadMaker);
+  }, [trayOpen]);
 
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
@@ -89,7 +107,9 @@ export default function Composer({ conversationId }: Props) {
   const imageInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const snapPickInput = useRef<HTMLInputElement>(null);
+  const stickerPickInput = useRef<HTMLInputElement>(null);
   const emojiButton = useRef<HTMLButtonElement>(null);
+  const stickerButton = useRef<HTMLButtonElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const recTimer = useRef<number>();
@@ -260,6 +280,45 @@ export default function Composer({ conversationId }: Props) {
       setSnapMode(false);
     }
   }
+
+  /**
+   * No publicId on purpose: one sticker file backs the tray and every chat it
+   * was sent to, and a file id on the message is what unsend deletes.
+   */
+  async function sendSticker(sticker: Sticker) {
+    setTrayOpen(false);
+    useStickers.getState().use(sticker.id);
+    try {
+      await send({
+        conversationId,
+        type: 'sticker',
+        body: '',
+        media: {
+          url: sticker.url,
+          thumbUrl: sticker.url,
+          mime: sticker.url.endsWith('.png') ? 'image/png' : 'image/webp',
+          width: sticker.width,
+          height: sticker.height,
+        },
+        replyTo: replyTo?.id || null,
+      });
+    } catch (err: any) {
+      toast(err?.message || 'Could not send that sticker.', true);
+    }
+  }
+
+  const openTray = () => {
+    const box = stickerButton.current?.getBoundingClientRect();
+    if (box) {
+      setTrayAnchor({
+        left: Math.min(box.left - 40, window.innerWidth - 388),
+        bottom: window.innerHeight - box.top + 10,
+      });
+    }
+    setTrayOpen((v) => !v);
+    setEmojiOpen(false);
+    setAttachOpen(false);
+  };
 
   /* ── voice notes ──────────────────────────────────────────────────────── */
 
@@ -630,12 +689,28 @@ export default function Composer({ conversationId }: Props) {
                 }
                 setEmojiOpen((v) => !v);
                 setAttachOpen(false);
+                setTrayOpen(false);
               }}
               aria-label="Emoji"
               aria-expanded={emojiOpen}
             >
               <IconEmoji size={19} />
             </button>
+            {/* Only while the box is empty: a sticker is sent instead of words,
+                and on a 360px phone the textarea needs that width back. */}
+            {!text.trim() && !editing && (
+              <button
+                ref={stickerButton}
+                data-sticker-toggle
+                className={`clay-round${trayOpen ? ' on' : ''}`}
+                style={{ width: 38, height: 38 }}
+                onClick={openTray}
+                aria-label="Stickers"
+                aria-expanded={trayOpen}
+              >
+                <IconSticker size={19} />
+              </button>
+            )}
           </div>
 
           {text.trim() && !editing && (
@@ -774,6 +849,47 @@ export default function Composer({ conversationId }: Props) {
           textarea.current?.focus();
         }}
       />
+        </Suspense>
+      )}
+
+      <input
+        ref={stickerPickInput}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) setMakerFile(f);
+          e.target.value = '';
+        }}
+      />
+
+      {trayUsed && (
+        <Suspense fallback={null}>
+          <StickerTray
+            open={trayOpen}
+            anchor={trayAnchor}
+            onClose={() => setTrayOpen(false)}
+            onPick={sendSticker}
+            onMake={() => {
+              setTrayOpen(false);
+              stickerPickInput.current?.click();
+            }}
+          />
+        </Suspense>
+      )}
+
+      {makerUsed && (
+        <Suspense fallback={null}>
+          <StickerMaker
+            open={Boolean(makerFile)}
+            file={makerFile}
+            onClose={() => setMakerFile(null)}
+            onSaved={(sticker, andSend) => {
+              if (andSend) sendSticker(sticker);
+              else toast('Sticker saved');
+            }}
+          />
         </Suspense>
       )}
 

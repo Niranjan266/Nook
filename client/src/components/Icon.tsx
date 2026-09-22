@@ -444,6 +444,15 @@ export const IconRefresh = (p: Props) => (
   </Svg>
 );
 
+/** A square with its corner peeling up — the sticker tray. */
+export const IconSticker = (p: Props) => (
+  <Svg {...p}>
+    <path d="M20 12.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6.5" />
+    <path d="M20 12.5 12.5 20c0-4.1 3.4-7.5 7.5-7.5Z" />
+    <path d="M9 10v.1M15 10v.1M9 14.5c.8.7 1.8 1 3 1" />
+  </Svg>
+);
+
 export const IconTag = (p: Props) => (
   <Svg {...p}>
     <path d="M4 11.2V5a1 1 0 0 1 1-1h6.2a2 2 0 0 1 1.4.6l7 7a2 2 0 0 1 0 2.8l-5.8 5.8a2 2 0 0 1-2.8 0l-7-7a2 2 0 0 1-.6-1.4Z" />

@@ -124,6 +124,8 @@ export const previewOf = (m: {
       return m.media?.name || 'File';
     case 'snap':
       return 'Snap';
+    case 'sticker':
+      return '🌟 Sticker';
     case 'call':
       return m.call?.kind === 'video' ? 'Video call' : 'Voice call';
     default:

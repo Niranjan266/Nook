@@ -9,6 +9,7 @@
  */
 import { z } from 'zod';
 import { uploadOwner } from '../db/messages.js';
+import { env } from '../config/env.js';
 
 /**
  * Media links end up in `src` and `href` on every client. Only web URLs and
@@ -24,6 +25,21 @@ export function isSafeMediaUrl(value) {
   } catch {
     return false;
   }
+}
+
+/**
+ * A file this server stored: a local `/uploads/` path (bare or behind
+ * PUBLIC_URL), or our own Cloudinary account. Stickers are only ever made
+ * here, so one pointing anywhere else is a hotlink to a picture nobody
+ * uploaded — and a sticker renders with no frame or caption to say where it
+ * came from.
+ */
+export function isOwnMediaUrl(value) {
+  if (!isSafeMediaUrl(value)) return false;
+  if (value.startsWith('/uploads/')) return !value.includes('..');
+  if (env.publicUrl && value.startsWith(`${env.publicUrl}/uploads/`)) return !value.includes('..');
+  if (env.cloudinary.enabled && value.startsWith(`https://res.cloudinary.com/${env.cloudinary.cloudName}/`)) return true;
+  return false;
 }
 
 const mediaUrl = z.string().max(2048).refine(isSafeMediaUrl, 'That media link is not allowed.');
@@ -45,7 +61,7 @@ export const mediaSchema = z.object({
 });
 
 export const sendPayloadSchema = z.object({
-  type: z.enum(['text', 'image', 'video', 'audio', 'voice', 'file', 'snap']).default('text'),
+  type: z.enum(['text', 'image', 'video', 'audio', 'voice', 'file', 'snap', 'sticker']).default('text'),
   body: z.string().max(8000).optional(),
   media: mediaSchema.nullish(),
   replyTo: z.string().max(64).nullable().optional(),
@@ -59,6 +75,15 @@ export const sendPayloadSchema = z.object({
   threadRoot: z.string().max(64).nullable().optional(),
   scheduledFor: z.string().max(64).nullable().optional(),
   transcript: z.string().max(8000).optional(),
+}).superRefine((p, ctx) => {
+  if (p.type !== 'sticker') return;
+  // A sticker is the picture and nothing else: no caption to render beside a
+  // bubble that is not there, and no view-once, which is what a snap is for.
+  if (!p.media) ctx.addIssue({ code: 'custom', path: ['media'], message: 'A sticker needs its picture.' });
+  else if (!isOwnMediaUrl(p.media.url))
+    ctx.addIssue({ code: 'custom', path: ['media', 'url'], message: 'Stickers must be uploaded to Nook.' });
+  if (p.body?.trim()) ctx.addIssue({ code: 'custom', path: ['body'], message: 'Stickers do not take a caption.' });
+  if (p.viewOnce) ctx.addIssue({ code: 'custom', path: ['viewOnce'], message: 'A sticker cannot be view-once.' });
 });
 
 /**
@@ -71,6 +96,9 @@ export const sendPayloadSchema = z.object({
  */
 export async function parseSendPayload(raw, senderId) {
   const payload = sendPayloadSchema.parse(raw ?? {});
+  // One sticker file is shared by every chat it is sent to and by the tray.
+  // Unsending one copy must not delete it for all the others.
+  if (payload.type === 'sticker' && payload.media) delete payload.media.publicId;
   if (payload.media?.publicId) {
     const owner = await uploadOwner(payload.media.publicId);
     if (!owner || String(owner) !== String(senderId)) delete payload.media.publicId;

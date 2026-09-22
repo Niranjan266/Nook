@@ -77,6 +77,7 @@ export type MessageType =
   | 'voice'
   | 'file'
   | 'snap'
+  | 'sticker'
   | 'system'
   | 'call';
 
@@ -92,6 +93,16 @@ export interface MediaPayload {
   duration?: number;
   waveform?: number[];
   blurhash?: string;
+}
+
+/** One sticker in your own tray. */
+export interface Sticker {
+  id: string;
+  url: string;
+  publicId: string;
+  width: number;
+  height: number;
+  createdAt: string;
 }
 
 export interface LinkPreview {

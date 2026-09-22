@@ -18,6 +18,7 @@ export const preview = (m) => {
   if (m.type === 'audio') return '🎵 Audio';
   if (m.type === 'file') return `📎 ${m.media?.name || 'File'}`;
   if (m.type === 'snap') return '🔥 Snap';
+  if (m.type === 'sticker') return '🌟 Sticker';
   if (m.type === 'call') return m.call?.kind === 'video' ? 'Video call' : 'Voice call';
   return m.body || '';
 };

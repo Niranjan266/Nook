@@ -354,6 +354,28 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
         );
       }
 
+      case 'sticker':
+        // Springs in only when it has just arrived, like the bubble itself;
+        // MotionConfig turns the bounce off for reduced-motion users.
+        return (
+          <motion.button
+            className="sticker-frame"
+            onClick={() => m.media && setLightbox({ messageId: m.id })}
+            initial={animateIn ? { scale: 0.35, rotate: -12, opacity: 0 } : false}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 460, damping: 15, mass: 0.8 }}
+            aria-label="Sticker — open it larger"
+          >
+            <img
+              src={safeUrl(m.media?.url)}
+              alt="Sticker"
+              loading={eager ? 'eager' : 'lazy'}
+              decoding="async"
+              draggable={false}
+            />
+          </motion.button>
+        );
+
       case 'call': {
         const missed = m.call?.status === 'missed' || m.call?.status === 'declined';
         return (
@@ -434,7 +456,10 @@ function MessageBubble({ message: m, conversation, meId, runStart, showAvatar, e
           <span style={{ width: 30, flex: 'none' }} />
         ) : null}
 
-        <div ref={bubbleRef} className={`bubble${isMediaBubble ? ' media' : ''}`}>
+        <div
+          ref={bubbleRef}
+          className={`bubble${isMediaBubble ? ' media' : ''}${m.type === 'sticker' ? ' sticker' : ''}`}
+        >
           {/* Each person keeps their own colour, so a busy group stays readable. */}
           {runStart && !mine && conversation.type === 'group' && (
             <span

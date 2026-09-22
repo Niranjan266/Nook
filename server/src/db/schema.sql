@@ -582,3 +582,24 @@ CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders (user_id, remind_at);
 -- time rather than stacking a second bell on the same bubble.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reminders_active
   ON reminders (user_id, message_id) WHERE fired_at IS NULL;
+
+-- Stickers people have made from their own photos.
+--
+-- The file itself lives wherever uploads live; this is the collection — which
+-- of those files someone keeps in their tray, and in what order. Deleting a
+-- row does not delete the file: stickers already sent still point at it.
+-- `sort_order` is bumped on every send, so the tray shows recently used first
+-- without a separate "last used" table.
+CREATE TABLE IF NOT EXISTS stickers (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  url        TEXT NOT NULL,
+  public_id  TEXT NOT NULL,
+  width      INTEGER NOT NULL DEFAULT 512,
+  height     INTEGER NOT NULL DEFAULT 512,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  UNIQUE (user_id, public_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stickers_user ON stickers (user_id, sort_order DESC);

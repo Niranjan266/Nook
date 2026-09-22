@@ -59,9 +59,13 @@ const resourceTypeFor = (kind) => {
 
 /**
  * @param {{buffer: Buffer, originalname: string, mimetype: string, size: number}} file
- * @param {{folder?: string}} opts
+ * @param {{folder?: string, plain?: boolean}} opts
+ *
+ * `plain` serves the file as it is: no JPEG thumbnail and no blurhash. For
+ * stickers, which are already small and whose whole point is a transparent
+ * edge that a JPEG thumbnail would fill with black.
  */
-export async function uploadBuffer(file, { folder = 'nook' } = {}) {
+export async function uploadBuffer(file, { folder = 'nook', plain = false } = {}) {
   const kind = kindFromMime(file.mimetype);
 
   if (env.cloudinary.enabled) {
@@ -76,7 +80,7 @@ export async function uploadBuffer(file, { folder = 'nook' } = {}) {
     // Cloudinary makes the thumbnail; we still make the blur placeholder,
     // because the point of a blurhash is that it arrives *with* the message.
     let blurhash = '';
-    if (kind === 'image') {
+    if (kind === 'image' && !plain) {
       const { blurhashFor } = await import('./images.js');
       blurhash = await blurhashFor(file.buffer);
     }
@@ -84,8 +88,9 @@ export async function uploadBuffer(file, { folder = 'nook' } = {}) {
     return {
       url: result.secure_url,
       blurhash,
-      thumbUrl:
-        kind === 'image'
+      thumbUrl: plain
+        ? result.secure_url
+        : kind === 'image'
           ? cloudinary.url(result.public_id, { width: 480, crop: 'limit', quality: 'auto', fetch_format: 'auto' })
           : kind === 'video'
             ? cloudinary.url(result.public_id, { resource_type: 'video', format: 'jpg', width: 480, crop: 'limit' })
@@ -125,7 +130,10 @@ export async function uploadBuffer(file, { folder = 'nook' } = {}) {
   let thumbUrl = '';
   let blurhash = '';
   let size = {};
-  if (kind === 'image') {
+  if (kind === 'image' && plain) {
+    const { dimensions } = await import('./images.js');
+    size = (await dimensions(file.buffer)) || {};
+  } else if (kind === 'image') {
     const { makeThumbnail, blurhashFor, dimensions } = await import('./images.js');
     [thumbUrl, blurhash, size] = await Promise.all([
       makeThumbnail(file.buffer, publicId),

@@ -23,7 +23,9 @@ export default function Lightbox() {
    * open; if the bubble is not in view it simply zooms from the centre.
    */
   const origin = useMemo(() => {
-    const el = lightbox && document.querySelector(`#m-${CSS.escape(lightbox.messageId)} .media-frame`);
+    const el =
+      lightbox &&
+      document.querySelector(`#m-${CSS.escape(lightbox.messageId)} :is(.media-frame, .sticker-frame)`);
     const r = el?.getBoundingClientRect();
     if (!r || r.bottom < 0 || r.top > window.innerHeight) return { x: 0, y: 0, scale: 0.94 };
     return {
