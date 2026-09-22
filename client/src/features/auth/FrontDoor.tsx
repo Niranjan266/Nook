@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import type { CSSProperties } from 'react';
+import {
+  motion,
+  AnimatePresence,
+  useAnimationControls,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from 'framer-motion';
+import type { Transition, Variants } from 'framer-motion';
 import { useAuth } from '@/stores/auth';
+import { useUi } from '@/stores/ui';
 import { get, post, setToken, ApiError } from '@/lib/api';
 import { API_BASE } from '@/lib/config';
-import { spring, stepIn } from '@/lib/motion';
-import { IconCheck, IconWarning, IconDownload } from '@/components/Icon';
+import { quick } from '@/lib/motion';
+import { IconCheck, IconWarning, IconDownload, IconSun, IconMoon } from '@/components/Icon';
 import { startGoogleSignIn, bindDeepLinks } from '@/lib/native';
+import type { Me } from '@/lib/types';
 
 type Step = 'in' | 'up' | 'recover' | 'reset';
 
@@ -62,8 +74,154 @@ const showApp =
   /Android/i.test(navigator.userAgent) &&
   !(window as any).Capacitor?.isNativePlatform?.();
 
+/* ── shared door pieces ──────────────────────────────────────────────────────
+   Exported for GuestDoor, which is the same room with fewer fields. They live
+   here rather than in a new module so the two doors cannot drift apart. */
+
+/** How long the check holds before the app takes over. Long enough to be
+    seen, short enough that nobody waits on it. */
+const SUCCESS_BEAT = 340;
+
+/** Hold the success face for a beat. Reduced motion still gets a glimpse,
+    just a shorter one — the point is confirmation, not choreography. */
+export const successBeat = (reduce: boolean | null) =>
+  new Promise<void>((resolve) => setTimeout(resolve, reduce ? 160 : SUCCESS_BEAT));
+
+/** Stagger index for the entrance, read by the CSS as --i. */
+export const enterAt = (i: number) => ({ '--i': i }) as CSSProperties;
+
+/**
+ * The card resizes with a spring rather than the app's default, which is
+ * tuned for bubbles: a whole card overshooting reads as wobble, not weight.
+ */
+const layoutSpring: Transition = { type: 'spring', stiffness: 460, damping: 42, mass: 0.9 };
+
+/** A short, decaying shake. Horizontal only — a nod "no", never a jolt. */
+const SHAKE = { x: [0, -9, 8, -5, 3, 0], transition: { duration: 0.36, ease: 'easeOut' } };
+
+/**
+ * The cause of an error has to be seen, so the card shakes when one arrives.
+ * Keyed on the message: submit clears it first, so the same mistake twice
+ * still shakes twice.
+ */
+export function useErrorShake(error: string, reduce: boolean | null) {
+  const controls = useAnimationControls();
+  useEffect(() => {
+    if (error && !reduce) controls.start(SHAKE);
+  }, [error, reduce, controls]);
+  return controls;
+}
+
+/** Slow clay blobs behind everything. Transform-only, so the GPU does it. */
+export const DoorBackdrop = () => (
+  <div className="door-blobs" aria-hidden="true">
+    <span />
+    <span />
+    <span />
+    <span />
+  </div>
+);
+
+/**
+ * What the theme looks like right now, including when it is left to the
+ * system. The store only knows the preference; this follows the OS as well,
+ * so the icon never shows a sun over a dark screen.
+ */
+function useResolvedDark() {
+  const theme = useUi((s) => s.theme);
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setSystemDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return theme === 'dark' || (theme === 'system' && systemDark);
+}
+
+/**
+ * Light/dark, before you are even in. Choosing sets an explicit theme — a
+ * person who taps it has made a choice, and "system" would quietly undo it
+ * the next time the OS flips. Both icons stay mounted and swap in CSS, so the
+ * rotation costs nothing and never needs a render to finish.
+ */
+export function ThemeToggle() {
+  const dark = useResolvedDark();
+  const setTheme = useUi((s) => s.setTheme);
+  const label = dark ? 'Switch to light theme' : 'Switch to dark theme';
+  return (
+    <button
+      type="button"
+      className="door-theme"
+      data-dark={dark ? 'true' : 'false'}
+      onClick={() => setTheme(dark ? 'light' : 'dark')}
+      aria-label={label}
+      title={label}
+    >
+      <IconSun className="door-theme-sun" size={20} />
+      <IconMoon className="door-theme-moon" size={20} />
+    </button>
+  );
+}
+
+/**
+ * The inside of a submit button: label, working dots and the success check
+ * stacked in one grid cell. Stacking — not swapping — is what keeps the
+ * button exactly the same size through every state, so nothing below it moves.
+ */
+export function SubmitFace({
+  state,
+  label,
+  busyLabel = 'One moment…',
+}: {
+  state: 'idle' | 'busy' | 'done';
+  label: string;
+  busyLabel?: string;
+}) {
+  return (
+    <span className="door-face" data-state={state}>
+      <span className="door-face-label">{label}</span>
+      <span className="door-face-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="door-face-done" aria-hidden="true">
+        <IconCheck size={22} strokeWidth={2.6} />
+      </span>
+      <span className="sr-only" aria-live="polite">
+        {state === 'busy' ? busyLabel : state === 'done' ? 'Signed in' : ''}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Steps slide in the direction of travel. Opacity runs on its own short
+ * clock so the old step is gone before the new one has finished settling —
+ * two half-visible forms at once reads as a glitch.
+ */
+const stepSlide: Variants = {
+  hidden: (dir: number) => ({ opacity: 0, x: dir > 0 ? 28 : -28 }),
+  show: {
+    opacity: 1,
+    x: 0,
+    transition: { x: { type: 'spring', stiffness: 420, damping: 36 }, opacity: { duration: 0.2 } },
+  },
+  exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -28 : 28, transition: quick }),
+};
+
+/** Reduced motion: the same change, without the travel. */
+const stepFade: Variants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.16 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+};
+
 export default function FrontDoor() {
-  const { login, signup } = useAuth();
+  const reduce = useReducedMotion();
   const [step, setStep] = useState<Step>('in');
   const [dir, setDir] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -78,6 +236,21 @@ export default function FrontDoor() {
   const [notice, setNotice] = useState('');
   const [avail, setAvail] = useState<{ ok: boolean; msg: string } | null>(null);
   const [googleOn, setGoogleOn] = useState(true);
+  const [done, setDone] = useState(false);
+
+  /* The entrance runs on CSS keyed off this class, then the class goes.
+     CSS rather than framer because it plays even in a background tab, and
+     dropping the class on a timer means nothing can be left stuck at
+     opacity 0 — worst case, it simply appears. */
+  const [intro, setIntro] = useState(true);
+  useEffect(() => {
+    const t = window.setTimeout(() => setIntro(false), 900);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  const shake = useErrorShake(error, reduce);
+  const layoutOn = !reduce;
+  const layoutT = { layout: layoutSpring };
 
   /* Shown straight away and hidden only when the server says it is not set up.
      Waiting for the answer first meant a sleeping server — a minute and more
@@ -170,13 +343,15 @@ export default function FrontDoor() {
   const ry = useSpring(useTransform(mx, [-0.5, 0.5], [-11, 11]), { stiffness: 150, damping: 18 });
 
   useEffect(() => {
+    // Motion nobody asked for, driven by the pointer — the first thing to go.
+    if (reduce) return;
     const onMove = (e: PointerEvent) => {
       mx.set(e.clientX / window.innerWidth - 0.5);
       my.set(e.clientY / window.innerHeight - 0.5);
     };
     window.addEventListener('pointermove', onMove);
     return () => window.removeEventListener('pointermove', onMove);
-  }, [mx, my]);
+  }, [mx, my, reduce]);
 
   /* ── username availability ────────────────────────────────────────────── */
   const availTimer = useRef<number>();
@@ -215,17 +390,32 @@ export default function FrontDoor() {
     setBusy(true);
     setError('');
     try {
+      /*
+       * Sign-in and sign-up call the endpoints here and hand the session to
+       * the store with adopt(), rather than going through login()/signup().
+       * Those set status 'in' the moment the request lands, which unmounts
+       * this screen in the same tick — the check would never be seen. adopt()
+       * is exactly what they do (setToken + me + status), just a beat later.
+       * If the store's login ever grows extra steps, mirror them here.
+       */
       if (step === 'in') {
-        await login(username.trim().toLowerCase(), password);
-        await openDoor();
+        const data = await post<{ user: Me; accessToken: string }>('/auth/login', {
+          username: username.trim().toLowerCase(),
+          password,
+        });
+        setDone(true);
+        await successBeat(reduce);
+        useAuth.getState().adopt(data.user, data.accessToken);
       } else if (step === 'up') {
-        await signup({
+        const data = await post<{ user: Me; accessToken: string }>('/auth/signup', {
           username: username.trim().toLowerCase(),
           displayName: displayName.trim() || username.trim(),
           password,
           email: email.trim() || undefined,
         });
-        await openDoor();
+        setDone(true);
+        await successBeat(reduce);
+        useAuth.getState().adopt(data.user, data.accessToken);
       } else if (step === 'recover') {
         const res = await post<{ message: string }>('/auth/recover', {
           username: username.trim().toLowerCase(),
@@ -239,10 +429,16 @@ export default function FrontDoor() {
           password,
         });
         setToken(data.accessToken);
+        setDone(true);
+        await successBeat(reduce);
         await useAuth.getState().init();
+        // init() failing leaves us mounted; do not leave a check on a door
+        // that did not open.
+        setDone(false);
         await openDoor();
       }
     } catch (err) {
+      setDone(false);
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.');
       setBusy(false);
     }
@@ -260,234 +456,299 @@ export default function FrontDoor() {
   const heading = HEADINGS[step];
   const pw = strength(password);
 
+  const faceState = done ? 'done' : busy ? 'busy' : 'idle';
+
   return (
-    <div className={`door${opening ? ' opening' : ''}`}>
-      <div className="door-blobs" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-        <span />
-      </div>
+    <div className={`door${opening ? ' opening' : ''}${intro ? ' intro' : ''}`}>
+      <DoorBackdrop />
+      <ThemeToggle />
 
       <div className="door-stack">
-        <div className="door-mark">
-          <motion.img
-            src="/logo.svg"
-            alt=""
-            width={104}
-            height={104}
-            style={{ rotateX: rx, rotateY: ry, transformPerspective: 900 }}
-          />
-          <div className="stack" style={{ alignItems: 'center', gap: 2 }}>
-            <span className="door-wordmark">Nook</span>
-            <span className="door-tagline">Your corner of the internet.</span>
+        {/* layout="position": when the card grows or shrinks the column
+            re-centres, and the mark should glide with it, not jump. */}
+        <motion.div className="door-mark" layout={layoutOn ? 'position' : false} transition={layoutT}>
+          <div className="door-mark-in">
+            <motion.img
+              src="/logo.svg"
+              alt=""
+              width={104}
+              height={104}
+              style={{ rotateX: rx, rotateY: ry, transformPerspective: 900 }}
+            />
+            <div className="stack" style={{ alignItems: 'center', gap: 2 }}>
+              <span className="door-wordmark">Nook</span>
+              <span className="door-tagline">Your corner of the internet.</span>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="door-panel">
-          <form onSubmit={submit} noValidate>
-          <div className="door-steps">
-            {/* initial={false} — never animate the first paint in, or a
-                background tab can leave the form invisible until focus */}
-            <AnimatePresence mode="wait" custom={dir} initial={false}>
-              <motion.div key={step} custom={dir} variants={stepIn} initial="hidden" animate="show" exit="exit">
-                <h1 className="door-heading">{heading.title}</h1>
-                <p className="door-sub">{heading.sub}</p>
+        {/* The entrance rises on this wrapper, the card itself resizes and
+            shakes. Separate elements, because a CSS animation and framer
+            writing the same element's transform would fight. */}
+        <div className="door-rise">
+          <motion.div
+            className="door-panel"
+            layout={layoutOn}
+            animate={shake}
+            transition={layoutT}
+            // Set inline so framer can correct the corners while the card
+            // scales; a radius only in CSS would squash mid-resize.
+            style={{ borderRadius: 38 }}
+          >
+            <form onSubmit={submit} noValidate>
+              <div className="door-steps">
+                {/* initial={false} — never animate the first paint in, or a
+                    background tab can leave the form invisible until focus.
+                    popLayout lifts the leaving step out of the flow, so the
+                    card resizes straight to the new step's height instead of
+                    holding the old one until the exit finishes. */}
+                <AnimatePresence mode="popLayout" custom={dir} initial={false}>
+                  <motion.div
+                    key={step}
+                    custom={dir}
+                    variants={reduce ? stepFade : stepSlide}
+                    initial="hidden"
+                    animate="show"
+                    exit="exit"
+                    layout={layoutOn ? 'position' : false}
+                    transition={layoutT}
+                  >
+                    <h1 className="door-heading door-in" style={enterAt(0)}>
+                      {heading.title}
+                    </h1>
+                    <p className="door-sub door-in" style={enterAt(1)}>
+                      {heading.sub}
+                    </p>
 
-                <div className="door-fields">
-                  {step !== 'reset' && (
-                    <label className="field">
-                      <span className="field-label">Username</span>
-                      <input
-                        className="groove"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').toLowerCase())}
-                        placeholder="riverbend"
-                        autoComplete="username"
-                        autoCapitalize="none"
-                        spellCheck={false}
-                        maxLength={20}
-                        required
-                      />
-                      {step === 'up' && avail && (
-                        <span className={`door-avail ${avail.ok ? 'ok' : 'no'}`}>
-                          {avail.ok ? <IconCheck size={15} /> : <IconWarning size={15} />}
-                          {avail.msg}
-                        </span>
-                      )}
-                    </label>
-                  )}
-
-                  {step === 'up' && (
-                    <label className="field">
-                      <span className="field-label">What should people call you?</span>
-                      <input
-                        className="groove"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="River Bend"
-                        autoComplete="name"
-                        maxLength={40}
-                      />
-                    </label>
-                  )}
-
-                  {step === 'reset' && (
-                    <div className="field">
-                      <span className="field-label">Six-digit code</span>
-                      <div className="code-row">
-                        {Array.from({ length: 6 }).map((_, i) => (
+                    <div className="door-fields">
+                      {step !== 'reset' && (
+                        <label className="field door-in" style={enterAt(2)}>
+                          <span className="field-label">Username</span>
                           <input
-                            key={i}
                             className="groove"
-                            inputMode="numeric"
-                            maxLength={1}
-                            value={code[i] || ''}
-                            aria-label={`Digit ${i + 1}`}
-                            onChange={(e) => {
-                              const v = e.target.value.replace(/\D/g, '');
-                              const next = (code.slice(0, i) + v + code.slice(i + 1)).slice(0, 6);
-                              setCode(next);
-                              if (v) (e.target.nextElementSibling as HTMLInputElement)?.focus();
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Backspace' && !code[i]) {
-                                const prev = (e.currentTarget.previousElementSibling as HTMLInputElement) || null;
-                                prev?.focus();
-                                setCode(code.slice(0, Math.max(0, i - 1)));
-                              }
-                            }}
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').toLowerCase())}
+                            placeholder="riverbend"
+                            autoComplete="username"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                            maxLength={20}
+                            required
                           />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                          <AnimatePresence initial={false}>
+                            {step === 'up' && avail && (
+                              <motion.span
+                                key={avail.ok ? 'ok' : 'no'}
+                                className={`door-avail ${avail.ok ? 'ok' : 'no'}`}
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                              >
+                                {avail.ok ? <IconCheck size={15} /> : <IconWarning size={15} />}
+                                {avail.msg}
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
+                        </label>
+                      )}
 
-                  {step !== 'recover' && (
-                    <label className="field">
-                      <span className="field-label">
-                        {step === 'in' ? 'Password' : step === 'reset' ? 'New password' : 'Password'}
-                      </span>
-                      <input
-                        className="groove"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        autoComplete={step === 'in' ? 'current-password' : 'new-password'}
-                        required
-                      />
-                      {step !== 'in' && password.length > 0 && (
-                        <div className="strength" aria-hidden="true">
-                          {[0, 1, 2, 3].map((i) => (
-                            <i key={i} className={i < pw ? (pw < 3 ? 'warn' : 'on') : ''} />
-                          ))}
+                      {step === 'up' && (
+                        <label className="field door-in" style={enterAt(3)}>
+                          <span className="field-label">What should people call you?</span>
+                          <input
+                            className="groove"
+                            value={displayName}
+                            onChange={(e) => setDisplayName(e.target.value)}
+                            placeholder="River Bend"
+                            autoComplete="name"
+                            maxLength={40}
+                          />
+                        </label>
+                      )}
+
+                      {step === 'reset' && (
+                        <div className="field door-in" style={enterAt(2)}>
+                          <span className="field-label">Six-digit code</span>
+                          <div className="code-row">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                              <input
+                                key={i}
+                                className="groove"
+                                inputMode="numeric"
+                                maxLength={1}
+                                value={code[i] || ''}
+                                aria-label={`Digit ${i + 1}`}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/\D/g, '');
+                                  const next = (code.slice(0, i) + v + code.slice(i + 1)).slice(0, 6);
+                                  setCode(next);
+                                  if (v) (e.target.nextElementSibling as HTMLInputElement)?.focus();
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Backspace' && !code[i]) {
+                                    const prev = (e.currentTarget.previousElementSibling as HTMLInputElement) || null;
+                                    prev?.focus();
+                                    setCode(code.slice(0, Math.max(0, i - 1)));
+                                  }
+                                }}
+                              />
+                            ))}
+                          </div>
                         </div>
                       )}
-                    </label>
-                  )}
 
+                      {step !== 'recover' && (
+                        <label className="field door-in" style={enterAt(step === 'up' ? 4 : 3)}>
+                          <span className="field-label">
+                            {step === 'in' ? 'Password' : step === 'reset' ? 'New password' : 'Password'}
+                          </span>
+                          <input
+                            className="groove"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            autoComplete={step === 'in' ? 'current-password' : 'new-password'}
+                            required
+                          />
+                          {step !== 'in' && password.length > 0 && (
+                            <div className="strength" aria-hidden="true">
+                              {[0, 1, 2, 3].map((i) => (
+                                <i key={i} className={i < pw ? (pw < 3 ? 'warn' : 'on') : ''} />
+                              ))}
+                            </div>
+                          )}
+                        </label>
+                      )}
+
+                      {step === 'up' && (
+                        <label className="field door-in" style={enterAt(5)}>
+                          <span className="field-label">Email — optional, for recovery only</span>
+                          <input
+                            className="groove"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            autoComplete="email"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              <AnimatePresence mode="popLayout" initial={false}>
+                {(error || notice) && (
+                  <motion.p
+                    key={error ? `e:${error}` : `n:${notice}`}
+                    className={`field-error${notice && !error ? ' field-notice' : ''}`}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 0.9, 0.3, 1] } }}
+                    exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    layout={layoutOn ? 'position' : false}
+                    transition={layoutT}
+                    role="status"
+                  >
+                    {error ? <IconWarning size={15} /> : <IconCheck size={15} />}
+                    {error || notice}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+
+              <motion.div
+                className="door-actions door-in"
+                style={enterAt(5)}
+                layout={layoutOn ? 'position' : false}
+                transition={layoutT}
+              >
+                <button
+                  className={`slab slab-block door-submit${busy || done ? ' is-busy' : ''}`}
+                  type="submit"
+                  disabled={!canSubmit || busy}
+                  aria-busy={busy}
+                >
+                  <SubmitFace
+                    state={faceState}
+                    label={
+                      step === 'in'
+                        ? 'Open the door'
+                        : step === 'up'
+                          ? 'Make my nook'
+                          : step === 'recover'
+                            ? 'Send me a code'
+                            : 'Set password and go in'
+                    }
+                  />
+                </button>
+
+                {/* Only on the two steps where it means something. On "forgot
+                    password" it would be a non-sequitur, and during a reset the
+                    person is mid-way through a different flow. */}
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {googleOn && (step === 'in' || step === 'up') && (
+                    <motion.div
+                      key="google"
+                      className="door-google"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                    >
+                      <div className="door-or" aria-hidden="true">
+                        <span>or</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="slab slab-quiet slab-block google-btn"
+                        onClick={() => {
+                          // A full-page navigation, not a popup: popups are blocked
+                          // on some mobile browsers and break the back button.
+                          // In the app this opens a Custom Tab and comes back
+                          // through nook://auth; in a browser it is an ordinary
+                          // navigation. `startGoogleSignIn` says which happened.
+                          startGoogleSignIn(API_BASE).then((handled) => {
+                            if (!handled) window.location.href = `${API_BASE}/api/auth/google/start`;
+                          });
+                        }}
+                      >
+                        <GoogleMark />
+                        Continue with Google
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="door-switch">
+                  {step === 'in' && (
+                    <>
+                      <span>New here?</span>
+                      <button type="button" onClick={() => go('up')}>
+                        Make a nook
+                      </button>
+                      <span aria-hidden="true">·</span>
+                      <button type="button" onClick={() => go('recover')}>
+                        Forgot password
+                      </button>
+                    </>
+                  )}
                   {step === 'up' && (
-                    <label className="field">
-                      <span className="field-label">Email — optional, for recovery only</span>
-                      <input
-                        className="groove"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        autoComplete="email"
-                      />
-                    </label>
+                    <>
+                      <span>Already have one?</span>
+                      <button type="button" onClick={() => go('in')}>
+                        Sign in
+                      </button>
+                    </>
+                  )}
+                  {(step === 'recover' || step === 'reset') && (
+                    <button type="button" onClick={() => go('in')}>
+                      Back to sign in
+                    </button>
                   )}
                 </div>
               </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {(error || notice) && (
-            <motion.p
-              className="field-error"
-              style={notice && !error ? { color: 'var(--moss-deep)' } : undefined}
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              role="status"
-            >
-              {error ? <IconWarning size={15} /> : <IconCheck size={15} />}
-              {error || notice}
-            </motion.p>
-          )}
-
-          <div className="door-actions">
-            <button className="slab slab-block" type="submit" disabled={!canSubmit || busy}>
-              {busy
-                ? 'One moment…'
-                : step === 'in'
-                  ? 'Open the door'
-                  : step === 'up'
-                    ? 'Make my nook'
-                    : step === 'recover'
-                      ? 'Send me a code'
-                      : 'Set password and go in'}
-            </button>
-
-            {/* Only on the two steps where it means something. On "forgot
-                password" it would be a non-sequitur, and during a reset the
-                person is mid-way through a different flow. */}
-            {googleOn && (step === 'in' || step === 'up') && (
-              <>
-                <div className="door-or" aria-hidden="true">
-                  <span>or</span>
-                </div>
-                <button
-                  type="button"
-                  className="slab slab-quiet slab-block google-btn"
-                  onClick={() => {
-                    // A full-page navigation, not a popup: popups are blocked
-                    // on some mobile browsers and break the back button.
-                    // In the app this opens a Custom Tab and comes back
-                    // through nook://auth; in a browser it is an ordinary
-                    // navigation. `startGoogleSignIn` says which happened.
-                    startGoogleSignIn(API_BASE).then((handled) => {
-                      if (!handled) window.location.href = `${API_BASE}/api/auth/google/start`;
-                    });
-                  }}
-                >
-                  <GoogleMark />
-                  Continue with Google
-                </button>
-              </>
-            )}
-
-            <div className="door-switch">
-              {step === 'in' && (
-                <>
-                  <span>New here?</span>
-                  <button type="button" onClick={() => go('up')}>
-                    Make a nook
-                  </button>
-                  <span aria-hidden="true">·</span>
-                  <button type="button" onClick={() => go('recover')}>
-                    Forgot password
-                  </button>
-                </>
-              )}
-              {step === 'up' && (
-                <>
-                  <span>Already have one?</span>
-                  <button type="button" onClick={() => go('in')}>
-                    Sign in
-                  </button>
-                </>
-              )}
-              {(step === 'recover' || step === 'reset') && (
-                <button type="button" onClick={() => go('in')}>
-                  Back to sign in
-                </button>
-              )}
-            </div>
-          </div>
-        </form>
+            </form>
+          </motion.div>
         </div>
       </div>
 
