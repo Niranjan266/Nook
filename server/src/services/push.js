@@ -52,7 +52,7 @@ export async function notify(userId, payload) {
   // Native first: it is the one that reaches a locked phone.
   await Promise.all(
     devices.map(async (device) => {
-      const result = await sendToDevice(device.token, payload).catch(() => 'failed');
+      const result = await sendToDevice(device.token, payload, device).catch(() => 'failed');
       if (result === 'sent') sent += 1;
       // A dead registration retried on every message forever is invisible
       // breakage — the notification simply never arrives and nothing says why.

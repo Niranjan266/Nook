@@ -7,7 +7,7 @@
  * not the third-party services themselves.
  */
 import { suite, api, register } from './helpers.mjs';
-import { fcmReady, fcmMissing } from '../src/services/fcm.js';
+import { fcmReady, fcmMissing, buildMessage } from '../src/services/fcm.js';
 
 const t = suite('push transports');
 
@@ -51,6 +51,44 @@ t.ok('and only the newer owner keeps it', !aDevices.some((d) => d.token === shar
 
 r = await api('/push/device', { method: 'DELETE', token: b.token, body: { token: shared } });
 t.ok('a device can be removed on sign-out', r.status === 200, `${r.status}`);
+
+/* ── notification channels ────────────────────────────────────────────
+   Android freezes a channel's sound once made, so the louder ones are new
+   ids that only 1.0.8+ APKs create. Naming one an old APK lacks drops the
+   custom sound, so the server must only use them when the device says so. */
+
+const old = 'o'.repeat(140);
+const fresh = 'n'.repeat(140);
+await api('/push/device', { method: 'POST', token: a.token, body: { token: old } });
+r = await api('/push/device', { method: 'POST', token: a.token, body: { token: fresh, channels: 2 } });
+t.ok('a device can say it has the v2 channels', r.status === 201, `${r.status} ${JSON.stringify(r.json)}`);
+
+r = await api('/push/device', { method: 'POST', token: a.token, body: { token: 'q'.repeat(140), channels: 0 } });
+t.ok('a nonsense channel version is refused', r.status === 400, `${r.status}`);
+
+const mine = await devicesFor(a.id);
+const oldRow = mine.find((d) => d.token === old);
+const freshRow = mine.find((d) => d.token === fresh);
+t.ok('an old APK that says nothing is stored as v1', oldRow?.channels === 1, JSON.stringify(oldRow));
+t.ok('and a new one as v2', freshRow?.channels === 2, JSON.stringify(freshRow));
+
+const channelOf = (device, urgent) =>
+  buildMessage('tok', { title: 'x', urgent }, device).message.android.notification;
+t.ok('v1 devices keep the old message channel', channelOf(oldRow, false).channel_id === 'messages');
+t.ok('v1 devices keep the old call channel', channelOf(oldRow, true).channel_id === 'calls');
+t.ok('and are not told about sounds they lack', channelOf(oldRow, false).sound === undefined);
+t.ok('v2 devices get the louder message channel', channelOf(freshRow, false).channel_id === 'messages_v2');
+t.ok('v2 devices get the louder call channel', channelOf(freshRow, true).channel_id === 'calls_v2');
+t.ok('with the matching sound for pre-Oreo phones', channelOf(freshRow, false).sound === 'nook_message_v2'
+     && channelOf(freshRow, true).sound === 'nook_call_v2');
+t.ok('and the Nook buzz', channelOf(freshRow, false).vibrate_timings?.join(',') === '0.000s,0.080s,0.070s,0.080s,0.070s,0.220s',
+     JSON.stringify(channelOf(freshRow, false).vibrate_timings));
+t.ok('a device with no channel info is treated as v1', buildMessage('tok', {}).message.android.notification.channel_id === 'messages');
+
+// Re-registering from an old APK after a downgrade must step back down.
+await api('/push/device', { method: 'POST', token: a.token, body: { token: fresh } });
+t.ok('re-registering without channels resets to v1',
+     (await devicesFor(a.id)).find((d) => d.token === fresh)?.channels === 1);
 
 /* ── sending with nothing configured ──────────────────────────────────── */
 

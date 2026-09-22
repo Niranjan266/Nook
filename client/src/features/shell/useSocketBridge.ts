@@ -7,6 +7,7 @@ import { useCall } from '@/stores/call';
 import { useUi } from '@/stores/ui';
 import { useAuth } from '@/stores/auth';
 import { playNudge, type SoundId } from '@/lib/sounds';
+import { buzz } from '@/lib/native';
 import { previewOf } from '@/lib/format';
 import * as notifier from '@/lib/notify';
 
@@ -79,7 +80,8 @@ export function useSocketBridge(enabled: boolean) {
     socket.on('nudge', ({ from }) => {
       playNudge();
       ui().toast(`${from.displayName} nudged you`);
-      if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+      // The message buzz played twice: unmistakably Nook, and more insistent.
+      void buzz('nudge');
     });
     socket.on('message:react', (m) => chat().onMessageUpdate(m));
     socket.on('message:snap-viewed', (m) => chat().onMessageUpdate(m));

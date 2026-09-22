@@ -55,14 +55,17 @@ router.post(
 router.post(
   '/device',
   asyncRoute(async (req, res) => {
-    const { token, platform } = z
+    const { token, platform, channels } = z
       .object({
         token: z.string().min(20).max(4096),
         platform: z.enum(['android', 'ios']).optional().default('android'),
+        // Which notification channels the APK has made. Installed old builds
+        // never send it, and they only have the v1 channels.
+        channels: z.number().int().min(1).max(9).optional().default(1),
       })
       .parse(req.body);
 
-    await saveDevice(req.user.id, token, platform);
+    await saveDevice(req.user.id, token, platform, channels);
     res.status(201).json({ ok: true });
   })
 );

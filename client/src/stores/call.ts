@@ -3,6 +3,7 @@ import { get as apiGet } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import type { Person } from '@/lib/types';
 import { startCallAudio, stopCallAudio, setCallSpeaker } from '@/lib/callaudio';
+import { buzz } from '@/lib/native';
 
 type Phase = 'idle' | 'dialing' | 'ringing' | 'connecting' | 'live' | 'ended';
 
@@ -61,8 +62,14 @@ async function iceConfig(): Promise<RTCConfiguration> {
   }
 }
 
-/** A soft two-tone ring, built with the Web Audio API — no asset to load. */
-function playRing(): { stop: () => void } {
+/**
+ * A two-tone ring, built with the Web Audio API — no asset to load.
+ *
+ * An incoming ring also buzzes the heartbeat pattern: a call that only plays
+ * a tone is easy to miss with the phone in a pocket. Dialling out does not —
+ * you are already holding the phone.
+ */
+function playRing(incoming = false): { stop: () => void } {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const gain = ctx.createGain();
@@ -79,7 +86,7 @@ function playRing(): { stop: () => void } {
         osc.type = 'sine';
         osc.frequency.value = freq;
         g.gain.setValueAtTime(0.0001, now + i * 0.22);
-        g.gain.exponentialRampToValueAtTime(0.06, now + i * 0.22 + 0.04);
+        g.gain.exponentialRampToValueAtTime(incoming ? 0.24 : 0.12, now + i * 0.22 + 0.04);
         g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.22 + 0.36);
         osc.connect(g);
         g.connect(ctx.destination);
@@ -89,9 +96,22 @@ function playRing(): { stop: () => void } {
       setTimeout(beat, 2400);
     };
     beat();
+
+    // The heartbeat is ~3.7s long, so it repeats on its own clock, not the tone's.
+    let shake: ReturnType<typeof setInterval> | null = null;
+    if (incoming) {
+      buzz('call');
+      shake = setInterval(() => !stopped && buzz('call'), 4600);
+    }
     return {
       stop() {
         stopped = true;
+        if (shake) clearInterval(shake);
+        try {
+          navigator.vibrate?.(0); // cut a pattern that is still playing
+        } catch {
+          /* no Vibration API */
+        }
         setTimeout(() => ctx.close().catch(() => {}), 500);
       },
     };
@@ -261,7 +281,7 @@ export const useCall = create<CallState>((set, get) => ({
       return;
     }
     pendingOffer = payload.sdp;
-    ringtone = playRing();
+    ringtone = playRing(true);
     set({
       phase: 'ringing',
       callId: payload.callId,

@@ -50,8 +50,15 @@ export function isNativeApp(): boolean {
  * Changing the sound therefore means a new channel id, which is why this one
  * is versioned.
  */
-async function ensureChannels() {
+async function ensureChannels(): Promise<1 | 2> {
   const { PushNotifications } = await import('@capacitor/push-notifications');
+
+  /**
+   * From 1.0.8 the APK makes louder `_v2` channels itself, natively, because
+   * only Java can give a channel a custom vibration pattern. Remaking the v1
+   * channels here would just bring back the duplicates it deleted.
+   */
+  if (await hasNativeChannels()) return 2;
 
   await PushNotifications.createChannel({
     id: 'messages',
@@ -76,6 +83,35 @@ async function ensureChannels() {
     lights: true,
     lightColor: '#C0603C',
   });
+  return 1;
+}
+
+/** The first APK whose MainActivity creates `messages_v2` and `calls_v2`. */
+const NATIVE_CHANNELS_BUILD = 10;
+
+/**
+ * Whether this install has the v2 channels. Asking Android is the real answer;
+ * the build number is the fallback if listing fails, never the other way round,
+ * since a channel the server names but the phone lacks drops the sound.
+ */
+async function hasNativeChannels(): Promise<boolean> {
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    const { channels } = await PushNotifications.listChannels();
+    return channels.some((c) => c.id === 'messages_v2');
+  } catch {
+    return (await nativeBuild()) >= NATIVE_CHANNELS_BUILD;
+  }
+}
+
+/** The APK's versionCode, or 0 when unknown. The web bundle is shared, the APK is not. */
+async function nativeBuild(): Promise<number> {
+  try {
+    const { App } = await import('@capacitor/app');
+    return Number((await App.getInfo()).build) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 let registered = false;
@@ -130,11 +166,12 @@ export async function registerNativePush(): Promise<'on' | 'denied' | 'unavailab
     }
     if (status.receive !== 'granted') return 'denied';
 
-    await ensureChannels();
+    // Sent with the token so the server only names channels this phone has.
+    const channels = await ensureChannels();
 
     // The token arrives asynchronously through an event, not a return value.
     await PushNotifications.addListener('registration', (token) => {
-      post('/push/device', { token: token.value, platform: 'android' }).catch(() => {
+      post('/push/device', { token: token.value, platform: 'android', channels }).catch(() => {
         /* retried on the next launch; a failure here is not worth a dialog */
       });
     });
@@ -220,12 +257,86 @@ export async function styleStatusBar(dark: boolean) {
 
 /** A real haptic tap, rather than the blunt vibration the web API gives. */
 export async function tap() {
+  if (isNativeApp()) {
+    try {
+      const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
+      await Haptics.impact({ style: ImpactStyle.Medium });
+      return;
+    } catch {
+      /* an old build without the plugin; the web buzz below still works */
+    }
+  }
+  try {
+    navigator.vibrate?.(12);
+  } catch {
+    /* iOS has no Vibration API at all */
+  }
+}
+
+/* ── the Nook buzz ──────────────────────────────────────────────────────── */
+
+/**
+ * Nook's vibration signature, in the web's [on, off, on, …] milliseconds.
+ *
+ * A message is knock-knock-thud: two quick taps and a longer one, so it can be
+ * told from any other app's buzz in a pocket without looking. A call is a
+ * heartbeat, lub-DUB, three times — long enough that it cannot be a message.
+ *
+ * Mirrored in MainActivity (the lock-screen channels) and server fcm.js
+ * (vibrate_timings for pre-Oreo phones). Change all three together.
+ */
+export const BUZZ = {
+  message: [80, 70, 80, 70, 220],
+  nudge: [80, 70, 80, 70, 220, 200, 80, 70, 80, 70, 220],
+  call: [180, 110, 420, 650, 180, 110, 420, 650, 180, 110, 420],
+} as const;
+
+export type BuzzKind = keyof typeof BUZZ;
+
+type NookBuzzPlugin = { pattern(o: { timings: number[] }): Promise<void> };
+let nookBuzz: NookBuzzPlugin | null | undefined;
+
+/**
+ * Play a buzz as strongly as this device allows.
+ *
+ * From 1.0.8 the APK has NookBuzz, which drives the motor at full amplitude —
+ * noticeably harder than the default strength both navigator.vibrate and the
+ * Haptics plugin use. Older APKs and browsers fall back to the web API, and a
+ * WebView without one steps through the pattern with Haptics pulses.
+ */
+export async function buzz(kind: BuzzKind) {
+  const pattern = [...BUZZ[kind]];
+
+  if (isNativeApp() && nookBuzz !== null) {
+    try {
+      if (!nookBuzz) {
+        const { registerPlugin } = await import('@capacitor/core');
+        nookBuzz = registerPlugin<NookBuzzPlugin>('NookBuzz');
+      }
+      // Android's own format leads with a delay before the first pulse.
+      await nookBuzz.pattern({ timings: [0, ...pattern] });
+      return;
+    } catch {
+      nookBuzz = null; // not in this build; stop asking
+    }
+  }
+
+  try {
+    if (navigator.vibrate?.(pattern)) return;
+  } catch {
+    /* iOS has no Vibration API; calling it there throws */
+  }
+
   if (!isNativeApp()) return;
   try {
-    const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
-    await Haptics.impact({ style: ImpactStyle.Light });
+    const { Haptics } = await import('@capacitor/haptics');
+    let at = 0;
+    pattern.forEach((ms, i) => {
+      if (i % 2 === 0) setTimeout(() => Haptics.vibrate({ duration: ms }).catch(() => {}), at);
+      at += ms;
+    });
   } catch {
-    /* not native */
+    /* nothing left that can move the motor */
   }
 }
 

@@ -104,19 +104,31 @@ async function accessToken() {
 /* ── send ─────────────────────────────────────────────────────────────────── */
 
 /**
- * Send to one device.
- *
- * Returns `'gone'` when the token is dead so the caller can delete it. A dead
- * token that is never cleaned up is retried on every message forever, and the
- * failures are invisible — the notification simply never arrives and nothing
- * says why.
+ * Nook's vibration signature, as FCM durations. Mirrors BUZZ in the client's
+ * lib/native.ts and MainActivity; change all three together. On Android 8+
+ * the channel owns the buzz and these are ignored — they are for older phones,
+ * where the notification itself carries it.
  */
-export async function sendToDevice(token, payload) {
-  const creds = credentials();
-  const bearer = await accessToken();
-  if (!creds || !bearer) return 'unconfigured';
+const BUZZ = {
+  message: [0, 80, 70, 80, 70, 220],
+  call: [0, 180, 110, 420, 650, 180, 110, 420, 650, 180, 110, 420],
+};
+const timings = (ms) => ms.map((n) => `${(n / 1000).toFixed(3)}s`);
 
-  const body = {
+/**
+ * The FCM message for one device.
+ *
+ * Split out from the send so the channel choice can be tested without a
+ * network. `device.channels` is what the APK told us it created: v2 channels
+ * only exist from 1.0.8, and naming a channel the phone lacks silently drops
+ * the custom sound.
+ */
+export function buildMessage(token, payload, device = {}) {
+  const v2 = Number(device.channels) >= 2;
+  const kind = payload.urgent ? 'call' : 'message';
+  const channel = (payload.urgent ? 'calls' : 'messages') + (v2 ? '_v2' : '');
+
+  return {
     message: {
       token,
       /**
@@ -137,19 +149,44 @@ export async function sendToDevice(token, payload) {
       android: {
         // High priority wakes the device out of Doze. A chat message is
         // exactly what this is for; anything routine should not use it.
-        priority: payload.urgent ? 'high' : 'high',
+        priority: 'high',
         notification: {
           // The channel carries the custom sound and the vibration pattern.
           // Naming it here rather than relying on the default is what makes a
           // per-app sound possible at all on Android 8 and later.
-          channel_id: payload.urgent ? 'calls' : 'messages',
+          channel_id: channel,
           tag: payload.tag || `nook-${payload.conversationId || 'general'}`,
           icon: 'ic_stat_nook',
           color: '#C0603C',
+          // Pre-Oreo has no channels, so the sound and buzz ride on the
+          // notification. Only for v2 builds: older APKs lack the _v2 sounds.
+          ...(v2 && {
+            sound: `nook_${kind}_v2`,
+            default_sound: false,
+            vibrate_timings: timings(BUZZ[kind]),
+            default_vibrate_timings: false,
+            visibility: 'PUBLIC',
+          }),
         },
       },
     },
   };
+}
+
+/**
+ * Send to one device.
+ *
+ * Returns `'gone'` when the token is dead so the caller can delete it. A dead
+ * token that is never cleaned up is retried on every message forever, and the
+ * failures are invisible — the notification simply never arrives and nothing
+ * says why.
+ */
+export async function sendToDevice(token, payload, device = {}) {
+  const creds = credentials();
+  const bearer = await accessToken();
+  if (!creds || !bearer) return 'unconfigured';
+
+  const body = buildMessage(token, payload, device);
 
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${creds.project_id}/messages:send`,

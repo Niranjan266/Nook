@@ -14,24 +14,21 @@
  * unread count in the tab title.
  */
 import { playSound, type SoundId } from './sounds';
+import { buzz as nookBuzz } from './native';
 
 /**
- * A short buzz, for the case a sound cannot cover: a phone on silent, or in a
- * pocket. Two taps rather than one long one — a single long buzz reads as a
- * call, which is a bigger claim on attention than a message deserves.
+ * A buzz, for the case a sound cannot cover: a phone on silent, or in a
+ * pocket. Nook's knock-knock-thud rather than one long pulse — a single long
+ * buzz reads as a call, which is a bigger claim on attention than a message
+ * deserves.
  *
- * Guarded because Safari and every iOS browser have no Vibration API at all,
- * and calling it there throws. It is also ignored by browsers until the page
- * has been interacted with, which is correct and needs no handling: a page
- * nobody has touched has no business buzzing.
+ * Browsers ignore it until the page has been interacted with, which is
+ * correct and needs no handling: a page nobody has touched has no business
+ * buzzing. iOS has no Vibration API at all; nookBuzz guards for that.
  */
 function buzz(wanted?: boolean) {
   if (wanted === false) return;
-  try {
-    navigator.vibrate?.([60, 45, 60]);
-  } catch {
-    /* not supported here; the sound and the banner still happen */
-  }
+  void nookBuzz('message');
 }
 
 let unread = 0;

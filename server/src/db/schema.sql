@@ -531,3 +531,12 @@ CREATE TABLE IF NOT EXISTS media_uploads (
   user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   created_at INTEGER NOT NULL
 );
+
+-- Which notification channels a device's APK has created.
+--
+-- Android freezes a channel's sound and vibration once it exists, so louder
+-- sounds and the Nook buzz meant new channel ids (messages_v2, calls_v2),
+-- made natively from 1.0.8 on. Naming a channel the phone lacks drops the
+-- custom sound, and old APKs stay installed for months — so the app says what
+-- it has when it registers, and old rows default to the v1 channels.
+ALTER TABLE push_devices ADD COLUMN channels INTEGER NOT NULL DEFAULT 1;
