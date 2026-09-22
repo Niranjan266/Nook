@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion';
 import { useChat } from '@/stores/chat';
 import { useFriends } from '@/stores/friends';
 import { useAuth } from '@/stores/auth';
@@ -36,6 +36,8 @@ import {
   IconChecklist,
 } from '@/components/Icon';
 import PollBuilder, { type BuilderKind, type BuiltPoll, type BuiltList } from './PollBuilder';
+import RecordingBar, { waveformOf, recRowVariants, CANCEL_AT, LOCK_AT, type RecEnd } from './RecordingBar';
+import { tap } from '@/lib/native';
 
 interface Props {
   conversationId: string;
@@ -114,6 +116,15 @@ export default function Composer({ conversationId }: Props) {
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
   const [levels, setLevels] = useState<number[]>([]);
+  /** 'hold' while a finger is on the mic; 'locked' once it is hands-free. */
+  const [recMode, setRecMode] = useState<'hold' | 'locked'>('locked');
+  /** Why the recording row is leaving, read by its exit animation. */
+  const [recEnd, setRecEnd] = useState<RecEnd>('send');
+  const level = useMotionValue(0);
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
+  /** Every peak of the recording, for the waveform the note is saved with. */
+  const peaks = useRef<number[]>([]);
 
   const textarea = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -139,6 +150,7 @@ export default function Composer({ conversationId }: Props) {
    */
   useEffect(
     () => () => {
+      endGesture.current?.();
       window.clearInterval(recTimer.current);
       if (analyser.current) {
         cancelAnimationFrame(analyser.current.raf);
@@ -365,7 +377,7 @@ export default function Composer({ conversationId }: Props) {
 
   /* ── voice notes ──────────────────────────────────────────────────────── */
 
-  async function startRecording() {
+  async function startRecording(): Promise<boolean> {
     let stream: MediaStream | null = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -380,6 +392,7 @@ export default function Composer({ conversationId }: Props) {
       setRecording(true);
       setRecSeconds(0);
       setLevels([]);
+      peaks.current = [];
 
       recTimer.current = window.setInterval(() => setRecSeconds((s) => s + 1), 1000);
 
@@ -394,14 +407,21 @@ export default function Composer({ conversationId }: Props) {
       node.fftSize = 512;
       src.connect(node);
       const data = new Uint8Array(node.frequencyBinCount);
+      let frame = 0;
       const tick = () => {
         node.getByteTimeDomainData(data);
         let peak = 0;
         for (const v of data) peak = Math.max(peak, Math.abs(v - 128) / 128);
-        setLevels((l) => [...l.slice(-45), Math.max(0.08, peak)]);
+        const v = Math.max(0.08, peak);
+        // Every frame moves the rings (a style write); every fourth adds a
+        // bar (a render). Sixty renders a second was the composer's whole budget.
+        level.set(v);
+        peaks.current.push(v);
+        if (++frame % 4 === 0) setLevels((l) => [...l.slice(-47), v]);
         analyser.current!.raf = requestAnimationFrame(tick);
       };
       analyser.current = { ctx, node, raf: requestAnimationFrame(tick) };
+      return true;
     } catch (err: any) {
       // Permission may have been granted and something later failed; either
       // way the mic must not stay open behind a toast saying it was refused.
@@ -417,6 +437,89 @@ export default function Composer({ conversationId }: Props) {
         true
       );
     }
+    return false;
+  }
+
+  /**
+   * Hold to record, let go to send; slide left to cancel, up to lock.
+   *
+   * Listened for on the window, not the button: the mic button is replaced by
+   * the recording row the moment recording starts, and a listener on the
+   * element that was pressed would go with it, leaving the finger nowhere to
+   * be let go. A quick tap still means what it always did — start, and keep
+   * going hands-free — so nobody who learned the old way is caught out.
+   */
+  const endGesture = useRef<(() => void) | null>(null);
+  /**
+   * The gesture's listeners are made at the press and outlive that render.
+   * Calling stopRecording from their closure used the press-time state — a
+   * timer at 0:00 — so every held note was thrown away as too short. They call
+   * the latest one through this instead.
+   */
+  const stopLatest = useRef<(discard?: boolean) => void>(() => {});
+  function onMicDown(e: React.PointerEvent) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    endGesture.current?.();
+    const g = { x: e.clientX, y: e.clientY, at: Date.now(), done: false };
+    dragX.set(0);
+    dragY.set(0);
+    setRecMode('hold');
+    tap();
+
+    const finish = () => {
+      if (g.done) return;
+      g.done = true;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', lost);
+      endGesture.current = null;
+      animate(dragX, 0, { type: 'spring', stiffness: 500, damping: 34 });
+      animate(dragY, 0, { type: 'spring', stiffness: 500, damping: 34 });
+    };
+    const move = (ev: PointerEvent) => {
+      if (g.done || !recorder.current) return; // still waiting on the permission prompt
+      const dx = Math.min(0, ev.clientX - g.x);
+      const dy = Math.min(0, ev.clientY - g.y);
+      // One direction at a time: a drag is a cancel or a lock, never both.
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        dragX.set(dx);
+        dragY.set(0);
+      } else {
+        dragY.set(dy);
+        dragX.set(0);
+      }
+      if (dx < CANCEL_AT) {
+        finish();
+        tap();
+        stopLatest.current(true);
+      } else if (dy < LOCK_AT) {
+        finish();
+        tap();
+        setRecMode('locked');
+      }
+    };
+    const up = () => {
+      if (g.done) return;
+      finish();
+      // A tap, or a release before the mic was even granted: hands-free.
+      if (Date.now() - g.at < 350 || !recorder.current) setRecMode('locked');
+      else stopLatest.current(false);
+    };
+    // The system took the touch (a call, a scroll): keep what was recorded.
+    const lost = () => {
+      if (g.done) return;
+      finish();
+      setRecMode('locked');
+    };
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', lost);
+    endGesture.current = finish;
+    startRecording().then((ok) => {
+      if (!ok) finish();
+    });
   }
 
   function stopRecording(discard = false) {
@@ -430,7 +533,12 @@ export default function Composer({ conversationId }: Props) {
     if (!rec) return setRecording(false);
 
     const seconds = recSeconds;
-    const wave = levels.slice(-44);
+    // The whole note, not the last second of it: slicing the live meter kept
+    // only its tail, so a minute-long message was drawn from its final breath.
+    const wave = waveformOf(peaks.current);
+    peaks.current = [];
+    setRecEnd(discard ? 'discard' : 'send');
+    level.set(0);
 
     const pendingTranscript = transcriber.current
       ? discard
@@ -482,6 +590,7 @@ export default function Composer({ conversationId }: Props) {
     rec.stop();
     recorder.current = null;
   }
+  stopLatest.current = stopRecording;
 
   /**
    * A chat you may not write in yet gets a panel instead of a text box.
@@ -611,31 +720,23 @@ export default function Composer({ conversationId }: Props) {
         )}
       </AnimatePresence>
 
+      <AnimatePresence mode="popLayout" initial={false} custom={recEnd}>
       {recording ? (
-        <div className="composer-row">
-          <button className="clay-round" onClick={() => stopRecording(true)} aria-label="Discard recording">
-            <IconTrash />
-          </button>
-          <div className="rec-bar">
-            <span className="rec-dot" />
-            <span className="tabular small">{duration(recSeconds)}</span>
-            {liveTranscript ? (
-              <span className="small truncate grow" style={{ opacity: 0.8, fontStyle: 'italic' }}>
-                {liveTranscript}
-              </span>
-            ) : (
-              <span className="rec-live-wave">
-                {levels.slice(-40).map((v, i) => (
-                  <i key={i} style={{ height: `${Math.min(100, v * 130)}%` }} />
-                ))}
-              </span>
-            )}
-          </div>
-          <button className="composer-send recording" onClick={() => stopRecording(false)} aria-label="Send voice message">
-            <IconSend size={21} />
-          </button>
-        </div>
+        <motion.div key="rec" custom={recEnd} variants={recRowVariants} initial="initial" animate="enter" exit="exit">
+          <RecordingBar
+            seconds={recSeconds}
+            levels={levels}
+            level={level}
+            mode={recMode}
+            dragX={dragX}
+            dragY={dragY}
+            transcript={liveTranscript}
+            onDiscard={() => stopRecording(true)}
+            onSend={() => stopRecording(false)}
+          />
+        </motion.div>
       ) : (
+        <motion.div key="type" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.16 } }} exit={{ opacity: 0, transition: { duration: 0.08 } }}>
         <div className="composer-row" style={{ position: 'relative' }}>
           <button
             className={`clay-round${attachOpen ? ' on' : ''}`}
@@ -879,16 +980,26 @@ export default function Composer({ conversationId }: Props) {
             </button>
           ) : (
             <button
-              className="composer-send"
-              onClick={startRecording}
+              className="composer-send mic-hold"
+              onPointerDown={onMicDown}
+              // Keyboard and switch access have no "hold": a click with no
+              // pointer behind it starts a hands-free recording.
+              onClick={(e) => {
+                if (e.detail !== 0) return;
+                setRecMode('locked');
+                startRecording();
+              }}
+              onContextMenu={(e) => e.preventDefault()}
               aria-label="Record a voice message"
-              title="Hold a thought — record a voice message"
+              title="Hold to record — slide left to cancel, up to lock"
             >
               <IconMic size={21} />
             </button>
           )}
         </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       <input
         ref={imageInput}

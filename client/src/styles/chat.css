@@ -1326,9 +1326,167 @@
 }
 .rec-live-wave i {
   flex: 1;
-  background: var(--ink-faint);
+  background: color-mix(in srgb, var(--rust) 55%, var(--ink-faint));
   border-radius: 2px;
   min-height: 3px;
+  transition: height 90ms linear;
+}
+/* The newest bar grows up out of the line, so the wave reads as arriving. */
+.rec-live-wave i.fresh {
+  background: var(--rust);
+  animation: rec-bar-in 160ms var(--ease-out, ease-out);
+  transform-origin: center;
+}
+@keyframes rec-bar-in {
+  from {
+    transform: scaleY(0.2);
+  }
+}
+
+/* ── voice recording: hold, slide, lock ─────────────────────────────────── */
+
+.rec-row {
+  position: relative;
+}
+.rec-bin {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--rust);
+}
+.rec-time {
+  display: inline-flex;
+  min-width: 3.2ch;
+  font-variant-numeric: tabular-nums;
+}
+/* Each digit rolls in its own window, so 0:09 → 0:10 turns two wheels. */
+.rec-digit {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  height: 1.3em;
+  line-height: 1.3em;
+}
+.rec-digit > span {
+  display: inline-block;
+}
+.rec-slide-window {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  /* Fades out at the left edge, where the timer is. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px);
+  mask-image: linear-gradient(to right, transparent 0, #000 28px);
+  padding-left: 12px;
+}
+.rec-slide {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.rec-slide-chev {
+  font-size: 1.3em;
+  line-height: 1;
+  animation: rec-nudge 1.2s ease-in-out infinite;
+}
+@keyframes rec-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-5px);
+  }
+}
+.rec-transcript {
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.rec-action {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.rec-action .composer-send {
+  position: relative;
+  z-index: 2;
+}
+.rec-icon {
+  display: grid;
+  place-items: center;
+}
+/* Rings behind the button breathe with the voice: louder, wider. */
+.rec-rings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.rec-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--rust);
+  pointer-events: none;
+  z-index: 1;
+}
+.rec-ring-inner {
+  opacity: 0.28;
+}
+.rec-lock {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  margin-left: -17px;
+  width: 34px;
+  padding: 8px 0 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--clay-raised);
+  box-shadow: var(--clay-2);
+  color: var(--ink-soft);
+  z-index: 3;
+}
+.rec-lock-arrow {
+  font-size: 12px;
+  line-height: 1;
+  animation: rec-rise 1.2s ease-in-out infinite;
+}
+@keyframes rec-rise {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+/* A finger on the mic must not scroll the chat or open the long-press menu. */
+.mic-hold {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-live-wave i,
+  .rec-live-wave i.fresh,
+  .rec-slide-chev,
+  .rec-lock-arrow {
+    animation: none;
+    transition: none;
+  }
 }
 
 /* ── lightbox ───────────────────────────────────────────────────────────── */
