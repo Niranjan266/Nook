@@ -785,6 +785,12 @@ export default function FrontDoor() {
       <p className="door-note">
         Nook has no feed, no reels, no stories and no strangers. Messages are encrypted in transit
         and never used to train anything.
+        <span className="door-credit">
+          Made by{' '}
+          <a href="https://www.niranjand.in" rel="author">
+            Niranjan D
+          </a>
+        </span>
       </p>
 
       {/*

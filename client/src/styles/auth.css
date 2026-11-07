@@ -569,6 +569,17 @@
   line-height: 1.6;
 }
 
+.door-credit {
+  display: block;
+  margin-top: var(--s-2);
+}
+.door-credit a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* username availability, inline */
 .door-avail {
   display: flex;
